@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RunSmart Training Planner</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="hero">
+      <nav class="nav">
+        <div class="logo">RunSmart</div>
+        <div class="nav-links">
+          <a href="#planning">Planning</a>
+          <a href="#insights">Insights</a>
+          <a href="#data">Data</a>
+          <a href="#roadmap">Roadmap</a>
+        </div>
+        <div class="nav-actions">
+          <button class="ghost" data-action="signin">Sign in</button>
+          <button class="cta" data-action="start-plan">Start Plan</button>
+          <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false">
+            ☰
+          </button>
+        </div>
+      </nav>
+      <div class="mobile-nav" hidden>
+        <a href="#planning">Planning</a>
+        <a href="#insights">Insights</a>
+        <a href="#data">Data</a>
+        <a href="#roadmap">Roadmap</a>
+      </div>
+      <div class="hero-content">
+        <div>
+          <p class="eyebrow">AI-guided endurance training</p>
+          <h1>Plan smarter, adapt faster, and train with clarity.</h1>
+          <p class="subhead">
+            RunSmart blends evidence-informed coaching with real-life constraints so every training block
+            feels achievable, personalized, and explainable.
+          </p>
+          <div class="hero-actions">
+            <button class="cta" data-action="generate-plan">Generate a plan</button>
+            <button class="ghost" data-action="sample-week">View sample week</button>
+          </div>
+        </div>
+        <div class="hero-card">
+          <h3>Next Goal Race</h3>
+          <p class="muted">Trail 50K • 18 weeks out</p>
+          <div class="card-grid">
+            <div>
+              <span class="label">Weekly focus</span>
+              <strong>Base 2</strong>
+            </div>
+            <div>
+              <span class="label">Mileage</span>
+              <strong>42–48 mi</strong>
+            </div>
+            <div>
+              <span class="label">Key workout</span>
+              <strong>Progression long run</strong>
+            </div>
+            <div>
+              <span class="label">Readiness</span>
+              <strong class="positive">On track</strong>
+            </div>
+          </div>
+          <p class="card-note">
+            "You handled last week well. Keep the mid-week intensity controlled to stay fresh for the long run."
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="planning" class="section">
+        <div class="section-header">
+          <h2>Training plan generator</h2>
+          <p>
+            Build goal-oriented blocks with progression guardrails, realistic scheduling, and transparent coaching
+            rationale.
+          </p>
+        </div>
+        <div class="planning-grid">
+          <div class="grid">
+            <article>
+              <h4>Macro block builder</h4>
+              <p>Base → Build → Peak → Taper sequencing tuned to your race distance and terrain.</p>
+            </article>
+            <article>
+              <h4>Weekly structure</h4>
+              <p>Long runs, intensity, and recovery days aligned to your travel and workload constraints.</p>
+            </article>
+            <article>
+              <h4>Explainable adjustments</h4>
+              <p>Every change is tied to fatigue, consistency, and execution feedback.</p>
+            </article>
+          </div>
+          <form class="plan-form" aria-label="Generate training plan">
+            <h3>Quick plan builder</h3>
+            <label>
+              Goal race
+              <input type="text" name="race" placeholder="Trail 50K" required />
+            </label>
+            <label>
+              Race date
+              <input type="date" name="date" required />
+            </label>
+            <label>
+              Weekly availability
+              <select name="availability">
+                <option value="5">5 days</option>
+                <option value="6">6 days</option>
+                <option value="7">7 days</option>
+              </select>
+            </label>
+            <label>
+              Current weekly mileage
+              <input type="number" name="mileage" min="10" max="120" value="40" />
+            </label>
+            <label>
+              Key constraints
+              <textarea name="constraints" rows="3" placeholder="Work travel in week 6, prefer long runs on Sundays"></textarea>
+            </label>
+            <button class="cta" type="submit">Create draft plan</button>
+            <p class="form-note" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="insights" class="section accent">
+        <div class="section-header">
+          <h2>Training analysis & insights</h2>
+          <p>Understand readiness, spot risk early, and see the impact of your consistency.</p>
+        </div>
+        <div class="insight-cards">
+          <div class="insight">
+            <span class="pill">Training load</span>
+            <h4>Acute vs chronic balance</h4>
+            <p>Visualize fatigue and form trends so you can confidently push or recover.</p>
+          </div>
+          <div class="insight">
+            <span class="pill">Performance</span>
+            <h4>Race readiness forecast</h4>
+            <p>Track VO₂max trends, long-run durability, and race-specific confidence signals.</p>
+          </div>
+          <div class="insight">
+            <span class="pill">Risk</span>
+            <h4>Overtraining alerts</h4>
+            <p>Detect sudden spikes and missed recovery before they derail the block.</p>
+          </div>
+        </div>
+        <div class="insight-summary">
+          <div>
+            <h4>Latest check-in</h4>
+            <p class="muted">
+              \"Consistency is strong. Keep intensity in check this week to absorb the last long run.\"
+            </p>
+          </div>
+          <div class="stats">
+            <div>
+              <span class="label">Form trend</span>
+              <strong>+4.2</strong>
+            </div>
+            <div>
+              <span class="label">Readiness</span>
+              <strong class="positive">Green</strong>
+            </div>
+            <div>
+              <span class="label">Risk score</span>
+              <strong>Low</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="data" class="section">
+        <div class="section-header">
+          <h2>Reliable data ingestion</h2>
+          <p>Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
+        </div>
+        <div class="data-panel">
+          <div>
+            <h4>Connected sources</h4>
+            <ul>
+              <li>Strava activity sync</li>
+              <li>Manual run + cross-training entry</li>
+              <li>Heart-rate &amp; elevation support</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Privacy-first storage</h4>
+            <p>Firebase-backed, athlete-owned data with future multi-user expansion in mind.</p>
+            <button class="ghost" data-action="policy">Review data policy</button>
+          </div>
+          <div>
+            <h4>Sync health</h4>
+            <div class="sync-list">
+              <div>
+                <span class="label">Last sync</span>
+                <strong>Today, 6:42 AM</strong>
+              </div>
+              <div>
+                <span class="label">Activities imported</span>
+                <strong>18 this week</strong>
+              </div>
+              <div>
+                <span class="label">Gaps detected</span>
+                <strong>0</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap" class="section">
+        <div class="section-header">
+          <h2>Roadmap for future expansion</h2>
+          <p>Designed for single-athlete focus today, ready for collaborative coaching tomorrow.</p>
+        </div>
+        <div class="timeline">
+          <div>
+            <h4>Now</h4>
+            <p>Personal training optimization with explainable AI guidance.</p>
+          </div>
+          <div>
+            <h4>Next</h4>
+            <p>Coach-athlete sharing, injury prediction, and recovery integrations.</p>
+          </div>
+          <div>
+            <h4>Later</h4>
+            <p>Nutrition insights, sleep data, and smarter route intelligence.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>
+        <strong>RunSmart</strong>
+        <p>Evidence-informed training guidance for endurance runners.</p>
+      </div>
+      <div class="footer-links">
+        <span>Support</span>
+        <span>Privacy</span>
+        <span>Contact</span>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

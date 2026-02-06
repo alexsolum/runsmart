@@ -1,19 +1,57 @@
 # agents.md — AI Agents for Running Training Planning App
 
 ## Purpose of the Application
-This application helps plan, monitor, and adapt endurance running training toward specific goal races.  
-It focuses on structured periodization, balancing training load with real-life constraints (travel, work, family, events), and providing AI-guided coaching insights.
 
-Primary use is personal training optimization, but architecture should allow future sharing with a small group of runners.
+This application supports structured endurance running training toward goal races by combining:
+
+- AI-assisted training planning
+- Real-life schedule awareness (travel, events, work, etc.)
+- Training analytics and performance insights
+- Continuous adjustment recommendations
+
+Primary use is personal training optimization, with potential future sharing among a small group of runners.
 
 Core capabilities:
 
-- Training block planning toward goal races
+- Training block planning toward races
 - Weekly training planning with progression guidance
 - AI-generated workout suggestions
-- Integration with Strava training data
-- Training analytics and performance insights
-- Continuous adjustment recommendations based on training execution
+- Strava training data ingestion
+- Training analytics dashboards
+- Adaptive coaching feedback based on executed training
+
+
+---
+
+## Hosting & Architecture Context
+
+### Frontend
+
+- Static web app hosted on GitHub Pages
+- Mobile-friendly viewing required
+- Client interacts directly with Supabase backend
+
+Recommended framework:
+
+- React + Vite (preferred)
+- Alternative frameworks acceptable if static export compatible
+
+
+### Backend
+
+Supabase platform providing:
+
+- PostgreSQL database
+- Authentication
+- Edge Functions for secure server logic
+- Storage (optional future use)
+
+Edge Functions must be used for:
+
+- API key protection
+- AI agent execution
+- Strava secure integrations
+- Background processing
 
 
 ---
@@ -21,24 +59,22 @@ Core capabilities:
 ## Core Design Principles
 
 1. Athlete-first usability
-   - Plans must be practical and realistic within normal life constraints.
-   - Avoid overly aggressive training increases.
+   Training must fit real life, not dominate it.
 
 2. Evidence-informed coaching
-   - Follow structured endurance training principles.
-   - Default methodology: Jason Koop–inspired periodization.
+   Default methodology inspired by Jason Koop structured endurance training.
 
-3. Explainable AI guidance
-   - Agents should explain reasoning behind recommendations.
+3. Explainable AI
+   Agents must provide reasoning alongside recommendations.
 
-4. Progressive refinement
-   - Plans should evolve based on training execution data.
+4. Progressive adaptation
+   Plans evolve based on executed training and feedback.
 
-5. Single-user first, extensible later
-   - Architecture should support future multi-user expansion without premature complexity.
+5. Data ownership
+   Athlete controls their training data.
 
-6. Privacy-first data mindset
-   - Training data belongs to the athlete.
+6. Single-user first
+   Architecture should support future multi-user expansion without premature complexity.
 
 
 ---
@@ -47,39 +83,40 @@ Core capabilities:
 
 ### 1. Training Plan Generator Agent
 
-**Purpose:**
-Create structured training plans aligned with a goal race and life constraints.
+**Purpose**
 
-**Responsibilities:**
+Generate structured training plans aligned with goal races, lifestyle constraints, and recent training data.
+
+**Responsibilities**
 
 - Generate macro training blocks:
   - Base
   - Build
   - Peak
   - Taper
-- Generate weekly plans within blocks.
-- Suggest key workouts:
+- Generate weekly training plans.
+- Recommend key workouts:
   - Long runs
   - Intensity sessions
   - Recovery runs
-- Adjust plans based on:
-  - Fatigue trends
-  - Completed training
+- Adapt plans based on:
+  - Training load trends
   - Schedule constraints
+  - Athlete feedback
   - Goal race characteristics.
 
-**Inputs:**
+**Inputs**
 
-- Goal race info (date, distance, terrain)
+- Goal race details
+- Training history (Strava/manual)
 - Athlete context
 - Life calendar constraints
-- Recent training load
-- Historical Strava data
-- Athlete feedback/comments.
+- Analytics outputs
+- Weekly reflections.
 
-**Outputs:**
+**Outputs**
 
-- Training blocks timeline
+- Training block timelines
 - Weekly mileage targets
 - Suggested workouts
 - Coaching rationale.
@@ -89,146 +126,174 @@ Create structured training plans aligned with a goal race and life constraints.
 
 ### 2. Training Analysis Agent
 
-**Purpose:**
-Analyze completed training and provide coaching insights.
+**Purpose**
 
-**Responsibilities:**
+Analyze executed training and provide actionable coaching insights.
 
-- Compute training load metrics:
-  - Acute training load
-  - Chronic training load
-  - Fatigue/form modelling
-- Estimate performance indicators:
-  - VO₂max trends
-  - Race readiness
-  - Long-run preparedness
-- Detect risks:
-  - Overtraining signals
-  - Undertraining patterns
-- Provide forward-looking recommendations.
+**Responsibilities**
 
-**Inputs:**
+Compute and monitor:
 
-- Strava training data
-- Manual training logs
-- Athlete weekly reflections
+- Acute training load (ATL)
+- Chronic training load (CTL)
+- Fatigue/form modelling
+- VO₂max estimation trends
+- Race readiness indicators
+- Long-run preparedness.
+
+Detect:
+
+- Overtraining risk
+- Undertraining patterns
+- Training consistency trends.
+
+Provide:
+
+- Adjustment recommendations
+- Race predictions
+- Performance insights.
+
+**Inputs**
+
+- Activity data (Strava/manual)
+- Weekly athlete feedback
 - Planned vs executed training.
 
-**Outputs:**
+**Outputs**
 
-- Performance trend analysis
-- Adjustment suggestions
-- Race predictions
-- Readiness indicators.
+- Performance trend summaries
+- Recommendations
+- Risk indicators.
 
 
 ---
 
 ### 3. Data Ingestion Agent
 
-**Purpose:**
-Collect and normalize training data.
+**Purpose**
 
-**Responsibilities:**
+Ensure reliable ingestion, normalization, and storage of training data.
 
-- Integrate with Strava API.
+**Responsibilities**
+
+- Integrate with Strava API via Edge Functions.
 - Support manual workout entry.
 - Normalize activity data for analytics.
-- Ensure reliable data syncing.
+- Maintain consistent data quality.
 
-**Key data types:**
+**Key Data Types**
 
 - Distance
 - Duration
 - Elevation
 - Pace
 - Heart rate (if available)
-- Workout type classification.
+- Workout classification
+- Subjective effort.
 
-**Design notes:**
-
-- Must tolerate incomplete data.
-- Should support future wearable integrations.
-
-
----
-
-## Technology Context
-
-### Platform
-
-- Web-first application
-- Mobile-friendly viewing required
-
-### Backend
-
-- Firebase (authentication, backend logic, database)
-
-### Database
-
-- Firebase Firestore preferred
-
-### Visualization
-
-Preferred:
-
-- Plotly for fast interactive analytics dashboards.
-
-Optional later:
-
-- D3 for advanced custom visualizations.
+Design must tolerate incomplete or inconsistent data.
 
 
 ---
 
 ## Training Methodology Assumptions
 
-The system should default to:
+Default methodology:
 
 - Structured periodization
-- Emphasis on endurance sports physiology
-- Long-run centric training for ultra/endurance focus
-- Progressive overload balanced with recovery
-- Real-life schedule integration.
+- Long-run centric endurance focus
+- Progressive overload with recovery balance
+- Real-life schedule integration
+- Emphasis on injury prevention.
 
 Agents should avoid:
 
 - Sudden mileage spikes
-- Unrealistic weekly structures
-- Overly rigid coaching prescriptions.
+- Overly rigid training structures
+- Ignoring athlete fatigue signals.
 
 
 ---
 
-## AI Behavior Guidelines
+## Data Model Guidance (Supabase/Postgres)
+
+Primary tables expected:
+
+- users
+- goal_races
+- training_blocks
+- weekly_plans
+- activities
+- analytics_snapshots
+- athlete_feedback
+
+SQL schema should prioritize:
+
+- Time-series querying efficiency
+- Analytics flexibility
+- Clear relational links.
+
+
+---
+
+## Visualization Strategy
+
+Preferred:
+
+- Plotly for training dashboards.
+
+Possible future:
+
+- D3 for advanced visual analytics.
+
+
+---
+
+## AI Agent Behavior Guidelines
 
 Agents should:
 
 - Provide actionable recommendations.
-- Explain reasoning briefly.
-- Prioritize clarity over technical jargon.
-- Adjust recommendations when new data arrives.
+- Explain reasoning concisely.
+- Adapt recommendations continuously.
+- Account for incomplete compliance.
 
 Agents should not:
 
-- Assume perfect training compliance.
 - Overfit to short-term performance swings.
-- Ignore athlete lifestyle constraints.
+- Assume perfect execution.
+- Ignore life constraints.
 
 
 ---
 
 ## Planning Granularity
 
-Two separate AI planning layers:
+Two distinct planning layers:
 
-1. Training Block Planning:
-   - Months-level structure.
-   - Race-oriented.
+### 1. Training Block Planning
 
-2. Weekly Planning:
-   - Tactical execution.
-   - Adaptive based on recent training.
+- Months-level planning
+- Race-oriented
+- Periodization structure.
+
+### 2. Weekly Planning
+
+- Tactical execution
+- Adaptive to recent training.
+
+
+---
+
+## Security & Integration Requirements
+
+All sensitive operations must run through Supabase Edge Functions:
+
+- Strava API authentication
+- AI API interactions
+- Secure data processing.
+
+Frontend must never expose secrets.
 
 
 ---
@@ -236,19 +301,19 @@ Two separate AI planning layers:
 ## Future Expansion Possibilities
 
 - Multi-athlete support
-- Coach-athlete sharing
-- Injury prediction models
+- Social sharing of plans
+- Injury prediction modelling
 - Nutrition integration
-- Sleep/recovery data integration
-- Route recommendation intelligence.
+- Sleep/recovery integration
+- Advanced race simulation.
 
 
 ---
 
-## Non-Goals (for now)
+## Non-Goals (Current Phase)
 
 - Full coaching replacement
-- Public SaaS scaling
+- Large-scale SaaS deployment
 - Real-time wearable analytics
 - Complex social features.
 
@@ -259,8 +324,9 @@ Two separate AI planning layers:
 
 The system should help:
 
-- Maintain consistent training progression.
-- Balance training with life.
-- Improve race readiness.
-- Reduce injury risk.
-- Provide motivating, useful coaching insights.
+- Maintain consistent training progression
+- Balance training with life commitments
+- Improve race readiness
+- Reduce injury risk
+- Provide motivating and useful coaching insights.
+

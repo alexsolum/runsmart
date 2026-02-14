@@ -352,6 +352,236 @@ h1 {
   color: var(--muted);
 }
 
+/* Auth modal */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  margin: 16px;
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.2);
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.modal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.modal-tab {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.modal-tab.active {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.auth-form input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font: inherit;
+}
+
+.auth-error {
+  margin: 0;
+  font-size: 14px;
+  color: #dc2626;
+  min-height: 20px;
+}
+
+/* User email in nav */
+
+.user-email {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* My Plans */
+
+.my-plans {
+  margin-top: 32px;
+}
+
+.my-plans h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.plans-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.plan-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.plan-card-header h4 {
+  margin: 0;
+}
+
+.plan-delete {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.plan-delete:hover {
+  color: #dc2626;
+}
+
+.plan-card-details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.plan-card-constraints {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.plan-card-date {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Strava panel */
+
+.strava-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+#activities-section {
+  margin-top: 32px;
+}
+
+#activities-section h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.activities-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.activity-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.activity-card h4 {
+  margin: 0 0 4px;
+}
+
+.activity-card-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.activity-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.activity-card-date {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+
+.sync-status {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
 @media (max-width: 900px) {
   .hero,
   .section,

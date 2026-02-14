@@ -11,6 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   </head>
   <body>
     <header class="hero">
@@ -23,7 +24,9 @@
           <a href="#roadmap">Roadmap</a>
         </div>
         <div class="nav-actions">
-          <button class="ghost" data-action="signin">Sign in</button>
+          <span class="user-email" id="user-email" hidden></span>
+          <button class="ghost" data-action="signin" id="signin-btn">Sign in</button>
+          <button class="ghost" data-action="signout" id="signout-btn" hidden>Sign out</button>
           <button class="cta" data-action="start-plan">Start Plan</button>
           <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false">
             ☰
@@ -131,6 +134,10 @@
             <p class="form-note" role="status" aria-live="polite"></p>
           </form>
         </div>
+        <div class="my-plans" id="my-plans" hidden>
+          <h3>My plans</h3>
+          <div class="plans-list" id="plans-list"></div>
+        </div>
       </section>
 
       <section id="insights" class="section accent">
@@ -195,26 +202,36 @@
           </div>
           <div>
             <h4>Privacy-first storage</h4>
-            <p>Firebase-backed, athlete-owned data with future multi-user expansion in mind.</p>
+            <p>Supabase-backed, athlete-owned data with row-level security.</p>
             <button class="ghost" data-action="policy">Review data policy</button>
           </div>
-          <div>
-            <h4>Sync health</h4>
-            <div class="sync-list">
-              <div>
-                <span class="label">Last sync</span>
-                <strong>Today, 6:42 AM</strong>
+          <div id="strava-panel">
+            <h4>Strava</h4>
+            <div id="strava-disconnected">
+              <p class="muted">Connect your Strava account to import training data.</p>
+              <button class="cta" id="strava-connect-btn">Connect Strava</button>
+            </div>
+            <div id="strava-connected" hidden>
+              <div class="sync-list">
+                <div>
+                  <span class="label">Status</span>
+                  <strong class="positive">Connected</strong>
+                </div>
+                <div>
+                  <span class="label">Last sync</span>
+                  <strong id="last-sync-time">Never</strong>
+                </div>
               </div>
-              <div>
-                <span class="label">Activities imported</span>
-                <strong>18 this week</strong>
-              </div>
-              <div>
-                <span class="label">Gaps detected</span>
-                <strong>0</strong>
+              <div class="strava-actions">
+                <button class="cta" id="strava-sync-btn">Sync now</button>
+                <button class="ghost" id="strava-disconnect-btn">Disconnect</button>
               </div>
             </div>
           </div>
+        </div>
+        <div id="activities-section" hidden>
+          <h3>Recent activities</h3>
+          <div class="activities-list" id="activities-list"></div>
         </div>
       </section>
 
@@ -252,6 +269,29 @@
       </div>
     </footer>
 
+    <div class="modal-overlay" id="auth-modal" hidden>
+      <div class="modal">
+        <button class="modal-close" aria-label="Close">&times;</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-tab="signin">Sign in</button>
+          <button class="modal-tab" data-tab="signup">Sign up</button>
+        </div>
+        <form class="auth-form" id="auth-form">
+          <label>
+            Email
+            <input type="email" name="email" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" minlength="6" required />
+          </label>
+          <button class="cta" type="submit">Sign in</button>
+          <p class="auth-error" role="alert" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

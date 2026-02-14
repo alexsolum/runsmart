@@ -12,6 +12,7 @@
       rel="stylesheet"
     />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   </head>
   <body>
     <header class="hero">
@@ -52,30 +53,33 @@
             <button class="ghost" data-action="sample-week">View sample week</button>
           </div>
         </div>
-        <div class="hero-card">
-          <h3>Next Goal Race</h3>
-          <p class="muted">Trail 50K • 18 weeks out</p>
-          <div class="card-grid">
-            <div>
-              <span class="label">Weekly focus</span>
-              <strong>Base 2</strong>
+        <div class="hero-card" id="hero-card">
+          <div id="hero-card-static">
+            <h3>Next Goal Race</h3>
+            <p class="muted">Trail 50K &bull; 18 weeks out</p>
+            <div class="card-grid">
+              <div>
+                <span class="label">Weekly focus</span>
+                <strong>Base 2</strong>
+              </div>
+              <div>
+                <span class="label">Mileage</span>
+                <strong>42–48 mi</strong>
+              </div>
+              <div>
+                <span class="label">Key workout</span>
+                <strong>Progression long run</strong>
+              </div>
+              <div>
+                <span class="label">Readiness</span>
+                <strong class="positive">On track</strong>
+              </div>
             </div>
-            <div>
-              <span class="label">Mileage</span>
-              <strong>42–48 mi</strong>
-            </div>
-            <div>
-              <span class="label">Key workout</span>
-              <strong>Progression long run</strong>
-            </div>
-            <div>
-              <span class="label">Readiness</span>
-              <strong class="positive">On track</strong>
-            </div>
+            <p class="card-note">
+              "You handled last week well. Keep the mid-week intensity controlled to stay fresh for the long run."
+            </p>
           </div>
-          <p class="card-note">
-            "You handled last week well. Keep the mid-week intensity controlled to stay fresh for the long run."
-          </p>
+          <div id="hero-card-dynamic" hidden></div>
         </div>
       </div>
     </header>
@@ -93,7 +97,7 @@
           <div class="grid">
             <article>
               <h4>Macro block builder</h4>
-              <p>Base → Build → Peak → Taper sequencing tuned to your race distance and terrain.</p>
+              <p>Base &rarr; Build &rarr; Peak &rarr; Taper sequencing tuned to your race distance and terrain.</p>
             </article>
             <article>
               <h4>Weekly structure</h4>
@@ -130,6 +134,10 @@
               Key constraints
               <textarea name="constraints" rows="3" placeholder="Work travel in week 6, prefer long runs on Sundays"></textarea>
             </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="b2b" />
+              Back-to-back long run weekends
+            </label>
             <button class="cta" type="submit">Create draft plan</button>
             <p class="form-note" role="status" aria-live="polite"></p>
           </form>
@@ -138,11 +146,16 @@
           <h3>My plans</h3>
           <div class="plans-list" id="plans-list"></div>
         </div>
+        <div id="block-calendar" class="block-calendar" hidden>
+          <h3>Training blocks</h3>
+          <div id="block-timeline" class="block-timeline"></div>
+          <div id="block-details" class="block-details"></div>
+        </div>
       </section>
 
       <section id="insights" class="section accent">
         <div class="section-header">
-          <h2>Training analysis & insights</h2>
+          <h2>Training analysis &amp; insights</h2>
           <p>Understand readiness, spot risk early, and see the impact of your consistency.</p>
         </div>
         <div class="insight-cards">
@@ -154,7 +167,7 @@
           <div class="insight">
             <span class="pill">Performance</span>
             <h4>Race readiness forecast</h4>
-            <p>Track VO₂max trends, long-run durability, and race-specific confidence signals.</p>
+            <p>Track long-run durability, vertical progression, and race-specific confidence signals.</p>
           </div>
           <div class="insight">
             <span class="pill">Risk</span>
@@ -162,27 +175,67 @@
             <p>Detect sudden spikes and missed recovery before they derail the block.</p>
           </div>
         </div>
-        <div class="insight-summary">
+
+        <div id="training-load-section" hidden>
+          <h4>Training load trend</h4>
+          <div id="training-load-chart" class="chart-container"></div>
+        </div>
+
+        <div id="long-run-section" hidden>
+          <h4>Long run progression</h4>
+          <div id="long-run-chart" class="chart-container"></div>
+        </div>
+
+        <div class="insight-summary" id="insight-summary">
           <div>
             <h4>Latest check-in</h4>
-            <p class="muted">
-              \"Consistency is strong. Keep intensity in check this week to absorb the last long run.\"
+            <p class="muted" id="latest-checkin-text">
+              No check-in yet. Submit your weekly check-in below to track readiness.
             </p>
           </div>
-          <div class="stats">
+          <div class="stats" id="insight-stats">
             <div>
               <span class="label">Form trend</span>
-              <strong>+4.2</strong>
+              <strong id="stat-form">—</strong>
             </div>
             <div>
               <span class="label">Readiness</span>
-              <strong class="positive">Green</strong>
+              <strong id="stat-readiness">—</strong>
             </div>
             <div>
               <span class="label">Risk score</span>
-              <strong>Low</strong>
+              <strong id="stat-risk">—</strong>
             </div>
           </div>
+        </div>
+
+        <div id="checkin-section" hidden>
+          <h4>Weekly check-in</h4>
+          <form id="checkin-form" class="checkin-form">
+            <label>
+              Fatigue <output class="range-val">3</output>/5
+              <input type="range" name="fatigue" min="1" max="5" value="3" />
+            </label>
+            <label>
+              Sleep quality <output class="range-val">3</output>/5
+              <input type="range" name="sleep_quality" min="1" max="5" value="3" />
+            </label>
+            <label>
+              Motivation <output class="range-val">3</output>/5
+              <input type="range" name="motivation" min="1" max="5" value="3" />
+            </label>
+            <label>
+              Any niggles or pain?
+              <input type="text" name="niggles" placeholder="e.g. left achilles tightness" />
+            </label>
+            <label>
+              Notes
+              <textarea name="notes" rows="2" placeholder="How was your week?"></textarea>
+            </label>
+            <button class="cta" type="submit">Submit check-in</button>
+            <p class="checkin-note" role="status" aria-live="polite"></p>
+          </form>
+          <div id="checkin-history" class="checkin-history"></div>
         </div>
       </section>
 
@@ -229,6 +282,59 @@
             </div>
           </div>
         </div>
+
+        <div id="weekly-dashboard" hidden>
+          <h3>This week</h3>
+          <div id="current-week-summary" class="week-summary-grid"></div>
+          <h4>Recent weeks</h4>
+          <div id="weekly-history" class="weekly-history"></div>
+        </div>
+
+        <div id="manual-entry-section" hidden>
+          <h3>Log a workout</h3>
+          <form id="manual-entry-form" class="manual-form">
+            <label>
+              Activity name
+              <input type="text" name="name" placeholder="Morning trail run" required />
+            </label>
+            <label>
+              Type
+              <select name="type">
+                <option value="Run">Run</option>
+                <option value="Hike">Hike</option>
+                <option value="Walk">Walk</option>
+                <option value="Strength">Strength</option>
+                <option value="Yoga">Yoga</option>
+                <option value="Cross-training">Cross-training</option>
+              </select>
+            </label>
+            <div class="form-row">
+              <label>
+                Distance (mi)
+                <input type="number" name="distance" min="0" step="0.1" />
+              </label>
+              <label>
+                Duration (min)
+                <input type="number" name="duration" min="0" />
+              </label>
+              <label>
+                Elevation (ft)
+                <input type="number" name="elevation" min="0" />
+              </label>
+            </div>
+            <label>
+              Date
+              <input type="date" name="date" required />
+            </label>
+            <label>
+              Effort (RPE) <output class="range-val">5</output>/10
+              <input type="range" name="effort" min="1" max="10" value="5" />
+            </label>
+            <button class="cta" type="submit">Save workout</button>
+            <p class="manual-note" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+
         <div id="activities-section" hidden>
           <h3>Recent activities</h3>
           <div class="activities-list" id="activities-list"></div>

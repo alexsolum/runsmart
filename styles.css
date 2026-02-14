@@ -8,6 +8,8 @@
   --card: #ffffff;
   --border: #e2e8f0;
   --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #ef4444;
 }
 
 * {
@@ -69,6 +71,11 @@ a {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.2);
+}
+
+.cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .ghost {
@@ -255,6 +262,20 @@ h1 {
 
 .plan-form textarea {
   resize: vertical;
+}
+
+.checkbox-label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
 }
 
 .form-note {
@@ -519,6 +540,17 @@ h1 {
   margin: 0;
 }
 
+.plan-card-b2b {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 8px;
+}
+
 /* Strava panel */
 
 .strava-actions {
@@ -526,6 +558,312 @@ h1 {
   gap: 8px;
   margin-top: 16px;
 }
+
+/* Training block calendar */
+
+.block-calendar {
+  margin-top: 32px;
+}
+
+.block-calendar h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.block-timeline {
+  display: flex;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 64px;
+}
+
+.block-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 16px;
+  color: #fff;
+  min-width: 80px;
+}
+
+.block-bar strong {
+  font-size: 14px;
+}
+
+.block-bar span {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.block-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.block-detail-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.block-detail-card h5 {
+  margin: 0 0 8px;
+}
+
+.block-detail-card p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Charts */
+
+.chart-container {
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 16px;
+  min-height: 300px;
+}
+
+#training-load-section,
+#long-run-section {
+  margin-top: 32px;
+}
+
+#training-load-section h4,
+#long-run-section h4 {
+  margin-bottom: 0;
+}
+
+/* Check-in form */
+
+#checkin-section {
+  margin-top: 32px;
+}
+
+#checkin-section h4 {
+  margin-bottom: 16px;
+}
+
+.checkin-form {
+  display: grid;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px;
+  max-width: 480px;
+}
+
+.checkin-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.checkin-form input[type="text"],
+.checkin-form textarea {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font: inherit;
+}
+
+.checkin-form input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.range-val {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.checkin-note {
+  margin: 0;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.checkin-history {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+  max-width: 480px;
+}
+
+.checkin-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.checkin-card-header {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.checkin-card-metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.checkin-card-metrics span {
+  font-size: 13px;
+}
+
+.checkin-card-notes {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+/* Weekly dashboard */
+
+#weekly-dashboard {
+  margin-top: 32px;
+}
+
+#weekly-dashboard h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+#weekly-dashboard h4 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.week-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.week-stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+}
+
+.week-stat .label {
+  margin-bottom: 8px;
+}
+
+.week-stat strong {
+  font-size: 1.4rem;
+}
+
+.week-stat .trend {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.trend.up {
+  color: var(--success);
+}
+
+.trend.down {
+  color: var(--danger);
+}
+
+.trend.flat {
+  color: var(--muted);
+}
+
+.weekly-history {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.week-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.week-card-header {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.week-card-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  font-size: 12px;
+}
+
+.week-card-stats .label {
+  margin-bottom: 2px;
+}
+
+/* Manual entry form */
+
+#manual-entry-section {
+  margin-top: 32px;
+}
+
+#manual-entry-section h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.manual-form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  max-width: 480px;
+}
+
+.manual-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.manual-form input,
+.manual-form select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font: inherit;
+}
+
+.manual-form input[type="range"] {
+  accent-color: var(--accent);
+}
+
+.manual-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+/* Activity cards (ultra-focused) */
 
 #activities-section {
   margin-top: 32px;
@@ -549,8 +887,15 @@ h1 {
   padding: 20px;
 }
 
-.activity-card h4 {
-  margin: 0 0 4px;
+.activity-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.activity-card-header h4 {
+  margin: 0;
 }
 
 .activity-card-type {
@@ -570,16 +915,79 @@ h1 {
   gap: 12px;
 }
 
+.activity-card-secondary {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .activity-card-date {
   font-size: 12px;
   color: var(--muted);
   margin: 12px 0 0;
 }
 
+.rpe-select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.rpe-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rpe-badge.easy {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.rpe-badge.moderate {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.rpe-badge.hard {
+  background: #fecaca;
+  color: #991b1b;
+}
+
 .sync-status {
   font-size: 14px;
   color: var(--muted);
   margin-top: 8px;
+}
+
+/* Race countdown dynamic hero card */
+
+.countdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.countdown-weeks {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.countdown-unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 @media (max-width: 900px) {
@@ -604,6 +1012,14 @@ h1 {
   .planning-grid {
     grid-template-columns: 1fr;
   }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .block-timeline {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 600px) {
@@ -620,5 +1036,9 @@ h1 {
   .insight-summary .stats {
     flex-direction: column;
     gap: 12px;
+  }
+
+  .week-card-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

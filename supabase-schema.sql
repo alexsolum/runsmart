@@ -10,6 +10,7 @@ create table training_plans (
   availability integer not null default 5,
   current_mileage integer,
   constraints text,
+  b2b_long_runs boolean default false,
   created_at timestamptz default now()
 );
 
@@ -83,6 +84,7 @@ create table activities (
   started_at timestamptz not null,
   moving_time integer,
   elapsed_time integer,
+  effort_rating integer check (effort_rating between 1 and 10),
   source text default 'strava',
   created_at timestamptz default now()
 );
@@ -97,6 +99,41 @@ create policy "Users can insert own activities"
   on activities for insert
   with check (auth.uid() = user_id);
 
+create policy "Users can update own activities"
+  on activities for update
+  using (auth.uid() = user_id);
+
 create policy "Users can delete own activities"
   on activities for delete
+  using (auth.uid() = user_id);
+
+-- ============================================================
+-- Athlete feedback / weekly check-ins
+-- ============================================================
+
+create table athlete_feedback (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  plan_id uuid references training_plans(id) on delete set null,
+  week_of date not null,
+  fatigue integer not null check (fatigue between 1 and 5),
+  sleep_quality integer not null check (sleep_quality between 1 and 5),
+  motivation integer not null check (motivation between 1 and 5),
+  niggles text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+alter table athlete_feedback enable row level security;
+
+create policy "Users can view own feedback"
+  on athlete_feedback for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own feedback"
+  on athlete_feedback for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own feedback"
+  on athlete_feedback for delete
   using (auth.uid() = user_id);

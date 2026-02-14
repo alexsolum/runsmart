@@ -11,6 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   </head>
   <body>
     <header class="hero">
@@ -23,7 +24,9 @@
           <a href="#roadmap">Roadmap</a>
         </div>
         <div class="nav-actions">
-          <button class="ghost" data-action="signin">Sign in</button>
+          <span class="user-email" id="user-email" hidden></span>
+          <button class="ghost" data-action="signin" id="signin-btn">Sign in</button>
+          <button class="ghost" data-action="signout" id="signout-btn" hidden>Sign out</button>
           <button class="cta" data-action="start-plan">Start Plan</button>
           <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false">
             ☰
@@ -130,6 +133,10 @@
             <button class="cta" type="submit">Create draft plan</button>
             <p class="form-note" role="status" aria-live="polite"></p>
           </form>
+        </div>
+        <div class="my-plans" id="my-plans" hidden>
+          <h3>My plans</h3>
+          <div class="plans-list" id="plans-list"></div>
         </div>
       </section>
 
@@ -252,6 +259,29 @@
       </div>
     </footer>
 
+    <div class="modal-overlay" id="auth-modal" hidden>
+      <div class="modal">
+        <button class="modal-close" aria-label="Close">&times;</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-tab="signin">Sign in</button>
+          <button class="modal-tab" data-tab="signup">Sign up</button>
+        </div>
+        <form class="auth-form" id="auth-form">
+          <label>
+            Email
+            <input type="email" name="email" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" minlength="6" required />
+          </label>
+          <button class="cta" type="submit">Sign in</button>
+          <p class="auth-error" role="alert" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

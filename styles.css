@@ -519,6 +519,69 @@ h1 {
   margin: 0;
 }
 
+/* Strava panel */
+
+.strava-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+#activities-section {
+  margin-top: 32px;
+}
+
+#activities-section h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.activities-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.activity-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.activity-card h4 {
+  margin: 0 0 4px;
+}
+
+.activity-card-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.activity-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.activity-card-date {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+
+.sync-status {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
 @media (max-width: 900px) {
   .hero,
   .section,

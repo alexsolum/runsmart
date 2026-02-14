@@ -6,6 +6,10 @@ const isSupabaseConfigured =
   typeof SUPABASE_ANON_KEY !== "undefined" &&
   SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 
+const isStravaConfigured =
+  typeof STRAVA_CLIENT_ID !== "undefined" &&
+  STRAVA_CLIENT_ID !== "YOUR_STRAVA_CLIENT_ID";
+
 let db = null;
 if (isSupabaseConfigured) {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -27,6 +31,16 @@ const signoutBtn = document.getElementById("signout-btn");
 const userEmailEl = document.getElementById("user-email");
 const myPlans = document.getElementById("my-plans");
 const plansList = document.getElementById("plans-list");
+
+// Strava DOM refs
+const stravaConnectBtn = document.getElementById("strava-connect-btn");
+const stravaSyncBtn = document.getElementById("strava-sync-btn");
+const stravaDisconnectBtn = document.getElementById("strava-disconnect-btn");
+const stravaDisconnected = document.getElementById("strava-disconnected");
+const stravaConnected = document.getElementById("strava-connected");
+const lastSyncTime = document.getElementById("last-sync-time");
+const activitiesSection = document.getElementById("activities-section");
+const activitiesList = document.getElementById("activities-list");
 
 let currentAuthMode = "signin";
 let currentUser = null;
@@ -78,12 +92,121 @@ async function deletePlan(id) {
   if (error) throw error;
 }
 
+// ---- Strava functions ----
+
+function startStravaOAuth() {
+  const redirectUri = window.location.origin + window.location.pathname;
+  const scope = "activity:read_all";
+  const url =
+    "https://www.strava.com/oauth/authorize" +
+    "?client_id=" + encodeURIComponent(STRAVA_CLIENT_ID) +
+    "&redirect_uri=" + encodeURIComponent(redirectUri) +
+    "&response_type=code" +
+    "&scope=" + encodeURIComponent(scope) +
+    "&approval_prompt=auto";
+  window.location.href = url;
+}
+
+async function exchangeStravaCode(code) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return;
+
+  const res = await fetch(SUPABASE_URL + "/functions/v1/strava-auth", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + session.access_token,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ code }),
+  });
+
+  const result = await res.json();
+  if (!res.ok) throw new Error(result.error || "Strava connection failed");
+  return result;
+}
+
+async function syncStrava() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return;
+
+  const res = await fetch(SUPABASE_URL + "/functions/v1/strava-sync", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + session.access_token,
+      apikey: SUPABASE_ANON_KEY,
+    },
+  });
+
+  const result = await res.json();
+  if (!res.ok) throw new Error(result.error || "Sync failed");
+  return result;
+}
+
+async function disconnectStrava() {
+  const { error } = await db
+    .from("strava_connections")
+    .delete()
+    .eq("user_id", currentUser.id);
+  if (error) throw error;
+}
+
+async function checkStravaConnection() {
+  const { data, error } = await db
+    .from("strava_connections")
+    .select("strava_athlete_id, updated_at")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (error || !data) {
+    showStravaDisconnected();
+    return false;
+  }
+
+  showStravaConnected(data.updated_at);
+  return true;
+}
+
+async function loadActivities() {
+  const { data, error } = await db
+    .from("activities")
+    .select("*")
+    .order("started_at", { ascending: false })
+    .limit(20);
+  if (error) throw error;
+  return data;
+}
+
 // ---- UI helpers ----
 
 function escapeHtml(str) {
   const el = document.createElement("span");
   el.textContent = str;
   return el.innerHTML;
+}
+
+function formatDistance(meters) {
+  if (!meters) return "\u2014";
+  const miles = meters / 1609.344;
+  return miles.toFixed(1) + " mi";
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return "\u2014";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return h + "h " + m + "m";
+  return m + "m " + s + "s";
+}
+
+function formatPace(secPerKm) {
+  if (!secPerKm) return "\u2014";
+  const secPerMile = secPerKm * 1.60934;
+  const m = Math.floor(secPerMile / 60);
+  const s = Math.round(secPerMile % 60);
+  return m + ":" + String(s).padStart(2, "0") + " /mi";
 }
 
 function updateAuthUI(user) {
@@ -95,6 +218,9 @@ function updateAuthUI(user) {
     userEmailEl.textContent = user.email;
     myPlans.hidden = false;
     refreshPlans();
+    checkStravaConnection().then((connected) => {
+      if (connected) refreshActivities();
+    });
   } else {
     signinBtn.hidden = false;
     signoutBtn.hidden = true;
@@ -102,6 +228,24 @@ function updateAuthUI(user) {
     userEmailEl.textContent = "";
     myPlans.hidden = true;
     plansList.innerHTML = "";
+    showStravaDisconnected();
+    activitiesSection.hidden = true;
+    activitiesList.innerHTML = "";
+  }
+}
+
+function showStravaDisconnected() {
+  stravaDisconnected.hidden = false;
+  stravaConnected.hidden = true;
+  activitiesSection.hidden = true;
+}
+
+function showStravaConnected(updatedAt) {
+  stravaDisconnected.hidden = true;
+  stravaConnected.hidden = false;
+  activitiesSection.hidden = false;
+  if (updatedAt) {
+    lastSyncTime.textContent = new Date(updatedAt).toLocaleString();
   }
 }
 
@@ -111,6 +255,15 @@ async function refreshPlans() {
     renderPlans(plans);
   } catch (err) {
     plansList.innerHTML = '<p class="muted">Could not load plans.</p>';
+  }
+}
+
+async function refreshActivities() {
+  try {
+    const activities = await loadActivities();
+    renderActivities(activities);
+  } catch (err) {
+    activitiesList.innerHTML = '<p class="muted">Could not load activities.</p>';
   }
 }
 
@@ -161,6 +314,39 @@ function renderPlans(plans) {
       }
     });
   });
+}
+
+function renderActivities(activities) {
+  if (!activities || !activities.length) {
+    activitiesList.innerHTML =
+      '<p class="muted">No activities synced yet. Click "Sync now" to import from Strava.</p>';
+    return;
+  }
+
+  activitiesList.innerHTML = activities
+    .map(
+      (a) => `
+    <div class="activity-card">
+      <h4>${escapeHtml(a.name)}</h4>
+      <span class="activity-card-type">${escapeHtml(a.type || "Activity")}</span>
+      <div class="activity-card-stats">
+        <div>
+          <span class="label">Distance</span>
+          <strong>${formatDistance(a.distance)}</strong>
+        </div>
+        <div>
+          <span class="label">Duration</span>
+          <strong>${formatDuration(a.moving_time)}</strong>
+        </div>
+        <div>
+          <span class="label">Pace</span>
+          <strong>${formatPace(a.average_pace)}</strong>
+        </div>
+      </div>
+      <p class="activity-card-date">${new Date(a.started_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</p>
+    </div>`
+    )
+    .join("");
 }
 
 function showAuthModal() {
@@ -313,6 +499,68 @@ if (planForm) {
   });
 }
 
+// ---- Strava event listeners ----
+
+if (stravaConnectBtn) {
+  stravaConnectBtn.addEventListener("click", () => {
+    if (!currentUser) {
+      if (isSupabaseConfigured) {
+        showAuthModal();
+      } else {
+        alert("Sign in first to connect Strava.");
+      }
+      return;
+    }
+    if (!isStravaConfigured) {
+      alert(
+        "Strava is not configured yet.\n\n" +
+          "1. Create an API app at strava.com/settings/api\n" +
+          "2. Add your Client ID to config.js\n" +
+          "3. Add STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET as\n" +
+          "   Supabase Edge Function secrets"
+      );
+      return;
+    }
+    startStravaOAuth();
+  });
+}
+
+if (stravaSyncBtn) {
+  stravaSyncBtn.addEventListener("click", async () => {
+    stravaSyncBtn.disabled = true;
+    stravaSyncBtn.textContent = "Syncing\u2026";
+    try {
+      const result = await syncStrava();
+      lastSyncTime.textContent = new Date().toLocaleString();
+      stravaSyncBtn.textContent = result.synced + " synced";
+      refreshActivities();
+      setTimeout(() => {
+        stravaSyncBtn.textContent = "Sync now";
+        stravaSyncBtn.disabled = false;
+      }, 2000);
+    } catch (err) {
+      stravaSyncBtn.textContent = "Sync failed";
+      setTimeout(() => {
+        stravaSyncBtn.textContent = "Sync now";
+        stravaSyncBtn.disabled = false;
+      }, 2000);
+    }
+  });
+}
+
+if (stravaDisconnectBtn) {
+  stravaDisconnectBtn.addEventListener("click", async () => {
+    if (!confirm("Disconnect Strava? Your synced activities will remain.")) return;
+    try {
+      await disconnectStrava();
+      showStravaDisconnected();
+      activitiesSection.hidden = true;
+    } catch (err) {
+      alert("Could not disconnect: " + err.message);
+    }
+  });
+}
+
 // Mobile nav toggle
 if (menuToggle && mobileNav) {
   menuToggle.addEventListener("click", () => {
@@ -322,7 +570,41 @@ if (menuToggle && mobileNav) {
   });
 }
 
-// ---- Initialize auth state ----
+// ---- Handle Strava OAuth callback ----
+
+function handleStravaCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const scope = params.get("scope");
+
+  // Only process if we have a code and it looks like a Strava callback
+  if (!code || !scope || !scope.includes("activity")) return;
+
+  // Clean the URL so the code isn't visible / re-used
+  const cleanUrl = window.location.origin + window.location.pathname;
+  window.history.replaceState({}, document.title, cleanUrl);
+
+  // Wait for auth to initialize, then exchange the code
+  const tryExchange = async () => {
+    if (!currentUser) {
+      // Auth hasn't loaded yet — retry shortly
+      setTimeout(tryExchange, 300);
+      return;
+    }
+    try {
+      await exchangeStravaCode(code);
+      showStravaConnected(new Date().toISOString());
+      syncStrava().then(() => refreshActivities());
+      document.querySelector("#data").scrollIntoView({ behavior: "smooth" });
+    } catch (err) {
+      alert("Strava connection failed: " + err.message);
+    }
+  };
+
+  tryExchange();
+}
+
+// ---- Initialize ----
 
 if (db) {
   db.auth.onAuthStateChange((_event, session) => {
@@ -332,4 +614,6 @@ if (db) {
   db.auth.getSession().then(({ data: { session } }) => {
     updateAuthUI(session?.user || null);
   });
+
+  handleStravaCallback();
 }

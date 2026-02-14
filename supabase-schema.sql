@@ -35,3 +35,68 @@ create policy "Users can update own plans"
 create policy "Users can delete own plans"
   on training_plans for delete
   using (auth.uid() = user_id);
+
+-- ============================================================
+-- Strava connections (OAuth tokens, one per user)
+-- ============================================================
+
+create table strava_connections (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null unique,
+  strava_athlete_id bigint not null,
+  access_token text not null,
+  refresh_token text not null,
+  expires_at bigint not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table strava_connections enable row level security;
+
+-- Users can see their own connection status
+create policy "Users can view own strava connection"
+  on strava_connections for select
+  using (auth.uid() = user_id);
+
+-- Users can disconnect (delete) their own connection
+create policy "Users can delete own strava connection"
+  on strava_connections for delete
+  using (auth.uid() = user_id);
+
+-- Insert and update are handled by Edge Functions using the service_role key
+
+-- ============================================================
+-- Activities (synced from Strava or entered manually)
+-- ============================================================
+
+create table activities (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  strava_id bigint unique,
+  name text not null,
+  type text,
+  distance numeric,
+  duration numeric,
+  elevation_gain numeric,
+  average_pace numeric,
+  average_heartrate numeric,
+  started_at timestamptz not null,
+  moving_time integer,
+  elapsed_time integer,
+  source text default 'strava',
+  created_at timestamptz default now()
+);
+
+alter table activities enable row level security;
+
+create policy "Users can view own activities"
+  on activities for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own activities"
+  on activities for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own activities"
+  on activities for delete
+  using (auth.uid() = user_id);

@@ -202,26 +202,36 @@
           </div>
           <div>
             <h4>Privacy-first storage</h4>
-            <p>Firebase-backed, athlete-owned data with future multi-user expansion in mind.</p>
+            <p>Supabase-backed, athlete-owned data with row-level security.</p>
             <button class="ghost" data-action="policy">Review data policy</button>
           </div>
-          <div>
-            <h4>Sync health</h4>
-            <div class="sync-list">
-              <div>
-                <span class="label">Last sync</span>
-                <strong>Today, 6:42 AM</strong>
+          <div id="strava-panel">
+            <h4>Strava</h4>
+            <div id="strava-disconnected">
+              <p class="muted">Connect your Strava account to import training data.</p>
+              <button class="cta" id="strava-connect-btn">Connect Strava</button>
+            </div>
+            <div id="strava-connected" hidden>
+              <div class="sync-list">
+                <div>
+                  <span class="label">Status</span>
+                  <strong class="positive">Connected</strong>
+                </div>
+                <div>
+                  <span class="label">Last sync</span>
+                  <strong id="last-sync-time">Never</strong>
+                </div>
               </div>
-              <div>
-                <span class="label">Activities imported</span>
-                <strong>18 this week</strong>
-              </div>
-              <div>
-                <span class="label">Gaps detected</span>
-                <strong>0</strong>
+              <div class="strava-actions">
+                <button class="cta" id="strava-sync-btn">Sync now</button>
+                <button class="ghost" id="strava-disconnect-btn">Disconnect</button>
               </div>
             </div>
           </div>
+        </div>
+        <div id="activities-section" hidden>
+          <h3>Recent activities</h3>
+          <div class="activities-list" id="activities-list"></div>
         </div>
       </section>
 

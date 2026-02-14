@@ -78,6 +78,16 @@ async function signUp(email, password) {
   return data;
 }
 
+async function signInWithGoogle() {
+  const { error } = await db.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin + window.location.pathname,
+    },
+  });
+  if (error) throw error;
+}
+
 async function signOut() {
   const { error } = await db.auth.signOut();
   if (error) throw error;
@@ -986,6 +996,18 @@ authModal
 authModal.addEventListener("click", function (e) {
   if (e.target === authModal) hideAuthModal();
 });
+
+// Google sign-in button
+var googleSigninBtn = document.getElementById("google-signin-btn");
+if (googleSigninBtn) {
+  googleSigninBtn.addEventListener("click", async function () {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      authError.textContent = err.message;
+    }
+  });
+}
 
 // Plan form submit
 if (planForm) {

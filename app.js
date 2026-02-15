@@ -59,6 +59,12 @@ const weeklyHistoryEl = document.getElementById("weekly-history");
 const manualEntrySection = document.getElementById("manual-entry-section");
 const manualEntryForm = document.getElementById("manual-entry-form");
 
+// Gantt planner DOM refs
+const ganttPlanner = document.getElementById("gantt-planner");
+const ganttPhaseBar = document.getElementById("gantt-phase-bar");
+const ganttVolumeChart = document.getElementById("gantt-volume-chart");
+const ganttBody = document.getElementById("gantt-body");
+
 let currentAuthMode = "signin";
 let currentUser = null;
 let cachedPlans = [];
@@ -455,6 +461,7 @@ function updateAuthUI(user) {
     manualEntrySection.hidden = true;
     checkinSection.hidden = true;
     blockCalendar.hidden = true;
+    ganttPlanner.hidden = true;
     trainingLoadSection.hidden = true;
     longRunSection.hidden = true;
     heroCardStatic.hidden = false;
@@ -496,6 +503,7 @@ async function refreshPlans() {
     renderPlans(cachedPlans);
     renderRaceCountdown(cachedPlans);
     renderBlockCalendar(cachedPlans);
+    renderGanttPlanner(cachedPlans);
   } catch (err) {
     plansList.innerHTML = '<p class="muted">Could not load plans.</p>';
   }
@@ -601,6 +609,173 @@ function renderBlockCalendar(plans) {
       '<p>' + b.startMi + '–' + b.endMi + ' mi/wk</p>' +
       '<p>' + b.desc + '</p>' +
       '</div>';
+  }).join("");
+}
+
+// ---- UI: Gantt planner (Koop method) ----
+
+var KOOP_PHASES = {
+  preparation: { color: "#6366f1" },
+  endurance: { color: "#3b82f6" },
+  specificPrep: { color: "#f59e0b" },
+  taper: { color: "#22c55e" },
+};
+
+var KOOP_PHASE_KEYS = {
+  preparation: "gantt.preparation",
+  endurance: "gantt.endurance",
+  specificPrep: "gantt.specificPrep",
+  taper: "gantt.taper",
+};
+
+var KOOP_WORKOUTS = {
+  preparation: ["gantt.easyVolume", "gantt.steadyState", "gantt.tempo"],
+  endurance: ["gantt.steadyState", "gantt.tempo", "gantt.enduranceRun", "gantt.muscleTension"],
+  specificPrep: ["gantt.muscleTension", "gantt.overUnder", "gantt.raceSimulation", "gantt.tempo"],
+  taper: ["gantt.steadyState", "gantt.tempo"],
+};
+
+function computeKoopPlan(plan) {
+  var today = new Date();
+  var raceDate = new Date(plan.race_date);
+  var totalWeeks = Math.max(4, Math.ceil((raceDate - today) / (7 * 24 * 60 * 60 * 1000)));
+
+  // Koop phase distribution
+  var prepWeeks = Math.max(1, Math.round(totalWeeks * 0.15));
+  var enduranceWeeks = Math.max(1, Math.round(totalWeeks * 0.35));
+  var specificWeeks = Math.max(1, Math.round(totalWeeks * 0.35));
+  var taperWeeks = Math.max(1, totalWeeks - prepWeeks - enduranceWeeks - specificWeeks);
+
+  var baseMileage = plan.current_mileage || 30;
+  var peakMileage = Math.round(baseMileage * 1.45);
+
+  var phases = [
+    { key: "preparation", weeks: prepWeeks, startMi: baseMileage, endMi: Math.round(baseMileage * 1.1) },
+    { key: "endurance", weeks: enduranceWeeks, startMi: Math.round(baseMileage * 1.1), endMi: Math.round(baseMileage * 1.3) },
+    { key: "specificPrep", weeks: specificWeeks, startMi: Math.round(baseMileage * 1.3), endMi: peakMileage },
+    { key: "taper", weeks: taperWeeks, startMi: Math.round(peakMileage * 0.8), endMi: Math.round(baseMileage * 0.5) },
+  ];
+
+  var weeks = [];
+  var weekNum = 1;
+  var planStart = getWeekStart(today);
+
+  phases.forEach(function (phase) {
+    var workouts = KOOP_WORKOUTS[phase.key];
+    for (var i = 0; i < phase.weeks; i++) {
+      var weekDate = new Date(planStart);
+      weekDate.setDate(weekDate.getDate() + (weekNum - 1) * 7);
+
+      // Recovery every 3rd week (or 4th for longer phases)
+      var cycle = phase.weeks > 8 ? 4 : 3;
+      var recovery = phase.weeks > 2 && i > 0 && (i + 1) % cycle === 0;
+
+      var progressFrac = phase.weeks > 1 ? i / (phase.weeks - 1) : 0;
+      var mileage = Math.round(phase.startMi + (phase.endMi - phase.startMi) * progressFrac);
+      if (recovery) mileage = Math.round(mileage * 0.65);
+
+      var longRunMi = Math.round(mileage * 0.3);
+      var workoutKey = recovery ? "gantt.recoveryWeek" : workouts[i % workouts.length];
+
+      var notesKey = "";
+      if (recovery) notesKey = "gantt.recoveryWeek";
+      if (plan.b2b_long_runs && (phase.key === "specificPrep" || phase.key === "endurance") && !recovery && i > 0) {
+        notesKey = "gantt.b2bLong";
+      }
+
+      var weekEnd = new Date(weekDate);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      var isCurrent = today >= weekDate && today < weekEnd;
+
+      weeks.push({
+        week: weekNum,
+        date: weekDate,
+        phase: phase.key,
+        mileage: mileage,
+        longRun: longRunMi,
+        workoutKey: workoutKey,
+        recovery: recovery,
+        notesKey: notesKey,
+        isCurrent: isCurrent,
+      });
+
+      weekNum++;
+    }
+  });
+
+  // Add race week
+  weeks.push({
+    week: weekNum,
+    date: raceDate,
+    phase: "race",
+    mileage: 0,
+    longRun: 0,
+    workoutKey: "gantt.raceDay",
+    recovery: false,
+    notesKey: "gantt.raceWeek",
+    isCurrent: false,
+  });
+
+  return { weeks: weeks, phases: phases, totalWeeks: totalWeeks, peakMileage: peakMileage };
+}
+
+function renderGanttPlanner(plans) {
+  var futurePlans = plans.filter(function (p) { return new Date(p.race_date) > new Date(); });
+
+  if (!futurePlans.length) {
+    ganttPlanner.hidden = true;
+    return;
+  }
+
+  var plan = futurePlans[0];
+  var koopPlan = computeKoopPlan(plan);
+
+  ganttPlanner.hidden = false;
+
+  // Phase bar
+  ganttPhaseBar.innerHTML = koopPlan.phases.map(function (p) {
+    var info = KOOP_PHASES[p.key];
+    return '<div class="gantt-phase-segment" style="flex:' + p.weeks + ';background:' + info.color + '">' +
+      '<strong>' + t(KOOP_PHASE_KEYS[p.key]) + '</strong>' +
+      '<span>' + p.weeks + ' ' + t("dynamic.wk") + ' &middot; ' + p.startMi + '\u2013' + p.endMi + ' mi</span>' +
+      '</div>';
+  }).join("");
+
+  // Volume chart
+  var maxMileage = koopPlan.peakMileage || 1;
+  ganttVolumeChart.innerHTML = koopPlan.weeks.map(function (w) {
+    if (w.phase === "race") return '';
+    var pct = Math.max(5, Math.round((w.mileage / maxMileage) * 100));
+    var color = KOOP_PHASES[w.phase] ? KOOP_PHASES[w.phase].color : "#94a3b8";
+    var cls = "gantt-vol-bar";
+    if (w.recovery) cls += " recovery";
+    if (w.isCurrent) cls += " current";
+    return '<div class="' + cls + '" style="height:' + pct + '%;background:' + color + '" title="' + t("gantt.week") + ' ' + w.week + ': ' + w.mileage + ' mi">' +
+      (w.isCurrent ? '<span class="gantt-now-marker">' + t("gantt.today") + '</span>' : '') +
+      '<span class="gantt-vol-label">' + w.mileage + '</span>' +
+      '</div>';
+  }).join("");
+
+  // Detail table
+  ganttBody.innerHTML = koopPlan.weeks.map(function (w) {
+    var cls = "";
+    if (w.recovery) cls = "gantt-recovery";
+    if (w.isCurrent) cls = "gantt-current";
+
+    var phaseColor = w.phase === "race" ? "#ef4444" : (KOOP_PHASES[w.phase] ? KOOP_PHASES[w.phase].color : "#94a3b8");
+    var phaseName = w.phase === "race" ? t("gantt.raceWeek") : t(KOOP_PHASE_KEYS[w.phase]);
+
+    var dateStr = w.date.toLocaleDateString(currentLang === "no" ? "nb-NO" : "en-US", { month: "short", day: "numeric" });
+
+    return '<tr class="' + cls + '">' +
+      '<td>' + (w.isCurrent ? '<strong>' + w.week + '</strong>' : w.week) + '</td>' +
+      '<td>' + dateStr + '</td>' +
+      '<td><span class="gantt-phase-dot" style="background:' + phaseColor + '"></span><span class="gantt-phase-name">' + phaseName + '</span></td>' +
+      '<td>' + (w.phase === "race" ? '\u2014' : w.mileage + ' mi') + '</td>' +
+      '<td>' + t(w.workoutKey) + '</td>' +
+      '<td>' + (w.phase === "race" ? '\u2014' : w.longRun + ' mi') + '</td>' +
+      '<td>' + (w.notesKey ? t(w.notesKey) : '') + '</td>' +
+      '</tr>';
   }).join("");
 }
 
@@ -1266,7 +1441,30 @@ function handleStravaCallback() {
   tryExchange();
 }
 
+// ---- Language switcher ----
+
+document.querySelectorAll(".lang-option").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    setLanguage(btn.dataset.lang);
+    // Re-render dynamic content with new language
+    if (cachedPlans.length) {
+      renderRaceCountdown(cachedPlans);
+      renderBlockCalendar(cachedPlans);
+      renderGanttPlanner(cachedPlans);
+    }
+    if (cachedAllActivities.length) {
+      renderWeeklyDashboard(cachedAllActivities);
+      renderTrainingLoadChart(cachedAllActivities);
+      renderLongRunChart(cachedAllActivities);
+    }
+  });
+});
+
 // ---- Initialize ----
+
+// Apply saved language on load
+document.documentElement.lang = currentLang;
+applyTranslations();
 
 if (db) {
   db.auth.onAuthStateChange(function (_event, session) {

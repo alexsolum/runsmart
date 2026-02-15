@@ -1,87 +1,114 @@
 // ---- Supabase client ----
 
-const isSupabaseConfigured =
+var isSupabaseConfigured =
   typeof SUPABASE_URL !== "undefined" &&
   SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
   typeof SUPABASE_ANON_KEY !== "undefined" &&
   SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 
-const isStravaConfigured =
+var isStravaConfigured =
   typeof STRAVA_CLIENT_ID !== "undefined" &&
   STRAVA_CLIENT_ID !== "YOUR_STRAVA_CLIENT_ID";
 
-let db = null;
+var db = null;
 if (isSupabaseConfigured) {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
+// ---- Aliases from Compute module ----
+
+var getWeekStart = Compute.getWeekStart;
+var computeWeeklySummary = Compute.computeWeeklySummary;
+var computeTrainingBlocks = Compute.computeTrainingBlocks;
+var computeCurrentBlock = Compute.computeCurrentBlock;
+var computeTrainingLoad = Compute.computeTrainingLoad;
+var computeLongRuns = Compute.computeLongRuns;
+var computeKoopPlan = Compute.computeKoopPlan;
+var generateCoachingInsights = Compute.generateCoachingInsights;
+var formatDistance = Compute.formatDistance;
+var formatDuration = Compute.formatDuration;
+var formatPace = Compute.formatPace;
+var formatElevation = Compute.formatElevation;
+var trendArrow = Compute.trendArrow;
+var KOOP_PHASES = Compute.KOOP_PHASES;
+var KOOP_PHASE_KEYS = Compute.KOOP_PHASE_KEYS;
+
 // ---- DOM refs ----
 
-const actions = document.querySelectorAll("[data-action]");
-const planForm = document.querySelector(".plan-form");
-const formNote = document.querySelector(".form-note");
-const menuToggle = document.querySelector(".menu-toggle");
-const mobileNav = document.querySelector(".mobile-nav");
-const authModal = document.getElementById("auth-modal");
-const authForm = document.getElementById("auth-form");
-const authError = document.querySelector(".auth-error");
-const authTabs = document.querySelectorAll(".modal-tab");
-const signinBtn = document.getElementById("signin-btn");
-const signoutBtn = document.getElementById("signout-btn");
-const userEmailEl = document.getElementById("user-email");
-const myPlans = document.getElementById("my-plans");
-const plansList = document.getElementById("plans-list");
+var actions = document.querySelectorAll("[data-action]");
+var planForm = document.querySelector(".plan-form");
+var formNote = document.querySelector(".form-note");
+var authModal = document.getElementById("auth-modal");
+var authForm = document.getElementById("auth-form");
+var authError = document.querySelector(".auth-error");
+var authTabs = document.querySelectorAll(".modal-tab");
+var signinBtn = document.getElementById("signin-btn");
+var signoutBtn = document.getElementById("signout-btn");
+var userEmailEl = document.getElementById("user-email");
+var myPlans = document.getElementById("my-plans");
+var plansList = document.getElementById("plans-list");
 
 // Strava DOM refs
-const stravaConnectBtn = document.getElementById("strava-connect-btn");
-const stravaSyncBtn = document.getElementById("strava-sync-btn");
-const stravaDisconnectBtn = document.getElementById("strava-disconnect-btn");
-const stravaDisconnected = document.getElementById("strava-disconnected");
-const stravaConnected = document.getElementById("strava-connected");
-const lastSyncTime = document.getElementById("last-sync-time");
-const activitiesSection = document.getElementById("activities-section");
-const activitiesList = document.getElementById("activities-list");
+var stravaConnectBtn = document.getElementById("strava-connect-btn");
+var stravaSyncBtn = document.getElementById("strava-sync-btn");
+var stravaDisconnectBtn = document.getElementById("strava-disconnect-btn");
+var stravaDisconnected = document.getElementById("strava-disconnected");
+var stravaConnected = document.getElementById("strava-connected");
+var lastSyncTime = document.getElementById("last-sync-time");
+var activitiesSection = document.getElementById("activities-section");
+var activitiesList = document.getElementById("activities-list");
 
-// New feature DOM refs
-const heroCardStatic = document.getElementById("hero-card-static");
-const heroCardDynamic = document.getElementById("hero-card-dynamic");
-const blockCalendar = document.getElementById("block-calendar");
-const blockTimeline = document.getElementById("block-timeline");
-const blockDetails = document.getElementById("block-details");
-const trainingLoadSection = document.getElementById("training-load-section");
-const longRunSection = document.getElementById("long-run-section");
-const checkinSection = document.getElementById("checkin-section");
-const checkinForm = document.getElementById("checkin-form");
-const checkinHistory = document.getElementById("checkin-history");
-const weeklyDashboard = document.getElementById("weekly-dashboard");
-const currentWeekSummary = document.getElementById("current-week-summary");
-const weeklyHistoryEl = document.getElementById("weekly-history");
-const manualEntrySection = document.getElementById("manual-entry-section");
-const manualEntryForm = document.getElementById("manual-entry-form");
+// Feature DOM refs
+var heroCardStatic = document.getElementById("hero-card-static");
+var heroCardDynamic = document.getElementById("hero-card-dynamic");
+var blockCalendar = document.getElementById("block-calendar");
+var blockTimeline = document.getElementById("block-timeline");
+var blockDetails = document.getElementById("block-details");
+var trainingLoadSection = document.getElementById("training-load-section");
+var longRunSection = document.getElementById("long-run-section");
+var checkinSection = document.getElementById("checkin-section");
+var checkinForm = document.getElementById("checkin-form");
+var checkinHistory = document.getElementById("checkin-history");
+var weeklyDashboard = document.getElementById("weekly-dashboard");
+var currentWeekSummary = document.getElementById("current-week-summary");
+var weeklyHistoryEl = document.getElementById("weekly-history");
+var manualEntrySection = document.getElementById("manual-entry-section");
+var manualEntryForm = document.getElementById("manual-entry-form");
 
 // Gantt planner DOM refs
-const ganttPlanner = document.getElementById("gantt-planner");
-const ganttPhaseBar = document.getElementById("gantt-phase-bar");
-const ganttVolumeChart = document.getElementById("gantt-volume-chart");
-const ganttBody = document.getElementById("gantt-body");
+var ganttPlanner = document.getElementById("gantt-planner");
+var ganttPhaseBar = document.getElementById("gantt-phase-bar");
+var ganttVolumeChart = document.getElementById("gantt-volume-chart");
+var ganttBody = document.getElementById("gantt-body");
 
-let currentAuthMode = "signin";
-let currentUser = null;
-let cachedPlans = [];
-let cachedAllActivities = [];
+// Coach DOM refs
+var coachInsightsEl = document.getElementById("coach-insights");
+
+// Sidebar DOM refs
+var sidebar = document.getElementById("sidebar");
+var sidebarClose = document.getElementById("sidebar-close");
+var sidebarOverlay = document.getElementById("sidebar-overlay");
+var topbarMenu = document.getElementById("topbar-menu");
+var sidebarLinks = document.querySelectorAll(".sidebar-link");
+
+var currentAuthMode = "signin";
+var currentUser = null;
+var cachedPlans = [];
+var cachedAllActivities = [];
+var cachedCheckins = [];
 
 // ---- Auth functions ----
 
 async function signIn(email, password) {
-  const { data, error } = await db.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
+  var result = await db.auth.signInWithPassword({ email: email, password: password });
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 async function signUp(email, password) {
-  const { data, error } = await db.auth.signUp({ email, password });
-  if (error) throw error;
-  return data;
+  var result = await db.auth.signUp({ email: email, password: password });
+  if (result.error) throw result.error;
+  return result;
 }
 
 async function signInWithGoogle() {
@@ -96,48 +123,65 @@ async function signInWithGoogle() {
       redirectTo: redirectTo,
     },
   });
-  if (error) throw error;
+  if (result.error) throw result.error;
 }
 
 async function signOut() {
-  const { error } = await db.auth.signOut();
-  if (error) throw error;
+  var result = await db.auth.signOut();
+  if (result.error) throw result.error;
 }
 
 // ---- Plan functions ----
 
 async function loadPlans() {
-  const { data, error } = await db
+  var result = await db
     .from("training_plans")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data;
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 async function createPlan(plan) {
-  const { data, error } = await db
+  // Try with b2b_long_runs first, fallback without if column doesn't exist
+  var payload = { ...plan, user_id: currentUser.id };
+  var result = await db
     .from("training_plans")
-    .insert([{ ...plan, user_id: currentUser.id }])
+    .insert([payload])
     .select();
-  if (error) throw error;
-  return data[0];
+
+  if (result.error) {
+    var msg = result.error.message || "";
+    if (msg.includes("b2b_long_runs") && msg.includes("schema cache")) {
+      // Column doesn't exist in the live DB — retry without it
+      var fallback = { ...payload };
+      delete fallback.b2b_long_runs;
+      var retry = await db
+        .from("training_plans")
+        .insert([fallback])
+        .select();
+      if (retry.error) throw retry.error;
+      return retry.data[0];
+    }
+    throw result.error;
+  }
+  return result.data[0];
 }
 
 async function deletePlan(id) {
-  const { error } = await db
+  var result = await db
     .from("training_plans")
     .delete()
     .eq("id", id);
-  if (error) throw error;
+  if (result.error) throw result.error;
 }
 
 // ---- Strava functions ----
 
 function startStravaOAuth() {
-  const redirectUri = window.location.origin + window.location.pathname;
-  const scope = "activity:read_all";
-  const url =
+  var redirectUri = window.location.origin + window.location.pathname;
+  var scope = "activity:read_all";
+  var url =
     "https://www.strava.com/oauth/authorize" +
     "?client_id=" + encodeURIComponent(STRAVA_CLIENT_ID) +
     "&redirect_uri=" + encodeURIComponent(redirectUri) +
@@ -148,29 +192,31 @@ function startStravaOAuth() {
 }
 
 async function exchangeStravaCode(code) {
-  const { data: { session } } = await db.auth.getSession();
+  var sessionResult = await db.auth.getSession();
+  var session = sessionResult.data.session;
   if (!session) return;
 
-  const res = await fetch(SUPABASE_URL + "/functions/v1/strava-auth", {
+  var res = await fetch(SUPABASE_URL + "/functions/v1/strava-auth", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
       apikey: SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code: code }),
   });
 
-  const result = await res.json();
+  var result = await res.json();
   if (!res.ok) throw new Error(result.error || "Strava connection failed");
   return result;
 }
 
 async function syncStrava() {
-  const { data: { session } } = await db.auth.getSession();
+  var sessionResult = await db.auth.getSession();
+  var session = sessionResult.data.session;
   if (!session) return;
 
-  const res = await fetch(SUPABASE_URL + "/functions/v1/strava-sync", {
+  var res = await fetch(SUPABASE_URL + "/functions/v1/strava-sync", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -179,218 +225,96 @@ async function syncStrava() {
     },
   });
 
-  const result = await res.json();
+  var result = await res.json();
   if (!res.ok) throw new Error(result.error || "Sync failed");
   return result;
 }
 
 async function disconnectStrava() {
-  const { error } = await db
+  var result = await db
     .from("strava_connections")
     .delete()
     .eq("user_id", currentUser.id);
-  if (error) throw error;
+  if (result.error) throw result.error;
 }
 
 async function checkStravaConnection() {
-  const { data, error } = await db
+  var result = await db
     .from("strava_connections")
     .select("strava_athlete_id, updated_at")
     .eq("user_id", currentUser.id)
     .maybeSingle();
 
-  if (error || !data) {
+  if (result.error || !result.data) {
     showStravaDisconnected();
     return false;
   }
 
-  showStravaConnected(data.updated_at);
+  showStravaConnected(result.data.updated_at);
   return true;
 }
 
 // ---- Activity functions ----
 
 async function loadActivities() {
-  const { data, error } = await db
+  var result = await db
     .from("activities")
     .select("*")
     .order("started_at", { ascending: false })
     .limit(20);
-  if (error) throw error;
-  return data;
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 async function loadAllActivities() {
-  const { data, error } = await db
+  var result = await db
     .from("activities")
     .select("*")
     .order("started_at", { ascending: true })
     .limit(500);
-  if (error) throw error;
-  return data;
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 async function updateActivityRpe(id, rating) {
-  const { error } = await db
+  var result = await db
     .from("activities")
     .update({ effort_rating: rating })
     .eq("id", id);
-  if (error) throw error;
+  if (result.error) throw result.error;
 }
 
 async function createManualActivity(activity) {
-  const { data, error } = await db
+  var result = await db
     .from("activities")
     .insert([{ ...activity, user_id: currentUser.id }])
     .select();
-  if (error) throw error;
-  return data[0];
+  if (result.error) throw result.error;
+  return result.data[0];
 }
 
 // ---- Check-in functions ----
 
 async function loadCheckins() {
-  const { data, error } = await db
+  var result = await db
     .from("athlete_feedback")
     .select("*")
     .order("week_of", { ascending: false })
     .limit(8);
-  if (error) throw error;
-  return data;
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 async function createCheckin(checkin) {
-  const { data, error } = await db
+  var result = await db
     .from("athlete_feedback")
     .insert([{ ...checkin, user_id: currentUser.id }])
     .select();
-  if (error) throw error;
-  return data[0];
+  if (result.error) throw result.error;
+  return result.data[0];
 }
 
-// ---- Computation helpers ----
-
-function getWeekStart(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function computeWeeklySummary(activities) {
-  const weeks = {};
-  activities.forEach(function (a) {
-    var ws = getWeekStart(new Date(a.started_at));
-    var key = ws.toISOString().split("T")[0];
-    if (!weeks[key]) weeks[key] = { distance: 0, elevation: 0, time: 0, count: 0 };
-    weeks[key].distance += Number(a.distance) || 0;
-    weeks[key].elevation += Number(a.elevation_gain) || 0;
-    weeks[key].time += Number(a.moving_time) || 0;
-    weeks[key].count++;
-  });
-  return weeks;
-}
-
-function computeTrainingBlocks(plan) {
-  var today = new Date();
-  var raceDate = new Date(plan.race_date);
-  var totalWeeks = Math.max(4, Math.ceil((raceDate - today) / (7 * 24 * 60 * 60 * 1000)));
-
-  var baseWeeks = Math.max(1, Math.round(totalWeeks * 0.30));
-  var buildWeeks = Math.max(1, Math.round(totalWeeks * 0.30));
-  var peakWeeks = Math.max(1, Math.round(totalWeeks * 0.25));
-  var taperWeeks = Math.max(1, totalWeeks - baseWeeks - buildWeeks - peakWeeks);
-
-  var baseMileage = plan.current_mileage || 30;
-
-  var blocks = [
-    { name: "Base", weeks: baseWeeks, startMi: baseMileage, endMi: Math.round(baseMileage * 1.15), color: "#3b82f6", desc: "Aerobic foundation, easy volume" },
-    { name: "Build", weeks: buildWeeks, startMi: Math.round(baseMileage * 1.15), endMi: Math.round(baseMileage * 1.35), color: "#f59e0b", desc: "Intensity + specificity" },
-    { name: "Peak", weeks: peakWeeks, startMi: Math.round(baseMileage * 1.35), endMi: Math.round(baseMileage * 1.45), color: "#ef4444", desc: "Race-specific simulation" },
-    { name: "Taper", weeks: taperWeeks, startMi: Math.round(baseMileage * 0.7), endMi: Math.round(baseMileage * 0.5), color: "#22c55e", desc: "Recovery + sharpening" },
-  ];
-
-  if (plan.b2b_long_runs) {
-    blocks[1].desc += " + B2B long weekends";
-    blocks[2].desc += " + B2B long weekends";
-  }
-
-  return blocks;
-}
-
-function computeCurrentBlock(plan) {
-  var blocks = computeTrainingBlocks(plan);
-  var today = new Date();
-  var raceDate = new Date(plan.race_date);
-  var totalWeeks = Math.max(4, Math.ceil((raceDate - today) / (7 * 24 * 60 * 60 * 1000)));
-  var weeksOut = totalWeeks;
-  var elapsed = 0;
-
-  for (var i = 0; i < blocks.length; i++) {
-    elapsed += blocks[i].weeks;
-    if (elapsed >= (totalWeeks - weeksOut + 1) || i === blocks.length - 1) {
-      return blocks[i];
-    }
-  }
-  return blocks[0];
-}
-
-function computeTrainingLoad(activities) {
-  if (!activities.length) return [];
-
-  var sorted = activities.slice().sort(function (a, b) {
-    return new Date(a.started_at) - new Date(b.started_at);
-  });
-
-  var dailyLoad = {};
-  sorted.forEach(function (a) {
-    var day = new Date(a.started_at).toISOString().split("T")[0];
-    dailyLoad[day] = (dailyLoad[day] || 0) + (Number(a.moving_time) || 0) / 60;
-  });
-
-  var firstDay = new Date(sorted[0].started_at);
-  var today = new Date();
-  var days = [];
-  for (var d = new Date(firstDay); d <= today; d.setDate(d.getDate() + 1)) {
-    var key = d.toISOString().split("T")[0];
-    days.push({ date: key, load: dailyLoad[key] || 0 });
-  }
-
-  var alphaATL = 2 / (7 + 1);
-  var alphaCTL = 2 / (42 + 1);
-  var atl = 0, ctl = 0;
-
-  return days.map(function (d) {
-    atl = alphaATL * d.load + (1 - alphaATL) * atl;
-    ctl = alphaCTL * d.load + (1 - alphaCTL) * ctl;
-    return { date: d.date, atl: atl, ctl: ctl, tsb: ctl - atl };
-  });
-}
-
-function computeLongRuns(activities) {
-  var weeks = {};
-  activities
-    .filter(function (a) { return a.type === "Run"; })
-    .forEach(function (a) {
-      var ws = getWeekStart(new Date(a.started_at));
-      var key = ws.toISOString().split("T")[0];
-      var dist = Number(a.distance) || 0;
-      if (!weeks[key] || dist > weeks[key].distance) {
-        weeks[key] = {
-          distance: dist,
-          time: Number(a.moving_time) || 0,
-          elevation: Number(a.elevation_gain) || 0,
-          name: a.name,
-        };
-      }
-    });
-
-  return Object.entries(weeks).sort(function (a, b) { return a[0].localeCompare(b[0]); });
-}
-
-// ---- Format helpers ----
+// ---- HTML escape ----
 
 function escapeHtml(str) {
   var el = document.createElement("span");
@@ -398,45 +322,34 @@ function escapeHtml(str) {
   return el.innerHTML;
 }
 
-function formatDistance(meters) {
-  if (!meters) return "\u2014";
-  return (meters / 1609.344).toFixed(1) + " mi";
+// ---- Sidebar navigation ----
+
+function navigateTo(sectionId) {
+  // Update active link
+  sidebarLinks.forEach(function (link) {
+    link.classList.toggle("active", link.dataset.section === sectionId);
+  });
+
+  // Show/hide pages
+  document.querySelectorAll(".page").forEach(function (page) {
+    page.classList.toggle("active", page.id === sectionId);
+  });
+
+  // Close mobile sidebar
+  closeSidebar();
+
+  // Scroll to top of main wrapper
+  document.querySelector(".main-wrapper").scrollTo(0, 0);
 }
 
-function formatDuration(seconds) {
-  if (!seconds) return "\u2014";
-  var h = Math.floor(seconds / 3600);
-  var m = Math.floor((seconds % 3600) / 60);
-  var s = seconds % 60;
-  if (h > 0) return h + "h " + m + "m";
-  return m + "m " + s + "s";
+function openSidebar() {
+  sidebar.classList.add("open");
+  sidebarOverlay.classList.add("active");
 }
 
-function formatPace(secPerKm) {
-  if (!secPerKm) return "\u2014";
-  var secPerMile = secPerKm * 1.60934;
-  var m = Math.floor(secPerMile / 60);
-  var s = Math.round(secPerMile % 60);
-  return m + ":" + String(s).padStart(2, "0") + " /mi";
-}
-
-function formatElevation(meters) {
-  if (!meters) return "\u2014";
-  return Math.round(meters * 3.28084).toLocaleString() + " ft";
-}
-
-function rpeClass(val) {
-  if (val <= 4) return "easy";
-  if (val <= 7) return "moderate";
-  return "hard";
-}
-
-function trendArrow(current, previous) {
-  if (!previous || previous === 0) return { text: "", cls: "flat" };
-  var pct = Math.round(((current - previous) / previous) * 100);
-  if (pct > 2) return { text: "+" + pct + "%", cls: "up" };
-  if (pct < -2) return { text: pct + "%", cls: "down" };
-  return { text: "~", cls: "flat" };
+function closeSidebar() {
+  sidebar.classList.remove("open");
+  sidebarOverlay.classList.remove("active");
 }
 
 // ---- UI: Auth ----
@@ -579,10 +492,10 @@ function renderRaceCountdown(plans) {
     '<div class="countdown-grid">' +
     '<div><span class="countdown-weeks">' + weeksOut + '</span><br><span class="countdown-unit">weeks out</span></div>' +
     '<div><span class="label">Current block</span><strong>' + block.name + '</strong></div>' +
-    '<div><span class="label">Target mileage</span><strong>' + block.startMi + '–' + block.endMi + ' mi</strong></div>' +
+    '<div><span class="label">Target mileage</span><strong>' + block.startMi + '\u2013' + block.endMi + ' mi</strong></div>' +
     '<div><span class="label">Readiness</span><strong class="positive">On track</strong></div>' +
     '</div>' +
-    (plan.b2b_long_runs ? '<p class="card-note">B2B long run weekends are active during Build and Peak phases.</p>' : '<p class="card-note">"Stay consistent with your ' + block.name.toLowerCase() + ' phase work. Trust the process."</p>');
+    (plan.b2b_long_runs ? '<p class="card-note">B2B long run weekends are active during Build and Peak phases.</p>' : '<p class="card-note">\u201cStay consistent with your ' + block.name.toLowerCase() + ' phase work. Trust the process.\u201d</p>');
 }
 
 // ---- UI: Training block calendar ----
@@ -603,7 +516,7 @@ function renderBlockCalendar(plans) {
   blockTimeline.innerHTML = blocks.map(function (b) {
     return '<div class="block-bar" style="flex:' + b.weeks + ';background:' + b.color + '">' +
       '<strong>' + b.name + '</strong>' +
-      '<span>' + b.weeks + ' wk &middot; ' + b.startMi + '–' + b.endMi + ' mi</span>' +
+      '<span>' + b.weeks + ' wk &middot; ' + b.startMi + '\u2013' + b.endMi + ' mi</span>' +
       '</div>';
   }).join("");
 
@@ -611,118 +524,13 @@ function renderBlockCalendar(plans) {
     return '<div class="block-detail-card">' +
       '<h5 style="color:' + b.color + '">' + b.name + '</h5>' +
       '<p>' + b.weeks + ' weeks</p>' +
-      '<p>' + b.startMi + '–' + b.endMi + ' mi/wk</p>' +
+      '<p>' + b.startMi + '\u2013' + b.endMi + ' mi/wk</p>' +
       '<p>' + b.desc + '</p>' +
       '</div>';
   }).join("");
 }
 
 // ---- UI: Gantt planner (Koop method) ----
-
-var KOOP_PHASES = {
-  preparation: { color: "#6366f1" },
-  endurance: { color: "#3b82f6" },
-  specificPrep: { color: "#f59e0b" },
-  taper: { color: "#22c55e" },
-};
-
-var KOOP_PHASE_KEYS = {
-  preparation: "gantt.preparation",
-  endurance: "gantt.endurance",
-  specificPrep: "gantt.specificPrep",
-  taper: "gantt.taper",
-};
-
-var KOOP_WORKOUTS = {
-  preparation: ["gantt.easyVolume", "gantt.steadyState", "gantt.tempo"],
-  endurance: ["gantt.steadyState", "gantt.tempo", "gantt.enduranceRun", "gantt.muscleTension"],
-  specificPrep: ["gantt.muscleTension", "gantt.overUnder", "gantt.raceSimulation", "gantt.tempo"],
-  taper: ["gantt.steadyState", "gantt.tempo"],
-};
-
-function computeKoopPlan(plan) {
-  var today = new Date();
-  var raceDate = new Date(plan.race_date);
-  var totalWeeks = Math.max(4, Math.ceil((raceDate - today) / (7 * 24 * 60 * 60 * 1000)));
-
-  // Koop phase distribution
-  var prepWeeks = Math.max(1, Math.round(totalWeeks * 0.15));
-  var enduranceWeeks = Math.max(1, Math.round(totalWeeks * 0.35));
-  var specificWeeks = Math.max(1, Math.round(totalWeeks * 0.35));
-  var taperWeeks = Math.max(1, totalWeeks - prepWeeks - enduranceWeeks - specificWeeks);
-
-  var baseMileage = plan.current_mileage || 30;
-  var peakMileage = Math.round(baseMileage * 1.45);
-
-  var phases = [
-    { key: "preparation", weeks: prepWeeks, startMi: baseMileage, endMi: Math.round(baseMileage * 1.1) },
-    { key: "endurance", weeks: enduranceWeeks, startMi: Math.round(baseMileage * 1.1), endMi: Math.round(baseMileage * 1.3) },
-    { key: "specificPrep", weeks: specificWeeks, startMi: Math.round(baseMileage * 1.3), endMi: peakMileage },
-    { key: "taper", weeks: taperWeeks, startMi: Math.round(peakMileage * 0.8), endMi: Math.round(baseMileage * 0.5) },
-  ];
-
-  var weeks = [];
-  var weekNum = 1;
-  var planStart = getWeekStart(today);
-
-  phases.forEach(function (phase) {
-    var workouts = KOOP_WORKOUTS[phase.key];
-    for (var i = 0; i < phase.weeks; i++) {
-      var weekDate = new Date(planStart);
-      weekDate.setDate(weekDate.getDate() + (weekNum - 1) * 7);
-
-      // Recovery every 3rd week (or 4th for longer phases)
-      var cycle = phase.weeks > 8 ? 4 : 3;
-      var recovery = phase.weeks > 2 && i > 0 && (i + 1) % cycle === 0;
-
-      var progressFrac = phase.weeks > 1 ? i / (phase.weeks - 1) : 0;
-      var mileage = Math.round(phase.startMi + (phase.endMi - phase.startMi) * progressFrac);
-      if (recovery) mileage = Math.round(mileage * 0.65);
-
-      var longRunMi = Math.round(mileage * 0.3);
-      var workoutKey = recovery ? "gantt.recoveryWeek" : workouts[i % workouts.length];
-
-      var notesKey = "";
-      if (recovery) notesKey = "gantt.recoveryWeek";
-      if (plan.b2b_long_runs && (phase.key === "specificPrep" || phase.key === "endurance") && !recovery && i > 0) {
-        notesKey = "gantt.b2bLong";
-      }
-
-      var weekEnd = new Date(weekDate);
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      var isCurrent = today >= weekDate && today < weekEnd;
-
-      weeks.push({
-        week: weekNum,
-        date: weekDate,
-        phase: phase.key,
-        mileage: mileage,
-        longRun: longRunMi,
-        workoutKey: workoutKey,
-        recovery: recovery,
-        notesKey: notesKey,
-        isCurrent: isCurrent,
-      });
-
-      weekNum++;
-    }
-  });
-
-  // Add race week
-  weeks.push({
-    week: weekNum,
-    date: raceDate,
-    phase: "race",
-    mileage: 0,
-    longRun: 0,
-    workoutKey: "gantt.raceDay",
-    recovery: false,
-    notesKey: "gantt.raceWeek",
-    isCurrent: false,
-  });
-
-  return { weeks: weeks, phases: phases, totalWeeks: totalWeeks, peakMileage: peakMileage };
-}
 
 function renderGanttPlanner(plans) {
   var futurePlans = plans.filter(function (p) { return new Date(p.race_date) > new Date(); });
@@ -784,7 +592,7 @@ function renderGanttPlanner(plans) {
   }).join("");
 }
 
-// ---- UI: Activities (ultra-focused) ----
+// ---- UI: Activities ----
 
 async function refreshActivities() {
   try {
@@ -829,7 +637,6 @@ function renderActivities(activities) {
       '</div>';
   }).join("");
 
-  // RPE change handlers
   activitiesList.querySelectorAll(".rpe-select").forEach(function (sel) {
     sel.addEventListener("change", async function () {
       var val = parseInt(sel.value, 10);
@@ -852,6 +659,7 @@ async function refreshAllActivitiesAndCharts() {
     renderTrainingLoadChart(cachedAllActivities);
     renderLongRunChart(cachedAllActivities);
     updateInsightStats(cachedAllActivities);
+    renderCoachInsights();
   } catch (err) {
     // silently fail for charts
   }
@@ -1029,12 +837,62 @@ function updateInsightStats(activities) {
   }
 }
 
+// ---- UI: Coach insights ----
+
+var COACH_ICONS = {
+  warning: "\u26a0\ufe0f",
+  alert: "\u26a1",
+  battery: "\ud83d\udd0b",
+  fatigue: "\ud83d\ude34",
+  balance: "\u2696\ufe0f",
+  trending: "\ud83d\udcc8",
+  decline: "\ud83d\udcc9",
+  spike: "\ud83d\udca5",
+  longrun: "\ud83c\udfc3",
+  rest: "\ud83d\udca4",
+  motivation: "\ud83d\udd25",
+  injury: "\ud83e\ude79",
+  race: "\ud83c\udfc1",
+  taper: "\ud83c\udf43",
+  start: "\ud83d\ude80",
+};
+
+function renderCoachInsights() {
+  var insights = generateCoachingInsights({
+    activities: cachedAllActivities,
+    checkins: cachedCheckins,
+    plans: cachedPlans,
+  });
+
+  if (!insights.length) {
+    coachInsightsEl.innerHTML =
+      '<div class="coach-empty">' +
+      '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>' +
+      '<p>' + t("coach.noData") + '</p>' +
+      '</div>';
+    return;
+  }
+
+  coachInsightsEl.innerHTML = insights.map(function (insight) {
+    var icon = COACH_ICONS[insight.icon] || "\ud83d\udcac";
+    return '<div class="coach-card ' + insight.type + '">' +
+      '<div class="coach-card-icon">' + icon + '</div>' +
+      '<div class="coach-card-body">' +
+      '<h4>' + t(insight.titleKey) + '</h4>' +
+      '<p>' + t(insight.descKey) + '</p>' +
+      (insight.meta ? '<div class="coach-card-meta">' + escapeHtml(insight.meta) + '</div>' : '') +
+      '</div>' +
+      '</div>';
+  }).join("");
+}
+
 // ---- UI: Check-ins ----
 
 async function refreshCheckins() {
   try {
-    var checkins = await loadCheckins();
-    renderCheckins(checkins);
+    cachedCheckins = await loadCheckins();
+    renderCheckins(cachedCheckins);
+    renderCoachInsights();
   } catch (err) {
     // silently fail
   }
@@ -1046,7 +904,6 @@ function renderCheckins(checkins) {
     return;
   }
 
-  // Update latest check-in text
   var latest = checkins[0];
   var latestText = document.getElementById("latest-checkin-text");
   var parts = [];
@@ -1086,23 +943,41 @@ function hideAuthModal() {
 
 // ---- Event listeners ----
 
-// Navigation actions
+// Sidebar navigation
+sidebarLinks.forEach(function (link) {
+  link.addEventListener("click", function (e) {
+    e.preventDefault();
+    navigateTo(link.dataset.section);
+  });
+});
+
+if (topbarMenu) {
+  topbarMenu.addEventListener("click", openSidebar);
+}
+if (sidebarClose) {
+  sidebarClose.addEventListener("click", closeSidebar);
+}
+if (sidebarOverlay) {
+  sidebarOverlay.addEventListener("click", closeSidebar);
+}
+
+// Navigation actions (buttons with data-action)
 actions.forEach(function (button) {
   button.addEventListener("click", function () {
     var action = button.dataset.action;
 
     if (action === "start-plan" || action === "generate-plan") {
-      document.querySelector("#planning").scrollIntoView({ behavior: "smooth" });
+      navigateTo("planning");
       return;
     }
 
     if (action === "sample-week") {
-      document.querySelector("#insights").scrollIntoView({ behavior: "smooth" });
+      navigateTo("insights");
       return;
     }
 
     if (action === "policy") {
-      document.querySelector("#data").scrollIntoView({ behavior: "smooth" });
+      navigateTo("data");
       return;
     }
 
@@ -1325,7 +1200,6 @@ if (checkinForm) {
       note.textContent = "Check-in saved!";
       note.style.color = "var(--success)";
       checkinForm.reset();
-      // Reset range display values
       checkinForm.querySelectorAll("input[type=range]").forEach(function (r) {
         r.value = 3;
         var output = r.parentElement.querySelector(".range-val");
@@ -1377,7 +1251,6 @@ if (manualEntryForm) {
       note.textContent = "Workout saved!";
       note.style.color = "var(--success)";
       manualEntryForm.reset();
-      // Reset range display
       var effortOutput = manualEntryForm.querySelector(".range-val");
       if (effortOutput) effortOutput.textContent = "5";
       var effortRange = manualEntryForm.querySelector("input[name=effort]");
@@ -1404,15 +1277,6 @@ document.querySelectorAll("input[type=range]").forEach(function (input) {
   }
 });
 
-// Mobile nav toggle
-if (menuToggle && mobileNav) {
-  menuToggle.addEventListener("click", function () {
-    var isOpen = menuToggle.getAttribute("aria-expanded") === "true";
-    menuToggle.setAttribute("aria-expanded", String(!isOpen));
-    mobileNav.hidden = isOpen;
-  });
-}
-
 // ---- Handle Strava OAuth callback ----
 
 function handleStravaCallback() {
@@ -1437,7 +1301,7 @@ function handleStravaCallback() {
         refreshActivities();
         refreshAllActivitiesAndCharts();
       });
-      document.querySelector("#data").scrollIntoView({ behavior: "smooth" });
+      navigateTo("data");
     } catch (err) {
       alert("Strava connection failed: " + err.message);
     }
@@ -1462,6 +1326,7 @@ document.querySelectorAll(".lang-option").forEach(function (btn) {
       renderTrainingLoadChart(cachedAllActivities);
       renderLongRunChart(cachedAllActivities);
     }
+    renderCoachInsights();
   });
 });
 
@@ -1482,3 +1347,11 @@ if (db) {
 
   handleStravaCallback();
 }
+
+// Handle hash navigation on load
+(function () {
+  var hash = window.location.hash.replace("#", "");
+  if (hash && document.getElementById(hash)) {
+    navigateTo(hash);
+  }
+})();

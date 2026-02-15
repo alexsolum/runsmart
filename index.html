@@ -15,82 +15,116 @@
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   </head>
   <body>
-    <header class="hero">
-      <nav class="nav">
-        <div class="logo">RunSmart</div>
-        <div class="nav-links">
-          <a href="#planning" data-i18n="nav.planning">Planning</a>
-          <a href="#insights" data-i18n="nav.insights">Insights</a>
-          <a href="#data" data-i18n="nav.data">Data</a>
-          <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
-        </div>
-        <div class="nav-actions">
-          <div class="lang-switcher">
-            <button class="lang-option active" data-lang="en">EN</button>
-            <button class="lang-option" data-lang="no">NO</button>
-          </div>
-          <span class="user-email" id="user-email" hidden></span>
-          <button class="ghost" data-action="signin" id="signin-btn" data-i18n="nav.signin">Sign in</button>
-          <button class="ghost" data-action="signout" id="signout-btn" hidden data-i18n="nav.signout">Sign out</button>
-          <button class="cta" data-action="start-plan" data-i18n="nav.startPlan">Start Plan</button>
-          <button class="menu-toggle" aria-label="Open navigation" aria-expanded="false">
-            &#9776;
-          </button>
-        </div>
-      </nav>
-      <div class="mobile-nav" hidden>
-        <a href="#planning" data-i18n="nav.planning">Planning</a>
-        <a href="#insights" data-i18n="nav.insights">Insights</a>
-        <a href="#data" data-i18n="nav.data">Data</a>
-        <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
+    <!-- Sidebar navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">RunSmart</div>
+        <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">&times;</button>
       </div>
-      <div class="hero-content">
-        <div>
-          <p class="eyebrow" data-i18n="hero.eyebrow">AI-guided endurance training</p>
-          <h1 data-i18n="hero.title">Plan smarter, adapt faster, and train with clarity.</h1>
-          <p class="subhead" data-i18n="hero.subhead">
-            RunSmart blends evidence-informed coaching with real-life constraints so every training block
-            feels achievable, personalized, and explainable.
-          </p>
-          <div class="hero-actions">
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="sidebar-link active" data-section="dashboard">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span data-i18n="sidebar.dashboard">Dashboard</span>
+        </a>
+        <a href="#planning" class="sidebar-link" data-section="planning">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span data-i18n="sidebar.planning">Planning</span>
+        </a>
+        <a href="#insights" class="sidebar-link" data-section="insights">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span data-i18n="sidebar.insights">Insights</span>
+        </a>
+        <a href="#data" class="sidebar-link" data-section="data">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span data-i18n="sidebar.data">Data</span>
+        </a>
+        <a href="#coach" class="sidebar-link" data-section="coach">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+          <span data-i18n="sidebar.coach">Coach</span>
+        </a>
+        <a href="#roadmap" class="sidebar-link" data-section="roadmap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          <span data-i18n="sidebar.roadmap">Roadmap</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="lang-switcher">
+          <button class="lang-option active" data-lang="en">EN</button>
+          <button class="lang-option" data-lang="no">NO</button>
+        </div>
+        <div class="sidebar-auth">
+          <span class="user-email" id="user-email" hidden></span>
+          <button class="sidebar-auth-btn" data-action="signin" id="signin-btn" data-i18n="nav.signin">Sign in</button>
+          <button class="sidebar-auth-btn" data-action="signout" id="signout-btn" hidden data-i18n="nav.signout">Sign out</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Main content area -->
+    <div class="main-wrapper">
+      <!-- Top bar (mobile) -->
+      <header class="topbar">
+        <button class="topbar-menu" id="topbar-menu" aria-label="Open navigation">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="topbar-logo">RunSmart</div>
+        <button class="topbar-cta" data-action="start-plan" data-i18n="nav.startPlan">Start Plan</button>
+      </header>
+
+      <!-- Dashboard section -->
+      <section id="dashboard" class="page active">
+        <div class="page-header">
+          <div>
+            <p class="eyebrow" data-i18n="hero.eyebrow">AI-guided endurance training</p>
+            <h1 data-i18n="hero.title">Plan smarter, adapt faster, and train with clarity.</h1>
+            <p class="subhead" data-i18n="hero.subhead">
+              RunSmart blends evidence-informed coaching with real-life constraints so every training block
+              feels achievable, personalized, and explainable.
+            </p>
+          </div>
+        </div>
+        <div class="dashboard-grid">
+          <div class="hero-card" id="hero-card">
+            <div id="hero-card-static">
+              <h3 data-i18n="hero.nextGoal">Next Goal Race</h3>
+              <p class="muted" data-i18n="hero.trailInfo">Trail 50K &bull; 18 weeks out</p>
+              <div class="card-grid">
+                <div>
+                  <span class="label" data-i18n="hero.weeklyFocus">Weekly focus</span>
+                  <strong>Base 2</strong>
+                </div>
+                <div>
+                  <span class="label" data-i18n="hero.mileage">Mileage</span>
+                  <strong>42&ndash;48 mi</strong>
+                </div>
+                <div>
+                  <span class="label" data-i18n="hero.keyWorkout">Key workout</span>
+                  <strong>Progression long run</strong>
+                </div>
+                <div>
+                  <span class="label" data-i18n="hero.readiness">Readiness</span>
+                  <strong class="positive" data-i18n="hero.onTrack">On track</strong>
+                </div>
+              </div>
+              <p class="card-note" data-i18n="hero.cardNote">
+                &ldquo;You handled last week well. Keep the mid-week intensity controlled to stay fresh for the long run.&rdquo;
+              </p>
+            </div>
+            <div id="hero-card-dynamic" hidden></div>
+          </div>
+          <div class="dashboard-actions">
             <button class="cta" data-action="generate-plan" data-i18n="hero.generatePlan">Generate a plan</button>
             <button class="ghost" data-action="sample-week" data-i18n="hero.sampleWeek">View sample week</button>
           </div>
         </div>
-        <div class="hero-card" id="hero-card">
-          <div id="hero-card-static">
-            <h3 data-i18n="hero.nextGoal">Next Goal Race</h3>
-            <p class="muted" data-i18n="hero.trailInfo">Trail 50K &bull; 18 weeks out</p>
-            <div class="card-grid">
-              <div>
-                <span class="label" data-i18n="hero.weeklyFocus">Weekly focus</span>
-                <strong>Base 2</strong>
-              </div>
-              <div>
-                <span class="label" data-i18n="hero.mileage">Mileage</span>
-                <strong>42&ndash;48 mi</strong>
-              </div>
-              <div>
-                <span class="label" data-i18n="hero.keyWorkout">Key workout</span>
-                <strong>Progression long run</strong>
-              </div>
-              <div>
-                <span class="label" data-i18n="hero.readiness">Readiness</span>
-                <strong class="positive" data-i18n="hero.onTrack">On track</strong>
-              </div>
-            </div>
-            <p class="card-note" data-i18n="hero.cardNote">
-              &ldquo;You handled last week well. Keep the mid-week intensity controlled to stay fresh for the long run.&rdquo;
-            </p>
-          </div>
-          <div id="hero-card-dynamic" hidden></div>
-        </div>
-      </div>
-    </header>
+      </section>
 
-    <main>
-      <section id="planning" class="section">
-        <div class="section-header">
+      <!-- Planning section -->
+      <section id="planning" class="page">
+        <div class="page-header">
           <h2 data-i18n="planning.title">Training plan generator</h2>
           <p data-i18n="planning.desc">
             Build goal-oriented blocks with progression guardrails, realistic scheduling, and transparent coaching
@@ -179,8 +213,9 @@
         </div>
       </section>
 
-      <section id="insights" class="section accent">
-        <div class="section-header">
+      <!-- Insights section -->
+      <section id="insights" class="page">
+        <div class="page-header">
           <h2 data-i18n="insights.title">Training analysis &amp; insights</h2>
           <p data-i18n="insights.desc">Understand readiness, spot risk early, and see the impact of your consistency.</p>
         </div>
@@ -265,8 +300,9 @@
         </div>
       </section>
 
-      <section id="data" class="section">
-        <div class="section-header">
+      <!-- Data section -->
+      <section id="data" class="page">
+        <div class="page-header">
           <h2 data-i18n="data.title">Reliable data ingestion</h2>
           <p data-i18n="data.desc">Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
         </div>
@@ -367,8 +403,23 @@
         </div>
       </section>
 
-      <section id="roadmap" class="section">
-        <div class="section-header">
+      <!-- Coach section -->
+      <section id="coach" class="page">
+        <div class="page-header">
+          <h2 data-i18n="coach.title">AI Coach</h2>
+          <p data-i18n="coach.subtitle">Personalized coaching insights based on your training data</p>
+        </div>
+        <div id="coach-insights" class="coach-insights">
+          <div class="coach-empty">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+            <p data-i18n="coach.noData">Connect Strava or log workouts to receive coaching insights.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Roadmap section -->
+      <section id="roadmap" class="page">
+        <div class="page-header">
           <h2 data-i18n="roadmap.title">Roadmap for future expansion</h2>
           <p data-i18n="roadmap.desc">Designed for single-athlete focus today, ready for collaborative coaching tomorrow.</p>
         </div>
@@ -387,20 +438,21 @@
           </div>
         </div>
       </section>
-    </main>
 
-    <footer class="footer">
-      <div>
-        <strong>RunSmart</strong>
-        <p data-i18n="footer.tagline">Evidence-informed training guidance for endurance runners.</p>
-      </div>
-      <div class="footer-links">
-        <span data-i18n="footer.support">Support</span>
-        <span data-i18n="footer.privacy">Privacy</span>
-        <span data-i18n="footer.contact">Contact</span>
-      </div>
-    </footer>
+      <footer class="footer">
+        <div>
+          <strong>RunSmart</strong>
+          <p data-i18n="footer.tagline">Evidence-informed training guidance for endurance runners.</p>
+        </div>
+        <div class="footer-links">
+          <span data-i18n="footer.support">Support</span>
+          <span data-i18n="footer.privacy">Privacy</span>
+          <span data-i18n="footer.contact">Contact</span>
+        </div>
+      </footer>
+    </div>
 
+    <!-- Auth modal -->
     <div class="modal-overlay" id="auth-modal" hidden>
       <div class="modal">
         <button class="modal-close" aria-label="Close">&times;</button>
@@ -430,6 +482,7 @@
     </div>
 
     <script src="lang.js"></script>
+    <script src="compute.js"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
   </body>

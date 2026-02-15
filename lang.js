@@ -252,6 +252,24 @@ var TRANSLATIONS = {
     "coach.getStarted": "Get started",
     "coach.getStartedDesc": "Sync your Strava account or log a workout to start receiving personalized coaching insights.",
 
+    // Weekly calendar
+    "cal.title": "Weekly training calendar",
+    "cal.easy": "Easy",
+    "cal.recovery": "Recovery",
+    "cal.intensity": "Intensity",
+    "cal.long": "Long run",
+    "cal.mediumLong": "Med-long",
+    "cal.rest": "Rest",
+    "cal.race": "Race",
+    "cal.easyRun": "Easy run",
+    "cal.recoveryRun": "Recovery run",
+    "cal.longRun": "Long run",
+    "cal.shakeout": "Shakeout",
+    "cal.raceDay": "Race day",
+    "cal.totalVolume": "total volume",
+    "cal.longRunLabel": "long run",
+    "cal.currentWeek": "Current week",
+
     // Language
     "lang.en": "English",
     "lang.no": "Norsk",
@@ -507,6 +525,24 @@ var TRANSLATIONS = {
     "coach.taperPhaseDesc": "L\u00f8pet ditt er 3\u20134 uker unna. Begynn \u00e5 redusere volum mens du opprettholder litt intensitet for \u00e5 holde deg skarp.",
     "coach.getStarted": "Kom i gang",
     "coach.getStartedDesc": "Synkroniser Strava-kontoen din eller logg en trening for \u00e5 begynne \u00e5 motta personlige treningsinnsikter.",
+
+    // Weekly calendar
+    "cal.title": "Ukentlig treningskalender",
+    "cal.easy": "Rolig",
+    "cal.recovery": "Restitusjon",
+    "cal.intensity": "Intensitet",
+    "cal.long": "Langtur",
+    "cal.mediumLong": "Mellomlang",
+    "cal.rest": "Hvile",
+    "cal.race": "Løp",
+    "cal.easyRun": "Rolig løp",
+    "cal.recoveryRun": "Restitusjonsløp",
+    "cal.longRun": "Langtur",
+    "cal.shakeout": "Uttøyingsløp",
+    "cal.raceDay": "Løpsdag",
+    "cal.totalVolume": "totalt volum",
+    "cal.longRunLabel": "langtur",
+    "cal.currentWeek": "Denne uken",
 
     // Language
     "lang.en": "English",

@@ -717,6 +717,7 @@ h2 {
 
 .gantt-table tbody tr:hover {
   background: var(--accent-soft);
+  cursor: pointer;
 }
 
 .gantt-table tbody tr.gantt-recovery {
@@ -759,6 +760,174 @@ h2 {
 
 .gantt-phase-name {
   font-size: 12px;
+}
+
+/* ---- Weekly calendar ---- */
+
+.weekly-calendar {
+  margin-top: 32px;
+}
+
+.weekly-calendar h3 {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.weekly-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.weekly-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weekly-cal-btn {
+  padding: 6px 12px;
+  font-size: 14px;
+  min-width: 36px;
+}
+
+.weekly-cal-label {
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 200px;
+  text-align: center;
+}
+
+.weekly-cal-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.weekly-cal-meta .pill {
+  margin-bottom: 0;
+}
+
+.weekly-cal-meta-stat {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.weekly-cal-meta-stat strong {
+  color: var(--text);
+}
+
+.weekly-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.weekly-cal-day {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.weekly-cal-day:hover {
+  border-color: var(--accent);
+}
+
+.weekly-cal-day.is-today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+.weekly-cal-day.is-rest {
+  opacity: 0.55;
+}
+
+.weekly-cal-day-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.weekly-cal-day-date {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.weekly-cal-workout-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.weekly-cal-workout-badge.type-easy {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.weekly-cal-workout-badge.type-recovery {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.weekly-cal-workout-badge.type-intensity {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.weekly-cal-workout-badge.type-long {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.weekly-cal-workout-badge.type-medium-long {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.weekly-cal-workout-badge.type-rest {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.weekly-cal-workout-badge.type-race {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.weekly-cal-workout-name {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+  line-height: 1.3;
+}
+
+.weekly-cal-workout-dist {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.weekly-cal-day.is-rest .weekly-cal-workout-dist {
+  color: var(--muted);
 }
 
 /* ---- Insights ---- */
@@ -1533,6 +1702,15 @@ h2 {
     flex-direction: column;
   }
 
+  .weekly-cal-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .weekly-calendar-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .footer {
     padding: 24px 20px;
   }
@@ -1554,6 +1732,10 @@ h2 {
   .insight-summary .stats {
     flex-direction: column;
     gap: 12px;
+  }
+
+  .weekly-cal-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .week-card-stats {

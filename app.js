@@ -24,6 +24,7 @@ var computeCurrentBlock = Compute.computeCurrentBlock;
 var computeTrainingLoad = Compute.computeTrainingLoad;
 var computeLongRuns = Compute.computeLongRuns;
 var computeKoopPlan = Compute.computeKoopPlan;
+var computeWeeklyCalendar = Compute.computeWeeklyCalendar;
 var generateCoachingInsights = Compute.generateCoachingInsights;
 var formatDistance = Compute.formatDistance;
 var formatDuration = Compute.formatDuration;
@@ -81,6 +82,14 @@ var ganttPhaseBar = document.getElementById("gantt-phase-bar");
 var ganttVolumeChart = document.getElementById("gantt-volume-chart");
 var ganttBody = document.getElementById("gantt-body");
 
+// Weekly calendar DOM refs
+var weeklyCalendar = document.getElementById("weekly-calendar");
+var weeklyCalLabel = document.getElementById("weekly-cal-label");
+var weeklyCalMeta = document.getElementById("weekly-cal-meta");
+var weeklyCalGrid = document.getElementById("weekly-cal-grid");
+var weeklyCalPrev = document.getElementById("weekly-cal-prev");
+var weeklyCalNext = document.getElementById("weekly-cal-next");
+
 // Coach DOM refs
 var coachInsightsEl = document.getElementById("coach-insights");
 
@@ -96,6 +105,9 @@ var currentUser = null;
 var cachedPlans = [];
 var cachedAllActivities = [];
 var cachedCheckins = [];
+var cachedKoopPlan = null;
+var cachedCalendarPlan = null;
+var calendarWeekIndex = 0;
 
 // ---- Auth functions ----
 
@@ -380,6 +392,7 @@ function updateAuthUI(user) {
     checkinSection.hidden = true;
     blockCalendar.hidden = true;
     ganttPlanner.hidden = true;
+    weeklyCalendar.hidden = true;
     trainingLoadSection.hidden = true;
     longRunSection.hidden = true;
     heroCardStatic.hidden = false;
@@ -422,6 +435,7 @@ async function refreshPlans() {
     renderRaceCountdown(cachedPlans);
     renderBlockCalendar(cachedPlans);
     renderGanttPlanner(cachedPlans);
+    renderWeeklyCalendar(cachedPlans);
   } catch (err) {
     plansList.innerHTML = '<p class="muted">Could not load plans.</p>';
   }
@@ -580,7 +594,7 @@ function renderGanttPlanner(plans) {
 
     var dateStr = w.date.toLocaleDateString(currentLang === "no" ? "nb-NO" : "en-US", { month: "short", day: "numeric" });
 
-    return '<tr class="' + cls + '">' +
+    return '<tr class="' + cls + '" data-week-index="' + (w.week - 1) + '" style="cursor:pointer">' +
       '<td>' + (w.isCurrent ? '<strong>' + w.week + '</strong>' : w.week) + '</td>' +
       '<td>' + dateStr + '</td>' +
       '<td><span class="gantt-phase-dot" style="background:' + phaseColor + '"></span><span class="gantt-phase-name">' + phaseName + '</span></td>' +
@@ -590,6 +604,147 @@ function renderGanttPlanner(plans) {
       '<td>' + (w.notesKey ? t(w.notesKey) : '') + '</td>' +
       '</tr>';
   }).join("");
+
+  // Click a Gantt row to jump to that week in the calendar
+  ganttBody.querySelectorAll("tr[data-week-index]").forEach(function (row) {
+    row.addEventListener("click", function () {
+      var idx = parseInt(row.dataset.weekIndex, 10);
+      if (cachedKoopPlan && idx >= 0 && idx < cachedKoopPlan.weeks.length) {
+        calendarWeekIndex = idx;
+        renderCalendarWeek();
+        weeklyCalendar.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
+}
+
+// ---- UI: Weekly training calendar ----
+
+var DAY_NAMES_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+var DAY_NAMES_NO = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
+
+var CAL_TYPE_LABELS = {
+  easy: "cal.easy",
+  recovery: "cal.recovery",
+  intensity: "cal.intensity",
+  long: "cal.long",
+  "medium-long": "cal.mediumLong",
+  rest: "cal.rest",
+  race: "cal.race",
+};
+
+function renderWeeklyCalendar(plans) {
+  var futurePlans = plans.filter(function (p) { return new Date(p.race_date) > new Date(); });
+
+  if (!futurePlans.length) {
+    weeklyCalendar.hidden = true;
+    cachedKoopPlan = null;
+    cachedCalendarPlan = null;
+    return;
+  }
+
+  var plan = futurePlans[0];
+  cachedCalendarPlan = plan;
+  cachedKoopPlan = computeKoopPlan(plan);
+
+  // Default to current week
+  var currentIdx = -1;
+  cachedKoopPlan.weeks.forEach(function (w, i) {
+    if (w.isCurrent) currentIdx = i;
+  });
+  calendarWeekIndex = currentIdx >= 0 ? currentIdx : 0;
+
+  weeklyCalendar.hidden = false;
+  renderCalendarWeek();
+}
+
+function renderCalendarWeek() {
+  if (!cachedKoopPlan || !cachedCalendarPlan) return;
+
+  var weeks = cachedKoopPlan.weeks;
+  var weekData = weeks[calendarWeekIndex];
+  if (!weekData) return;
+
+  var availability = cachedCalendarPlan.availability || 5;
+  var b2b = cachedCalendarPlan.b2b_long_runs || false;
+
+  // Navigation label
+  var weekDate = weekData.date;
+  var dateOpts = { month: "short", day: "numeric" };
+  var locale = currentLang === "no" ? "nb-NO" : "en-US";
+  var phaseName = weekData.phase === "race"
+    ? t("gantt.raceWeek")
+    : t(KOOP_PHASE_KEYS[weekData.phase]);
+
+  weeklyCalLabel.textContent = t("gantt.week") + " " + weekData.week + " \u2014 " +
+    weekDate.toLocaleDateString(locale, dateOpts) + " \u2014 " + phaseName;
+
+  // Disable prev/next at boundaries
+  weeklyCalPrev.disabled = calendarWeekIndex <= 0;
+  weeklyCalNext.disabled = calendarWeekIndex >= weeks.length - 1;
+
+  // Meta info
+  var phaseColor = weekData.phase === "race"
+    ? "#ef4444"
+    : (KOOP_PHASES[weekData.phase] ? KOOP_PHASES[weekData.phase].color : "#94a3b8");
+
+  weeklyCalMeta.innerHTML =
+    '<span class="pill" style="background:' + phaseColor + '20;color:' + phaseColor + '">' + phaseName + '</span>' +
+    (weekData.phase !== "race"
+      ? '<span class="weekly-cal-meta-stat"><strong>' + weekData.mileage + ' mi</strong> ' + t("cal.totalVolume") + '</span>' +
+        '<span class="weekly-cal-meta-stat"><strong>' + weekData.longRun + ' mi</strong> ' + t("cal.longRunLabel") + '</span>'
+      : '') +
+    (weekData.recovery ? '<span class="pill" style="background:#dcfce7;color:#166534">' + t("gantt.recoveryWeek") + '</span>' : '') +
+    (weekData.isCurrent ? '<span class="pill">' + t("cal.currentWeek") + '</span>' : '');
+
+  // Day grid
+  var calDays = computeWeeklyCalendar(weekData, availability, b2b);
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+
+  weeklyCalGrid.innerHTML = calDays.map(function (day, i) {
+    var dayDate = day.date;
+    var isToday = dayDate.getFullYear() === today.getFullYear() &&
+      dayDate.getMonth() === today.getMonth() &&
+      dayDate.getDate() === today.getDate();
+    var isRest = day.type === "rest";
+
+    var cls = "weekly-cal-day";
+    if (isToday) cls += " is-today";
+    if (isRest) cls += " is-rest";
+
+    var typeCls = "type-" + day.type;
+    var typeLabel = t(CAL_TYPE_LABELS[day.type] || day.type);
+    var workoutName = t(day.labelKey);
+
+    return '<div class="' + cls + '">' +
+      '<div class="weekly-cal-day-name">' + dayNames[i] + '</div>' +
+      '<div class="weekly-cal-day-date">' + dayDate.toLocaleDateString(locale, dateOpts) + '</div>' +
+      '<span class="weekly-cal-workout-badge ' + typeCls + '">' + typeLabel + '</span>' +
+      '<div class="weekly-cal-workout-name">' + workoutName + '</div>' +
+      '<div class="weekly-cal-workout-dist">' + (day.distance > 0 ? day.distance + " mi" : "\u2014") + '</div>' +
+      '</div>';
+  }).join("");
+}
+
+// Calendar navigation
+if (weeklyCalPrev) {
+  weeklyCalPrev.addEventListener("click", function () {
+    if (calendarWeekIndex > 0) {
+      calendarWeekIndex--;
+      renderCalendarWeek();
+    }
+  });
+}
+
+if (weeklyCalNext) {
+  weeklyCalNext.addEventListener("click", function () {
+    if (cachedKoopPlan && calendarWeekIndex < cachedKoopPlan.weeks.length - 1) {
+      calendarWeekIndex++;
+      renderCalendarWeek();
+    }
+  });
 }
 
 // ---- UI: Activities ----
@@ -1320,6 +1475,7 @@ document.querySelectorAll(".lang-option").forEach(function (btn) {
       renderRaceCountdown(cachedPlans);
       renderBlockCalendar(cachedPlans);
       renderGanttPlanner(cachedPlans);
+      renderWeeklyCalendar(cachedPlans);
     }
     if (cachedAllActivities.length) {
       renderWeeklyDashboard(cachedAllActivities);

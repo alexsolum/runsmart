@@ -112,10 +112,15 @@ async function signUp(email, password) {
 }
 
 async function signInWithGoogle() {
-  var result = await db.auth.signInWithOAuth({
+  var redirectTo =
+    typeof AUTH_REDIRECT_URL === "string" && AUTH_REDIRECT_URL.trim()
+      ? AUTH_REDIRECT_URL.trim()
+      : window.location.origin + window.location.pathname;
+
+  const { error } = await db.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin + window.location.pathname,
+      redirectTo: redirectTo,
     },
   });
   if (result.error) throw result.error;

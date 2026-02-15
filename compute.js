@@ -486,6 +486,100 @@ var Compute = (function () {
     return insights;
   }
 
+  // ---- Weekly calendar distribution ----
+
+  function computeWeeklyCalendar(weekData, availability, b2bLongRuns) {
+    var mileage = weekData.mileage;
+    var longRunMi = weekData.longRun;
+    var weekDate = new Date(weekData.date);
+
+    var days = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(weekDate);
+      d.setDate(d.getDate() + i);
+      days.push({ date: d, type: null, labelKey: "", distance: 0 });
+    }
+
+    // Race week
+    if (weekData.phase === "race") {
+      for (var r = 0; r < 7; r++) {
+        days[r].type = "rest";
+        days[r].labelKey = "cal.rest";
+      }
+      days[6].type = "race";
+      days[6].labelKey = "cal.raceDay";
+      days[1].type = "easy";
+      days[1].labelKey = "cal.shakeout";
+      days[1].distance = 3;
+      days[3].type = "easy";
+      days[3].labelKey = "cal.shakeout";
+      days[3].distance = 2;
+      return days;
+    }
+
+    var remaining = mileage;
+
+    // Long run on Sunday (index 6)
+    days[6].type = "long";
+    days[6].labelKey = "cal.longRun";
+    days[6].distance = longRunMi;
+    remaining -= longRunMi;
+
+    // Key workout on Wednesday (index 2) unless recovery week
+    if (!weekData.recovery) {
+      var keyDist = Math.max(3, Math.round(mileage * 0.15));
+      days[2].type = "intensity";
+      days[2].labelKey = weekData.workoutKey;
+      days[2].distance = keyDist;
+      remaining -= keyDist;
+    }
+
+    // B2B medium-long on Saturday (index 5)
+    var isB2BWeek = b2bLongRuns && !weekData.recovery &&
+      (weekData.phase === "endurance" || weekData.phase === "specificPrep");
+    if (isB2BWeek) {
+      var medLongDist = Math.round(longRunMi * 0.65);
+      days[5].type = "medium-long";
+      days[5].labelKey = "cal.mediumLong";
+      days[5].distance = medLongDist;
+      remaining -= medLongDist;
+    }
+
+    // Rest days based on availability
+    var restIndices = availability <= 5 ? [0, 4] : availability === 6 ? [0] : [];
+    restIndices.forEach(function (idx) {
+      if (days[idx].type === null) {
+        days[idx].type = "rest";
+        days[idx].labelKey = "cal.rest";
+      }
+    });
+
+    // Fill remaining null days with easy/recovery runs
+    var emptyIndices = [];
+    for (var e = 0; e < 7; e++) {
+      if (days[e].type === null) emptyIndices.push(e);
+    }
+
+    if (emptyIndices.length > 0 && remaining > 0) {
+      var perDay = Math.round(remaining / emptyIndices.length);
+      emptyIndices.forEach(function (idx, pos) {
+        var dist = pos === emptyIndices.length - 1
+          ? Math.max(2, remaining - perDay * (emptyIndices.length - 1))
+          : Math.max(2, perDay);
+        days[idx].type = weekData.recovery ? "recovery" : "easy";
+        days[idx].labelKey = weekData.recovery ? "cal.recoveryRun" : "cal.easyRun";
+        days[idx].distance = dist;
+      });
+    } else {
+      emptyIndices.forEach(function (idx) {
+        days[idx].type = "rest";
+        days[idx].labelKey = "cal.rest";
+      });
+    }
+
+    return days;
+  }
+
   // ---- Public API ----
 
   return {
@@ -496,6 +590,7 @@ var Compute = (function () {
     computeTrainingLoad: computeTrainingLoad,
     computeLongRuns: computeLongRuns,
     computeKoopPlan: computeKoopPlan,
+    computeWeeklyCalendar: computeWeeklyCalendar,
     generateCoachingInsights: generateCoachingInsights,
     formatDistance: formatDistance,
     formatDuration: formatDuration,

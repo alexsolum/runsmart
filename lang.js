@@ -253,6 +253,12 @@ var TRANSLATIONS = {
     "coach.taperPhaseDesc": "Your race is 3\u20134 weeks away. Start reducing volume while maintaining some intensity to stay sharp.",
     "coach.getStarted": "Get started",
     "coach.getStartedDesc": "Sync your Strava account or log a workout to start receiving personalized coaching insights.",
+    "coach.getAIInsights": "Get AI coaching insights",
+    "coach.aiLoading": "Analyzing your training\u2026",
+    "coach.aiError": "AI coaching unavailable. Showing rule-based insights.",
+    "coach.aiBadge": "AI",
+    "coach.ruleBasedSection": "Training analysis",
+    "coach.aiSection": "AI coaching",
 
     // Weekly calendar
     "cal.title": "Weekly training calendar",
@@ -538,6 +544,12 @@ var TRANSLATIONS = {
     "coach.taperPhaseDesc": "L\u00f8pet ditt er 3\u20134 uker unna. Begynn \u00e5 redusere volum mens du opprettholder litt intensitet for \u00e5 holde deg skarp.",
     "coach.getStarted": "Kom i gang",
     "coach.getStartedDesc": "Synkroniser Strava-kontoen din eller logg en trening for \u00e5 begynne \u00e5 motta personlige treningsinnsikter.",
+    "coach.getAIInsights": "Hent AI-treningsinnsikt",
+    "coach.aiLoading": "Analyserer treningen din\u2026",
+    "coach.aiError": "AI-coaching utilgjengelig. Viser regelbaserte innsikter.",
+    "coach.aiBadge": "AI",
+    "coach.ruleBasedSection": "Treningsanalyse",
+    "coach.aiSection": "AI-coaching",
 
     // Weekly calendar
     "cal.title": "Ukentlig treningskalender",

@@ -464,6 +464,46 @@
       </footer>
     </div>
 
+    <!-- Day edit modal -->
+    <div class="modal-overlay" id="day-edit-modal" hidden>
+      <div class="modal day-edit-modal-inner">
+        <button class="modal-close" id="day-edit-close" aria-label="Close">&times;</button>
+        <h3 class="modal-title" id="day-edit-title" data-i18n="cal.editTitle">Edit workout</h3>
+        <form id="day-edit-form" class="day-edit-form">
+          <input type="hidden" name="dayIndex" />
+          <label>
+            <span data-i18n="cal.editType">Workout type</span>
+            <select name="workoutType">
+              <option value="easy" data-i18n="cal.easy">Easy</option>
+              <option value="recovery" data-i18n="cal.recovery">Recovery</option>
+              <option value="intensity" data-i18n="cal.intensity">Intensity</option>
+              <option value="long" data-i18n="cal.long">Long run</option>
+              <option value="medium-long" data-i18n="cal.mediumLong">Med-long</option>
+              <option value="rest" data-i18n="cal.rest">Rest</option>
+              <option value="race" data-i18n="cal.race">Race</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="cal.editName">Workout name</span>
+            <input type="text" name="workoutName" data-i18n="ph.workoutName" data-i18n-attr="placeholder" placeholder="e.g. Easy run" />
+          </label>
+          <label>
+            <span data-i18n="cal.editDistance">Distance (mi)</span>
+            <input type="number" name="distance" min="0" step="0.1" />
+          </label>
+          <label>
+            <span data-i18n="cal.editNotes">Notes</span>
+            <textarea name="notes" rows="2" data-i18n="ph.dayNotes" data-i18n-attr="placeholder" placeholder="Optional notes for this day"></textarea>
+          </label>
+          <div class="day-edit-actions">
+            <button class="cta" type="submit" data-i18n="cal.editSave">Save</button>
+            <button class="ghost" type="button" id="day-edit-reset" data-i18n="cal.editReset">Reset to plan</button>
+          </div>
+          <p class="day-edit-note" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
     <!-- Auth modal -->
     <div class="modal-overlay" id="auth-modal" hidden>
       <div class="modal">

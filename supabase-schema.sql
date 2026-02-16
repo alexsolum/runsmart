@@ -137,3 +137,41 @@ create policy "Users can insert own feedback"
 create policy "Users can delete own feedback"
   on athlete_feedback for delete
   using (auth.uid() = user_id);
+
+-- ============================================================
+-- Weekly plan entries (editable calendar day overrides)
+-- ============================================================
+
+create table weekly_plan_entries (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  plan_id uuid references training_plans(id) on delete cascade not null,
+  week_number integer not null,
+  day_of_week integer not null check (day_of_week between 0 and 6),
+  date date not null,
+  workout_type text not null default 'easy',
+  workout_name text,
+  distance_miles numeric,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (plan_id, week_number, day_of_week)
+);
+
+alter table weekly_plan_entries enable row level security;
+
+create policy "Users can view own plan entries"
+  on weekly_plan_entries for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own plan entries"
+  on weekly_plan_entries for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own plan entries"
+  on weekly_plan_entries for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete own plan entries"
+  on weekly_plan_entries for delete
+  using (auth.uid() = user_id);

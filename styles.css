@@ -930,6 +930,159 @@ h2 {
   color: var(--muted);
 }
 
+/* ---- Editable calendar enhancements ---- */
+
+.weekly-cal-day.is-editable {
+  cursor: pointer;
+  position: relative;
+}
+
+.weekly-cal-day.is-editable:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.1);
+}
+
+.weekly-cal-day.is-editable::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.weekly-cal-day.is-editable:hover::after {
+  opacity: 1;
+}
+
+.weekly-cal-day.is-edited {
+  border-left: 3px solid var(--accent);
+}
+
+.weekly-cal-day-notes {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Day edit modal */
+
+.day-edit-modal-inner {
+  max-width: 440px;
+}
+
+.day-edit-form {
+  display: grid;
+  gap: 16px;
+}
+
+.day-edit-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.day-edit-form input,
+.day-edit-form select,
+.day-edit-form textarea {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font: inherit;
+}
+
+.day-edit-form textarea {
+  resize: vertical;
+}
+
+.day-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.day-edit-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Mobile compact calendar list view */
+
+@media (max-width: 600px) {
+  .weekly-cal-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .weekly-cal-day {
+    min-height: unset;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+
+  .weekly-cal-day-name {
+    min-width: 32px;
+    margin-bottom: 0;
+  }
+
+  .weekly-cal-day-date {
+    min-width: 56px;
+    margin-bottom: 0;
+    font-size: 12px;
+  }
+
+  .weekly-cal-workout-badge {
+    flex-shrink: 0;
+  }
+
+  .weekly-cal-workout-name {
+    margin-top: 0;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .weekly-cal-workout-dist {
+    margin-top: 0;
+    padding-top: 0;
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .weekly-cal-day-notes {
+    display: none;
+  }
+
+  .weekly-cal-day.is-editable::after {
+    display: none;
+  }
+}
+
+/* Tablet compact: 2 cols but still card-like */
+
+@media (min-width: 601px) and (max-width: 900px) {
+  .weekly-cal-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 /* ---- Insights ---- */
 
 .insight-cards {
@@ -1702,10 +1855,6 @@ h2 {
     flex-direction: column;
   }
 
-  .weekly-cal-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
   .weekly-calendar-header {
     flex-direction: column;
     align-items: flex-start;
@@ -1732,10 +1881,6 @@ h2 {
   .insight-summary .stats {
     flex-direction: column;
     gap: 12px;
-  }
-
-  .weekly-cal-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .week-card-stats {

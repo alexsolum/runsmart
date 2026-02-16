@@ -65,8 +65,11 @@ Deno.serve(async (req) => {
       const refreshData = await refreshRes.json();
 
       if (refreshData.errors || !refreshData.access_token) {
+        const detail = refreshData.message
+          || (refreshData.errors && refreshData.errors.map((e: { field?: string; code?: string }) => e.field + ": " + e.code).join(", "))
+          || "unknown error";
         return new Response(
-          JSON.stringify({ error: "Strava token refresh failed — try reconnecting" }),
+          JSON.stringify({ error: "Strava token refresh failed (" + detail + ") — try reconnecting" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -91,17 +94,35 @@ Deno.serve(async (req) => {
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
+    if (!stravaRes.ok) {
+      const errorBody = await stravaRes.text();
+      let detail = "";
+      try {
+        const parsed = JSON.parse(errorBody);
+        detail = parsed.message || parsed.error || errorBody;
+      } catch {
+        detail = errorBody;
+      }
+      return new Response(
+        JSON.stringify({
+          error: "Strava API error (" + stravaRes.status + "): " + detail,
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const activities = await stravaRes.json();
 
     if (!Array.isArray(activities)) {
       return new Response(
-        JSON.stringify({ error: "Unexpected response from Strava" }),
+        JSON.stringify({ error: "Unexpected response from Strava: expected array of activities" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Upsert each activity
     let synced = 0;
+    let firstError: string | null = null;
     for (const a of activities) {
       const { error } = await supabase.from("activities").upsert(
         {
@@ -122,7 +143,22 @@ Deno.serve(async (req) => {
         },
         { onConflict: "strava_id" },
       );
-      if (!error) synced++;
+      if (!error) {
+        synced++;
+      } else if (!firstError) {
+        firstError = error.message;
+      }
+    }
+
+    if (synced === 0 && activities.length > 0) {
+      return new Response(
+        JSON.stringify({
+          error: "Failed to save activities: " + (firstError || "unknown database error"),
+          synced: 0,
+          total: activities.length,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     return new Response(

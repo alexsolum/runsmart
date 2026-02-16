@@ -40,8 +40,11 @@ Deno.serve(async (req) => {
     const tokenData = await tokenRes.json();
 
     if (tokenData.errors || !tokenData.access_token) {
+      const detail = tokenData.message
+        || (tokenData.errors && tokenData.errors.map((e: { field?: string; code?: string }) => e.field + ": " + e.code).join(", "))
+        || "unknown error";
       return new Response(
-        JSON.stringify({ error: "Strava rejected the authorization code" }),
+        JSON.stringify({ error: "Strava rejected the authorization code: " + detail }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

@@ -218,7 +218,7 @@ function startStravaOAuth() {
 async function exchangeStravaCode(code) {
   var sessionResult = await db.auth.getSession();
   var session = sessionResult.data.session;
-  if (!session) return;
+  if (!session) throw new Error("No active session — please sign in first");
 
   var res = await fetch(SUPABASE_URL + "/functions/v1/strava-auth", {
     method: "POST",
@@ -238,7 +238,7 @@ async function exchangeStravaCode(code) {
 async function syncStrava() {
   var sessionResult = await db.auth.getSession();
   var session = sessionResult.data.session;
-  if (!session) return;
+  if (!session) throw new Error("No active session — please sign in first");
 
   var res = await fetch(SUPABASE_URL + "/functions/v1/strava-sync", {
     method: "POST",
@@ -1748,15 +1748,23 @@ if (stravaSyncBtn) {
     try {
       var result = await syncStrava();
       lastSyncTime.textContent = new Date().toLocaleString();
-      stravaSyncBtn.textContent = result.synced + " synced";
+      if (result && result.synced > 0) {
+        stravaSyncBtn.textContent = result.synced + " synced";
+      } else if (result && result.total === 0) {
+        stravaSyncBtn.textContent = "No new activities";
+      } else {
+        stravaSyncBtn.textContent = "0 synced (" + (result ? result.total : 0) + " found)";
+      }
       refreshActivities();
       refreshAllActivitiesAndCharts();
       setTimeout(function () {
         stravaSyncBtn.textContent = "Sync now";
         stravaSyncBtn.disabled = false;
-      }, 2000);
+      }, 3000);
     } catch (err) {
+      console.error("Strava sync error:", err);
       stravaSyncBtn.textContent = "Sync failed";
+      alert("Strava sync failed: " + err.message);
       setTimeout(function () {
         stravaSyncBtn.textContent = "Sync now";
         stravaSyncBtn.disabled = false;
@@ -1901,11 +1909,18 @@ function handleStravaCallback() {
     try {
       await exchangeStravaCode(code);
       showStravaConnected(new Date().toISOString());
-      syncStrava().then(function () {
+      navigateTo("data");
+      try {
+        var syncResult = await syncStrava();
+        if (syncResult && syncResult.synced >= 0) {
+          lastSyncTime.textContent = new Date().toLocaleString();
+        }
         refreshActivities();
         refreshAllActivitiesAndCharts();
-      });
-      navigateTo("data");
+      } catch (syncErr) {
+        console.error("Strava sync after connect failed:", syncErr);
+        alert("Strava connected, but initial sync failed: " + syncErr.message + "\n\nTry clicking \"Sync now\" to retry.");
+      }
     } catch (err) {
       alert("Strava connection failed: " + err.message);
     }

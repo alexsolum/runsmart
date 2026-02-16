@@ -722,6 +722,36 @@ function renderWeeklyCalendar(plans) {
   renderCalendarWeek();
 }
 
+var calendarTransitionDir = "forward"; // "forward" or "back"
+
+function renderPhaseProgressBar() {
+  var progressEl = document.getElementById("weekly-cal-progress");
+  if (!progressEl || !cachedKoopPlan) return;
+
+  var phases = cachedKoopPlan.phases;
+  var totalWeeks = cachedKoopPlan.totalWeeks;
+  var currentWeek = cachedKoopPlan.weeks[calendarWeekIndex];
+  if (!currentWeek) return;
+
+  var elapsed = 0;
+  var html = "";
+  phases.forEach(function (phase) {
+    var pct = (phase.weeks / totalWeeks) * 100;
+    var color = KOOP_PHASES[phase.key] ? KOOP_PHASES[phase.key].color : "#94a3b8";
+    var isActive = currentWeek.phase === phase.key;
+    html += '<div class="weekly-cal-progress-seg' + (isActive ? " is-active" : "") +
+      '" style="width:' + pct + '%;background:' + color +
+      (isActive ? '' : ';opacity:0.35') + '"></div>';
+    elapsed += phase.weeks;
+  });
+
+  // Position dot
+  var dotPct = ((currentWeek.week - 1) / totalWeeks) * 100;
+  html += '<div class="weekly-cal-progress-dot" style="left:' + dotPct + '%"></div>';
+
+  progressEl.innerHTML = html;
+}
+
 function renderCalendarWeek() {
   if (!cachedKoopPlan || !cachedCalendarPlan) return;
 
@@ -761,6 +791,9 @@ function renderCalendarWeek() {
     (weekData.recovery ? '<span class="pill" style="background:#dcfce7;color:#166534">' + t("gantt.recoveryWeek") + '</span>' : '') +
     (weekData.isCurrent ? '<span class="pill">' + t("cal.currentWeek") + '</span>' : '');
 
+  // Phase progress bar
+  renderPhaseProgressBar();
+
   // Load saved entries then render
   var planId = cachedCalendarPlan.id;
   var weekNum = weekData.week;
@@ -775,7 +808,7 @@ function renderCalendarWeek() {
     today.setHours(0, 0, 0, 0);
     var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
 
-    weeklyCalGrid.innerHTML = calDays.map(function (day, i) {
+    var gridHtml = calDays.map(function (day, i) {
       var dayDate = day.date;
       var isToday = dayDate.getFullYear() === today.getFullYear() &&
         dayDate.getMonth() === today.getMonth() &&
@@ -789,35 +822,50 @@ function renderCalendarWeek() {
       var displayNotes = saved ? saved.notes : null;
       var isEdited = !!saved;
 
-      var isRest = displayType === "rest";
-
-      var cls = "weekly-cal-day";
+      var cls = "weekly-cal-day type-" + displayType;
       if (isToday) cls += " is-today";
-      if (isRest) cls += " is-rest";
       if (canEdit) cls += " is-editable";
-      if (isEdited) cls += " is-edited";
 
       var typeCls = "type-" + displayType;
       var typeLabel = t(CAL_TYPE_LABELS[displayType] || displayType);
 
       return '<div class="' + cls + '" data-day-index="' + i + '">' +
-        '<div class="weekly-cal-day-name">' + dayNames[i] + '</div>' +
+        '<div class="weekly-cal-day-header">' +
+          '<div class="weekly-cal-day-name">' + dayNames[i] +
+            (isEdited ? '<span class="weekly-cal-edited-badge"></span>' : '') +
+          '</div>' +
+          '<span class="weekly-cal-workout-badge ' + typeCls + '">' + typeLabel + '</span>' +
+        '</div>' +
         '<div class="weekly-cal-day-date">' + dayDate.toLocaleDateString(locale, dateOpts) + '</div>' +
-        '<span class="weekly-cal-workout-badge ' + typeCls + '">' + typeLabel + '</span>' +
+        '<div class="weekly-cal-workout-dist">' +
+          (displayDist > 0 ? displayDist + ' <small>mi</small>' : "\u2014") +
+        '</div>' +
         '<div class="weekly-cal-workout-name">' + escapeHtml(displayName) + '</div>' +
-        '<div class="weekly-cal-workout-dist">' + (displayDist > 0 ? displayDist + " mi" : "\u2014") + '</div>' +
         (displayNotes ? '<div class="weekly-cal-day-notes">' + escapeHtml(displayNotes) + '</div>' : '') +
         '</div>';
     }).join("");
 
+    // Apply transition animation
+    var transClass = calendarTransitionDir === "back" ? "transitioning transition-back" : "transitioning";
+    weeklyCalGrid.classList.add.apply(weeklyCalGrid.classList, transClass.split(" "));
+    requestAnimationFrame(function () {
+      weeklyCalGrid.innerHTML = gridHtml;
+      requestAnimationFrame(function () {
+        weeklyCalGrid.classList.remove("transitioning", "transition-back");
+      });
+    });
+
     // Attach click handlers for editing
     if (canEdit) {
-      weeklyCalGrid.querySelectorAll(".weekly-cal-day[data-day-index]").forEach(function (card) {
-        card.addEventListener("click", function () {
-          var idx = parseInt(card.dataset.dayIndex, 10);
-          openDayEditModal(idx, calDays[idx]);
+      // Use timeout to ensure HTML is in DOM after rAF
+      setTimeout(function () {
+        weeklyCalGrid.querySelectorAll(".weekly-cal-day[data-day-index]").forEach(function (card) {
+          card.addEventListener("click", function () {
+            var idx = parseInt(card.dataset.dayIndex, 10);
+            openDayEditModal(idx, calDays[idx]);
+          });
         });
-      });
+      }, 10);
     }
   };
 
@@ -958,6 +1006,7 @@ if (dayEditReset) {
 if (weeklyCalPrev) {
   weeklyCalPrev.addEventListener("click", function () {
     if (calendarWeekIndex > 0) {
+      calendarTransitionDir = "back";
       calendarWeekIndex--;
       renderCalendarWeek();
     }
@@ -967,6 +1016,7 @@ if (weeklyCalPrev) {
 if (weeklyCalNext) {
   weeklyCalNext.addEventListener("click", function () {
     if (cachedKoopPlan && calendarWeekIndex < cachedKoopPlan.weeks.length - 1) {
+      calendarTransitionDir = "forward";
       calendarWeekIndex++;
       renderCalendarWeek();
     }
@@ -1238,12 +1288,23 @@ var COACH_ICONS = {
   start: "\ud83d\ude80",
 };
 
+// AI Coach DOM refs
+var coachActionsEl = document.getElementById("coach-actions");
+var aiCoachBtn = document.getElementById("ai-coach-btn");
+var aiCoachStatus = document.getElementById("coach-ai-status");
+var aiCoachInsightsEl = document.getElementById("ai-coach-insights");
+
 function renderCoachInsights() {
   var insights = generateCoachingInsights({
     activities: cachedAllActivities,
     checkins: cachedCheckins,
     plans: cachedPlans,
   });
+
+  // Show/hide AI coaching button based on login status
+  if (coachActionsEl) {
+    coachActionsEl.hidden = !currentUser;
+  }
 
   if (!insights.length) {
     coachInsightsEl.innerHTML =
@@ -1254,17 +1315,179 @@ function renderCoachInsights() {
     return;
   }
 
-  coachInsightsEl.innerHTML = insights.map(function (insight) {
-    var icon = COACH_ICONS[insight.icon] || "\ud83d\udcac";
-    return '<div class="coach-card ' + insight.type + '">' +
-      '<div class="coach-card-icon">' + icon + '</div>' +
-      '<div class="coach-card-body">' +
-      '<h4>' + t(insight.titleKey) + '</h4>' +
-      '<p>' + t(insight.descKey) + '</p>' +
-      (insight.meta ? '<div class="coach-card-meta">' + escapeHtml(insight.meta) + '</div>' : '') +
-      '</div>' +
-      '</div>';
-  }).join("");
+  coachInsightsEl.innerHTML =
+    '<div class="coach-section-label">' + t("coach.ruleBasedSection") + '</div>' +
+    insights.map(function (insight) {
+      var icon = COACH_ICONS[insight.icon] || "\ud83d\udcac";
+      return '<div class="coach-card ' + insight.type + '">' +
+        '<div class="coach-card-icon">' + icon + '</div>' +
+        '<div class="coach-card-body">' +
+        '<h4>' + t(insight.titleKey) + '</h4>' +
+        '<p>' + t(insight.descKey) + '</p>' +
+        (insight.meta ? '<div class="coach-card-meta">' + escapeHtml(insight.meta) + '</div>' : '') +
+        '</div>' +
+        '</div>';
+    }).join("");
+}
+
+// ---- AI coaching via Gemini ----
+
+function buildAICoachPayload() {
+  // Weekly summary (last 4 weeks)
+  var weeklySummary = [];
+  if (cachedAllActivities && cachedAllActivities.length) {
+    var summaryData = Compute.computeWeeklySummary(cachedAllActivities);
+    var weekKeys = Object.keys(summaryData).sort().reverse().slice(0, 4).reverse();
+    weeklySummary = weekKeys.map(function (key) {
+      var w = summaryData[key];
+      // Find longest run for this week
+      var longestRun = 0;
+      cachedAllActivities.forEach(function (a) {
+        var ws = Compute.getWeekStart(new Date(a.started_at));
+        if (ws.toISOString().split("T")[0] === key) {
+          var dist = (Number(a.distance) || 0) / 1609.344;
+          if (dist > longestRun) longestRun = dist;
+        }
+      });
+      return {
+        weekOf: key,
+        distance: w.distance / 1609.344,
+        runs: w.count,
+        longestRun: longestRun,
+      };
+    });
+  }
+
+  // Recent activities (last 7 days)
+  var recentActivities = [];
+  var sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  if (cachedAllActivities) {
+    recentActivities = cachedAllActivities
+      .filter(function (a) { return new Date(a.started_at) >= sevenDaysAgo; })
+      .slice(0, 10)
+      .map(function (a) {
+        return {
+          name: a.name,
+          distance: (Number(a.distance) || 0) / 1609.344,
+          duration: Number(a.moving_time) || 0,
+          effort: a.effort_rating || null,
+        };
+      });
+  }
+
+  // Latest check-in
+  var latestCheckin = null;
+  if (cachedCheckins && cachedCheckins.length) {
+    var c = cachedCheckins[0];
+    latestCheckin = {
+      fatigue: c.fatigue,
+      sleepQuality: c.sleep_quality,
+      motivation: c.motivation,
+      niggles: c.niggles || null,
+    };
+  }
+
+  // Plan context
+  var planContext = null;
+  if (cachedCalendarPlan && cachedKoopPlan) {
+    var currentWeekData = cachedKoopPlan.weeks[calendarWeekIndex];
+    planContext = {
+      race: cachedCalendarPlan.race,
+      raceDate: cachedCalendarPlan.race_date,
+      phase: currentWeekData ? currentWeekData.phase : "unknown",
+      weekNumber: currentWeekData ? currentWeekData.week : 0,
+      targetMileage: currentWeekData ? currentWeekData.mileage : 0,
+    };
+  }
+
+  return {
+    weeklySummary: weeklySummary,
+    recentActivities: recentActivities,
+    latestCheckin: latestCheckin,
+    planContext: planContext,
+  };
+}
+
+async function fetchAICoaching() {
+  var sessionResult = await db.auth.getSession();
+  var session = sessionResult.data.session;
+  if (!session) throw new Error("Not authenticated");
+
+  var payload = buildAICoachPayload();
+
+  var res = await fetch(SUPABASE_URL + "/functions/v1/gemini-coach", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + session.access_token,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  var result = await res.json();
+  if (!res.ok) throw new Error(result.error || "AI coaching request failed");
+  return result.insights || [];
+}
+
+function renderAIInsights(insights) {
+  if (!aiCoachInsightsEl) return;
+
+  aiCoachInsightsEl.innerHTML =
+    '<div class="coach-section-label">' + t("coach.aiSection") +
+    ' <span class="ai-badge">' + t("coach.aiBadge") + '</span></div>' +
+    '<div class="coach-insights">' +
+    insights.map(function (insight) {
+      var icon = COACH_ICONS[insight.icon] || "\ud83d\udcac";
+      return '<div class="coach-card ai-insight ' + insight.type + '">' +
+        '<div class="coach-card-icon">' + icon + '</div>' +
+        '<div class="coach-card-body">' +
+        '<h4>' + escapeHtml(insight.title) + '<span class="ai-badge">' + t("coach.aiBadge") + '</span></h4>' +
+        '<p>' + escapeHtml(insight.body) + '</p>' +
+        '</div>' +
+        '</div>';
+    }).join("") +
+    '</div>';
+}
+
+// AI coach button handler
+if (aiCoachBtn) {
+  aiCoachBtn.addEventListener("click", async function () {
+    if (!currentUser || !db) return;
+
+    aiCoachBtn.disabled = true;
+    if (aiCoachStatus) {
+      aiCoachStatus.textContent = t("coach.aiLoading");
+      aiCoachStatus.style.color = "";
+    }
+
+    // Show loading skeleton
+    if (aiCoachInsightsEl) {
+      aiCoachInsightsEl.innerHTML =
+        '<div class="coach-section-label">' + t("coach.aiSection") + '</div>' +
+        '<div class="coach-skeleton"></div>' +
+        '<div class="coach-skeleton"></div>' +
+        '<div class="coach-skeleton"></div>';
+    }
+
+    try {
+      var insights = await fetchAICoaching();
+      renderAIInsights(insights);
+      if (aiCoachStatus) {
+        aiCoachStatus.textContent = "";
+      }
+    } catch (err) {
+      if (aiCoachInsightsEl) {
+        aiCoachInsightsEl.innerHTML = "";
+      }
+      if (aiCoachStatus) {
+        aiCoachStatus.textContent = t("coach.aiError");
+        aiCoachStatus.style.color = "var(--danger)";
+      }
+    }
+    aiCoachBtn.disabled = false;
+  });
 }
 
 // ---- UI: Check-ins ----

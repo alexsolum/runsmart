@@ -221,6 +221,7 @@
             </div>
           </div>
           <div class="weekly-cal-meta" id="weekly-cal-meta"></div>
+          <div class="weekly-cal-progress" id="weekly-cal-progress"></div>
           <div class="weekly-cal-grid" id="weekly-cal-grid"></div>
         </div>
       </section>
@@ -421,6 +422,11 @@
           <h2 data-i18n="coach.title">AI Coach</h2>
           <p data-i18n="coach.subtitle">Personalized coaching insights based on your training data</p>
         </div>
+        <div class="coach-actions" id="coach-actions" hidden>
+          <button class="cta" id="ai-coach-btn" data-i18n="coach.getAIInsights">Get AI coaching insights</button>
+          <span class="coach-ai-status" id="coach-ai-status"></span>
+        </div>
+        <div id="ai-coach-insights"></div>
         <div id="coach-insights" class="coach-insights">
           <div class="coach-empty">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>

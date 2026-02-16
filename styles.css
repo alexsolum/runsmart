@@ -372,10 +372,16 @@ h2 {
 }
 
 .grid article {
-  padding: 20px;
+  padding: 24px;
   background: var(--card);
   border-radius: 16px;
   border: 1px solid var(--border);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.grid article:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
 }
 
 .planning-grid {
@@ -460,6 +466,13 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 20px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.plan-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
 }
 
 .plan-card-header {
@@ -519,126 +532,178 @@ h2 {
 /* Training block calendar */
 
 .block-calendar {
-  margin-top: 32px;
+  margin-top: 40px;
 }
 
 .block-calendar h3 {
   margin-top: 0;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
 }
 
 .block-timeline {
   display: flex;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  min-height: 64px;
+  min-height: 72px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
 }
 
 .block-bar {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 12px 16px;
+  padding: 14px 18px;
   color: #fff;
   min-width: 80px;
+  position: relative;
+  transition: flex 0.3s ease;
+}
+
+.block-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.block-bar:last-child::after {
+  display: none;
 }
 
 .block-bar strong {
-  font-size: 14px;
+  font-size: 15px;
+  letter-spacing: 0.3px;
 }
 
 .block-bar span {
   font-size: 11px;
   opacity: 0.85;
+  margin-top: 2px;
 }
 
 .block-details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .block-detail-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 20px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border-top: 3px solid var(--border);
+}
+
+.block-detail-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
 }
 
 .block-detail-card h5 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  font-size: 15px;
 }
 
 .block-detail-card p {
   margin: 4px 0;
   font-size: 13px;
   color: var(--muted);
+  line-height: 1.5;
 }
 
 /* Gantt planner */
 
 .gantt-planner {
-  margin-top: 32px;
+  margin-top: 40px;
 }
 
 .gantt-planner h3 {
   margin-top: 0;
   margin-bottom: 4px;
+  font-size: 1.2rem;
 }
 
 .gantt-planner > .muted {
   margin-top: 0;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .gantt-phase-bar {
   display: flex;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  min-height: 56px;
-  margin-bottom: 16px;
+  min-height: 60px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
 }
 
 .gantt-phase-segment {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 10px 14px;
+  padding: 12px 16px;
   color: #fff;
   min-width: 70px;
   position: relative;
+  transition: flex 0.3s ease;
+}
+
+.gantt-phase-segment::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.gantt-phase-segment:last-child::after {
+  display: none;
 }
 
 .gantt-phase-segment strong {
   font-size: 13px;
+  letter-spacing: 0.3px;
 }
 
 .gantt-phase-segment span {
   font-size: 11px;
   opacity: 0.85;
+  margin-top: 1px;
 }
 
 .gantt-volume-chart {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 80px;
-  margin-bottom: 16px;
+  height: 100px;
+  margin-bottom: 20px;
   padding: 0 4px;
+  background: linear-gradient(to top, var(--bg) 0%, transparent 100%);
+  border-radius: 12px;
 }
 
 .gantt-vol-bar {
   flex: 1;
   min-width: 0;
-  border-radius: 4px 4px 0 0;
+  border-radius: 6px 6px 0 0;
   position: relative;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s;
   cursor: default;
 }
 
 .gantt-vol-bar:hover {
-  opacity: 0.8;
+  opacity: 0.85;
+  transform: scaleY(1.05);
+  transform-origin: bottom;
 }
 
 .gantt-vol-bar.recovery {
@@ -688,9 +753,15 @@ h2 {
 
 .gantt-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
   min-width: 640px;
+  background: var(--card);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .gantt-table thead {
@@ -701,18 +772,24 @@ h2 {
 
 .gantt-table th {
   text-align: left;
-  padding: 10px 12px;
+  padding: 12px 14px;
   font-weight: 600;
   font-size: 12px;
   color: var(--muted);
   background: var(--bg);
   border-bottom: 2px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .gantt-table td {
-  padding: 10px 12px;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+}
+
+.gantt-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .gantt-table tbody tr:hover {
@@ -765,12 +842,13 @@ h2 {
 /* ---- Weekly calendar ---- */
 
 .weekly-calendar {
-  margin-top: 32px;
+  margin-top: 40px;
 }
 
 .weekly-calendar h3 {
   margin-top: 0;
   margin-bottom: 4px;
+  font-size: 1.2rem;
 }
 
 .weekly-calendar-header {
@@ -796,15 +874,16 @@ h2 {
 
 .weekly-cal-label {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   min-width: 200px;
   text-align: center;
+  color: var(--text);
 }
 
 .weekly-cal-meta {
   display: flex;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -826,12 +905,13 @@ h2 {
 
 .weekly-cal-progress {
   display: flex;
-  height: 6px;
-  border-radius: 3px;
+  height: 8px;
+  border-radius: 4px;
   overflow: hidden;
   margin-bottom: 16px;
   background: var(--bg);
   position: relative;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .weekly-cal-progress-seg {
@@ -855,6 +935,70 @@ h2 {
   box-shadow: 0 0 0 2px var(--accent);
   transform: translateX(-50%);
   z-index: 2;
+}
+
+/* Weekly intensity bar */
+
+.weekly-intensity-bar {
+  margin-bottom: 16px;
+}
+
+.intensity-bar-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.intensity-bar-track {
+  display: flex;
+  height: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+  gap: 1px;
+}
+
+.intensity-bar-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  transition: width 0.3s ease;
+}
+
+.intensity-bar-seg span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+.intensity-bar-legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.intensity-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.intensity-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* Day grid */
@@ -882,12 +1026,13 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 14px;
-  min-height: 150px;
+  min-height: 170px;
   display: flex;
   flex-direction: column;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, transform 0.15s;
   border-left: 4px solid var(--border);
   position: relative;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .weekly-cal-day:hover {
@@ -1021,16 +1166,16 @@ h2 {
 }
 
 .weekly-cal-workout-dist {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--accent);
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 6px;
   line-height: 1;
 }
 
 .weekly-cal-workout-dist small {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted);
 }
@@ -1038,6 +1183,31 @@ h2 {
 .weekly-cal-day.type-rest .weekly-cal-workout-dist {
   color: var(--muted);
   font-size: 16px;
+}
+
+.weekly-cal-intensity-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.weekly-cal-day-desc {
+  font-size: 11px;
+  color: var(--text);
+  margin-top: 4px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  background: var(--bg);
+  padding: 6px 8px;
+  border-radius: 8px;
+  border-left: 2px solid var(--accent-soft);
 }
 
 .weekly-cal-day-notes {
@@ -1190,6 +1360,14 @@ h2 {
   }
 
   .weekly-cal-day-notes {
+    display: none;
+  }
+
+  .weekly-cal-day-desc {
+    display: none;
+  }
+
+  .weekly-cal-intensity-badge {
     display: none;
   }
 

@@ -98,7 +98,7 @@
                 </div>
                 <div>
                   <span class="label" data-i18n="hero.mileage">Mileage</span>
-                  <strong>42&ndash;48 mi</strong>
+                  <strong>68&ndash;77 km</strong>
                 </div>
                 <div>
                   <span class="label" data-i18n="hero.keyWorkout">Key workout</span>
@@ -165,8 +165,8 @@
               </select>
             </label>
             <label>
-              <span data-i18n="planning.currentMileage">Current weekly mileage</span>
-              <input type="number" name="mileage" min="10" max="120" value="40" />
+              <span data-i18n="planning.currentMileage">Current weekly volume (km)</span>
+              <input type="number" name="mileage" min="15" max="200" value="65" />
             </label>
             <label>
               <span data-i18n="planning.constraints">Key constraints</span>
@@ -222,6 +222,7 @@
           </div>
           <div class="weekly-cal-meta" id="weekly-cal-meta"></div>
           <div class="weekly-cal-progress" id="weekly-cal-progress"></div>
+          <div class="weekly-intensity-bar" id="weekly-intensity-bar"></div>
           <div class="weekly-cal-grid" id="weekly-cal-grid"></div>
         </div>
       </section>
@@ -385,7 +386,7 @@
             </label>
             <div class="form-row">
               <label>
-                <span data-i18n="data.distance">Distance (mi)</span>
+                <span data-i18n="data.distance">Distance (km)</span>
                 <input type="number" name="distance" min="0" step="0.1" />
               </label>
               <label>
@@ -393,7 +394,7 @@
                 <input type="number" name="duration" min="0" />
               </label>
               <label>
-                <span data-i18n="data.elevation">Elevation (ft)</span>
+                <span data-i18n="data.elevation">Elevation (m)</span>
                 <input type="number" name="elevation" min="0" />
               </label>
             </div>
@@ -494,8 +495,23 @@
             <input type="text" name="workoutName" data-i18n="ph.workoutName" data-i18n-attr="placeholder" placeholder="e.g. Easy run" />
           </label>
           <label>
-            <span data-i18n="cal.editDistance">Distance (mi)</span>
+            <span data-i18n="cal.editDistance">Distance (km)</span>
             <input type="number" name="distance" min="0" step="0.1" />
+          </label>
+          <label>
+            <span data-i18n="cal.editIntensity">Intensity</span>
+            <select name="intensity">
+              <option value="z1" data-i18n="intensity.z1">Z1 - Recovery</option>
+              <option value="z2" data-i18n="intensity.z2">Z2 - Easy / Aerobic</option>
+              <option value="z3" data-i18n="intensity.z3">Z3 - Tempo</option>
+              <option value="z4" data-i18n="intensity.z4">Z4 - Threshold</option>
+              <option value="z5" data-i18n="intensity.z5">Z5 - VO2max</option>
+              <option value="race" data-i18n="intensity.race">Race effort</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="cal.editDescription">Workout description</span>
+            <textarea name="description" rows="3" data-i18n="ph.workoutDesc" data-i18n-attr="placeholder" placeholder="e.g. 3km warm-up, 4x1km at tempo pace with 90s jog recovery, 2km cool-down"></textarea>
           </label>
           <label>
             <span data-i18n="cal.editNotes">Notes</span>

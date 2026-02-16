@@ -49,21 +49,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Authenticate the calling user
+    // Authenticate the calling user via the request JWT
+    const authHeader = req.headers.get("Authorization") || "";
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: userErr } = await authClient.auth.getUser();
+
+    if (userErr || !user) {
+      const detail = userErr?.message || "Unauthorized";
+      return new Response(
+        JSON.stringify({ error: detail }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    const jwt = req.headers.get("Authorization")?.replace("Bearer ", "");
-    const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt);
-
-    if (userErr || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
 
     // Upsert the connection (one row per user)
     const { error: upsertErr } = await supabase

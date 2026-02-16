@@ -230,8 +230,16 @@ async function exchangeStravaCode(code) {
     body: JSON.stringify({ code: code }),
   });
 
-  var result = await res.json();
-  if (!res.ok) throw new Error(result.error || "Strava connection failed");
+  var result;
+  try {
+    result = await res.json();
+  } catch (_e) {
+    throw new Error("strava-auth returned " + res.status + " (non-JSON response)");
+  }
+  if (!res.ok) {
+    var detail = result.error || result.message || result.msg || JSON.stringify(result);
+    throw new Error("strava-auth " + res.status + ": " + detail);
+  }
   return result;
 }
 
@@ -249,8 +257,16 @@ async function syncStrava() {
     },
   });
 
-  var result = await res.json();
-  if (!res.ok) throw new Error(result.error || "Sync failed");
+  var result;
+  try {
+    result = await res.json();
+  } catch (_e) {
+    throw new Error("strava-sync returned " + res.status + " (non-JSON response)");
+  }
+  if (!res.ok) {
+    var detail = result.error || result.message || result.msg || JSON.stringify(result);
+    throw new Error("strava-sync " + res.status + ": " + detail);
+  }
   return result;
 }
 

@@ -43,7 +43,7 @@ var Compute = (function () {
     var peakWeeks = Math.max(1, Math.round(totalWeeks * 0.25));
     var taperWeeks = Math.max(1, totalWeeks - baseWeeks - buildWeeks - peakWeeks);
 
-    var baseMileage = plan.current_mileage || 30;
+    var baseMileage = plan.current_mileage || 50;
 
     var blocks = [
       { name: "Base", weeks: baseWeeks, startMi: baseMileage, endMi: Math.round(baseMileage * 1.15), color: "#3b82f6", desc: "Aerobic foundation, easy volume" },
@@ -138,7 +138,7 @@ var Compute = (function () {
 
   function formatDistance(meters) {
     if (!meters) return "\u2014";
-    return (meters / 1609.344).toFixed(1) + " mi";
+    return (meters / 1000).toFixed(1) + " km";
   }
 
   function formatDuration(seconds) {
@@ -152,15 +152,14 @@ var Compute = (function () {
 
   function formatPace(secPerKm) {
     if (!secPerKm) return "\u2014";
-    var secPerMile = secPerKm * 1.60934;
-    var m = Math.floor(secPerMile / 60);
-    var s = Math.round(secPerMile % 60);
-    return m + ":" + String(s).padStart(2, "0") + " /mi";
+    var m = Math.floor(secPerKm / 60);
+    var s = Math.round(secPerKm % 60);
+    return m + ":" + String(s).padStart(2, "0") + " /km";
   }
 
   function formatElevation(meters) {
     if (!meters) return "\u2014";
-    return Math.round(meters * 3.28084).toLocaleString() + " ft";
+    return Math.round(meters).toLocaleString() + " m";
   }
 
   function rpeClass(val) {
@@ -210,7 +209,7 @@ var Compute = (function () {
     var specificWeeks = Math.max(1, Math.round(totalWeeks * 0.35));
     var taperWeeks = Math.max(1, totalWeeks - prepWeeks - enduranceWeeks - specificWeeks);
 
-    var baseMileage = plan.current_mileage || 30;
+    var baseMileage = plan.current_mileage || 50;
     var peakMileage = Math.round(baseMileage * 1.45);
 
     var phases = [
@@ -497,7 +496,7 @@ var Compute = (function () {
     for (var i = 0; i < 7; i++) {
       var d = new Date(weekDate);
       d.setDate(d.getDate() + i);
-      days.push({ date: d, type: null, labelKey: "", distance: 0 });
+      days.push({ date: d, type: null, labelKey: "", distance: 0, intensity: "z2", description: "" });
     }
 
     // Race week
@@ -505,15 +504,19 @@ var Compute = (function () {
       for (var r = 0; r < 7; r++) {
         days[r].type = "rest";
         days[r].labelKey = "cal.rest";
+        days[r].intensity = "z1";
       }
       days[6].type = "race";
       days[6].labelKey = "cal.raceDay";
+      days[6].intensity = "race";
       days[1].type = "easy";
       days[1].labelKey = "cal.shakeout";
-      days[1].distance = 3;
+      days[1].distance = 5;
+      days[1].intensity = "z1";
       days[3].type = "easy";
       days[3].labelKey = "cal.shakeout";
-      days[3].distance = 2;
+      days[3].distance = 3;
+      days[3].intensity = "z1";
       return days;
     }
 
@@ -523,14 +526,16 @@ var Compute = (function () {
     days[6].type = "long";
     days[6].labelKey = "cal.longRun";
     days[6].distance = longRunMi;
+    days[6].intensity = "z2";
     remaining -= longRunMi;
 
     // Key workout on Wednesday (index 2) unless recovery week
     if (!weekData.recovery) {
-      var keyDist = Math.max(3, Math.round(mileage * 0.15));
+      var keyDist = Math.max(5, Math.round(mileage * 0.15));
       days[2].type = "intensity";
       days[2].labelKey = weekData.workoutKey;
       days[2].distance = keyDist;
+      days[2].intensity = weekData.phase === "specificPrep" ? "z4" : "z3";
       remaining -= keyDist;
     }
 
@@ -542,6 +547,7 @@ var Compute = (function () {
       days[5].type = "medium-long";
       days[5].labelKey = "cal.mediumLong";
       days[5].distance = medLongDist;
+      days[5].intensity = "z2";
       remaining -= medLongDist;
     }
 
@@ -551,6 +557,7 @@ var Compute = (function () {
       if (days[idx].type === null) {
         days[idx].type = "rest";
         days[idx].labelKey = "cal.rest";
+        days[idx].intensity = "z1";
       }
     });
 
@@ -564,16 +571,18 @@ var Compute = (function () {
       var perDay = Math.round(remaining / emptyIndices.length);
       emptyIndices.forEach(function (idx, pos) {
         var dist = pos === emptyIndices.length - 1
-          ? Math.max(2, remaining - perDay * (emptyIndices.length - 1))
-          : Math.max(2, perDay);
+          ? Math.max(3, remaining - perDay * (emptyIndices.length - 1))
+          : Math.max(3, perDay);
         days[idx].type = weekData.recovery ? "recovery" : "easy";
         days[idx].labelKey = weekData.recovery ? "cal.recoveryRun" : "cal.easyRun";
         days[idx].distance = dist;
+        days[idx].intensity = weekData.recovery ? "z1" : "z2";
       });
     } else {
       emptyIndices.forEach(function (idx) {
         days[idx].type = "rest";
         days[idx].labelKey = "cal.rest";
+        days[idx].intensity = "z1";
       });
     }
 

@@ -538,7 +538,7 @@ function renderPlans(plans) {
         '<div class="plan-card-details">' +
         '<div><span class="label">Race date</span><strong>' + escapeHtml(plan.race_date) + '</strong></div>' +
         '<div><span class="label">Days/week</span><strong>' + plan.availability + '</strong></div>' +
-        '<div><span class="label">Mileage</span><strong>' + (plan.current_mileage || "\u2014") + ' mi/wk</strong></div>' +
+        '<div><span class="label">Volume</span><strong>' + (plan.current_mileage || "\u2014") + ' km/wk</strong></div>' +
         '</div>' +
         (plan.constraints ? '<p class="plan-card-constraints">' + escapeHtml(plan.constraints) + '</p>' : '') +
         (plan.b2b_long_runs ? '<span class="plan-card-b2b">B2B long runs</span>' : '') +
@@ -586,7 +586,7 @@ function renderRaceCountdown(plans) {
     '<div class="countdown-grid">' +
     '<div><span class="countdown-weeks">' + weeksOut + '</span><br><span class="countdown-unit">weeks out</span></div>' +
     '<div><span class="label">Current block</span><strong>' + block.name + '</strong></div>' +
-    '<div><span class="label">Target mileage</span><strong>' + block.startMi + '\u2013' + block.endMi + ' mi</strong></div>' +
+    '<div><span class="label">Target volume</span><strong>' + block.startMi + '\u2013' + block.endMi + ' km</strong></div>' +
     '<div><span class="label">Readiness</span><strong class="positive">On track</strong></div>' +
     '</div>' +
     (plan.b2b_long_runs ? '<p class="card-note">B2B long run weekends are active during Build and Peak phases.</p>' : '<p class="card-note">\u201cStay consistent with your ' + block.name.toLowerCase() + ' phase work. Trust the process.\u201d</p>');
@@ -610,15 +610,14 @@ function renderBlockCalendar(plans) {
   blockTimeline.innerHTML = blocks.map(function (b) {
     return '<div class="block-bar" style="flex:' + b.weeks + ';background:' + b.color + '">' +
       '<strong>' + b.name + '</strong>' +
-      '<span>' + b.weeks + ' wk &middot; ' + b.startMi + '\u2013' + b.endMi + ' mi</span>' +
+      '<span>' + b.weeks + ' wk &middot; ' + b.startMi + '\u2013' + b.endMi + ' km</span>' +
       '</div>';
   }).join("");
 
   blockDetails.innerHTML = blocks.map(function (b) {
-    return '<div class="block-detail-card">' +
+    return '<div class="block-detail-card" style="border-top-color:' + b.color + '">' +
       '<h5 style="color:' + b.color + '">' + b.name + '</h5>' +
-      '<p>' + b.weeks + ' weeks</p>' +
-      '<p>' + b.startMi + '\u2013' + b.endMi + ' mi/wk</p>' +
+      '<p><strong>' + b.weeks + ' weeks</strong> &middot; ' + b.startMi + '\u2013' + b.endMi + ' km/wk</p>' +
       '<p>' + b.desc + '</p>' +
       '</div>';
   }).join("");
@@ -644,7 +643,7 @@ function renderGanttPlanner(plans) {
     var info = KOOP_PHASES[p.key];
     return '<div class="gantt-phase-segment" style="flex:' + p.weeks + ';background:' + info.color + '">' +
       '<strong>' + t(KOOP_PHASE_KEYS[p.key]) + '</strong>' +
-      '<span>' + p.weeks + ' ' + t("dynamic.wk") + ' &middot; ' + p.startMi + '\u2013' + p.endMi + ' mi</span>' +
+      '<span>' + p.weeks + ' ' + t("dynamic.wk") + ' &middot; ' + p.startMi + '\u2013' + p.endMi + ' km</span>' +
       '</div>';
   }).join("");
 
@@ -657,7 +656,7 @@ function renderGanttPlanner(plans) {
     var cls = "gantt-vol-bar";
     if (w.recovery) cls += " recovery";
     if (w.isCurrent) cls += " current";
-    return '<div class="' + cls + '" style="height:' + pct + '%;background:' + color + '" title="' + t("gantt.week") + ' ' + w.week + ': ' + w.mileage + ' mi">' +
+    return '<div class="' + cls + '" style="height:' + pct + '%;background:' + color + '" title="' + t("gantt.week") + ' ' + w.week + ': ' + w.mileage + ' km">' +
       (w.isCurrent ? '<span class="gantt-now-marker">' + t("gantt.today") + '</span>' : '') +
       '<span class="gantt-vol-label">' + w.mileage + '</span>' +
       '</div>';
@@ -678,9 +677,9 @@ function renderGanttPlanner(plans) {
       '<td>' + (w.isCurrent ? '<strong>' + w.week + '</strong>' : w.week) + '</td>' +
       '<td>' + dateStr + '</td>' +
       '<td><span class="gantt-phase-dot" style="background:' + phaseColor + '"></span><span class="gantt-phase-name">' + phaseName + '</span></td>' +
-      '<td>' + (w.phase === "race" ? '\u2014' : w.mileage + ' mi') + '</td>' +
+      '<td>' + (w.phase === "race" ? '\u2014' : w.mileage + ' km') + '</td>' +
       '<td>' + t(w.workoutKey) + '</td>' +
-      '<td>' + (w.phase === "race" ? '\u2014' : w.longRun + ' mi') + '</td>' +
+      '<td>' + (w.phase === "race" ? '\u2014' : w.longRun + ' km') + '</td>' +
       '<td>' + (w.notesKey ? t(w.notesKey) : '') + '</td>' +
       '</tr>';
   }).join("");
@@ -711,6 +710,24 @@ var CAL_TYPE_LABELS = {
   "medium-long": "cal.mediumLong",
   rest: "cal.rest",
   race: "cal.race",
+};
+
+var INTENSITY_LABELS = {
+  z1: "intensity.z1",
+  z2: "intensity.z2",
+  z3: "intensity.z3",
+  z4: "intensity.z4",
+  z5: "intensity.z5",
+  race: "intensity.race",
+};
+
+var INTENSITY_COLORS = {
+  z1: { bg: "#dcfce7", text: "#166534" },
+  z2: { bg: "#dbeafe", text: "#1d4ed8" },
+  z3: { bg: "#fef3c7", text: "#92400e" },
+  z4: { bg: "#fed7aa", text: "#9a3412" },
+  z5: { bg: "#fecaca", text: "#991b1b" },
+  race: { bg: "#fce7f3", text: "#9d174d" },
 };
 
 function renderWeeklyCalendar(plans) {
@@ -801,14 +818,17 @@ function renderCalendarWeek() {
   weeklyCalMeta.innerHTML =
     '<span class="pill" style="background:' + phaseColor + '20;color:' + phaseColor + '">' + phaseName + '</span>' +
     (weekData.phase !== "race"
-      ? '<span class="weekly-cal-meta-stat"><strong>' + weekData.mileage + ' mi</strong> ' + t("cal.totalVolume") + '</span>' +
-        '<span class="weekly-cal-meta-stat"><strong>' + weekData.longRun + ' mi</strong> ' + t("cal.longRunLabel") + '</span>'
+      ? '<span class="weekly-cal-meta-stat"><strong>' + weekData.mileage + ' km</strong> ' + t("cal.totalVolume") + '</span>' +
+        '<span class="weekly-cal-meta-stat"><strong>' + weekData.longRun + ' km</strong> ' + t("cal.longRunLabel") + '</span>'
       : '') +
     (weekData.recovery ? '<span class="pill" style="background:#dcfce7;color:#166534">' + t("gantt.recoveryWeek") + '</span>' : '') +
     (weekData.isCurrent ? '<span class="pill">' + t("cal.currentWeek") + '</span>' : '');
 
   // Phase progress bar
   renderPhaseProgressBar();
+
+  // Weekly intensity bar (will be updated after days are rendered)
+  var intensityBarEl = document.getElementById("weekly-intensity-bar");
 
   // Load saved entries then render
   var planId = cachedCalendarPlan.id;
@@ -836,6 +856,8 @@ function renderCalendarWeek() {
       var displayName = saved ? (saved.workout_name || t(CAL_TYPE_LABELS[saved.workout_type] || saved.workout_type)) : t(day.labelKey);
       var displayDist = saved ? saved.distance_miles : day.distance;
       var displayNotes = saved ? saved.notes : null;
+      var displayIntensity = saved && saved.intensity ? saved.intensity : day.intensity;
+      var displayDescription = saved ? saved.description : (day.description || null);
       var isEdited = !!saved;
 
       var cls = "weekly-cal-day type-" + displayType;
@@ -845,6 +867,10 @@ function renderCalendarWeek() {
       var typeCls = "type-" + displayType;
       var typeLabel = t(CAL_TYPE_LABELS[displayType] || displayType);
 
+      var intensityColor = INTENSITY_COLORS[displayIntensity] || INTENSITY_COLORS.z2;
+      var intensityLabel = t(INTENSITY_LABELS[displayIntensity] || "intensity.z2");
+      var shortIntensity = intensityLabel.split(" - ")[0] || intensityLabel;
+
       return '<div class="' + cls + '" data-day-index="' + i + '">' +
         '<div class="weekly-cal-day-header">' +
           '<div class="weekly-cal-day-name">' + dayNames[i] +
@@ -853,13 +879,52 @@ function renderCalendarWeek() {
           '<span class="weekly-cal-workout-badge ' + typeCls + '">' + typeLabel + '</span>' +
         '</div>' +
         '<div class="weekly-cal-day-date">' + dayDate.toLocaleDateString(locale, dateOpts) + '</div>' +
+        (displayType !== "rest" ? '<span class="weekly-cal-intensity-badge" style="background:' + intensityColor.bg + ';color:' + intensityColor.text + '">' + shortIntensity + '</span>' : '') +
         '<div class="weekly-cal-workout-dist">' +
-          (displayDist > 0 ? displayDist + ' <small>mi</small>' : "\u2014") +
+          (displayDist > 0 ? displayDist + ' <small>km</small>' : "\u2014") +
         '</div>' +
         '<div class="weekly-cal-workout-name">' + escapeHtml(displayName) + '</div>' +
+        (displayDescription ? '<div class="weekly-cal-day-desc">' + escapeHtml(displayDescription) + '</div>' : '') +
         (displayNotes ? '<div class="weekly-cal-day-notes">' + escapeHtml(displayNotes) + '</div>' : '') +
         '</div>';
     }).join("");
+
+    // Render weekly intensity distribution bar
+    if (intensityBarEl) {
+      var zoneKm = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, race: 0 };
+      calDays.forEach(function (day, idx) {
+        var s = savedEntries[idx];
+        var zone = s && s.intensity ? s.intensity : day.intensity;
+        var dist = s ? (s.distance_miles || 0) : (day.distance || 0);
+        if (zone && dist > 0) zoneKm[zone] = (zoneKm[zone] || 0) + dist;
+      });
+      var totalKm = Object.values(zoneKm).reduce(function (a, b) { return a + b; }, 0);
+      if (totalKm > 0) {
+        var barHtml = '<div class="intensity-bar-label">' + t("cal.weeklyIntensity") + '</div><div class="intensity-bar-track">';
+        var zones = ["z1", "z2", "z3", "z4", "z5", "race"];
+        zones.forEach(function (z) {
+          if (zoneKm[z] > 0) {
+            var pct = (zoneKm[z] / totalKm) * 100;
+            var color = INTENSITY_COLORS[z] || INTENSITY_COLORS.z2;
+            var label = t(INTENSITY_LABELS[z]).split(" - ")[0];
+            barHtml += '<div class="intensity-bar-seg" style="width:' + pct + '%;background:' + color.text + '" title="' + label + ': ' + zoneKm[z] + ' km (' + Math.round(pct) + '%)">' +
+              (pct > 8 ? '<span>' + label + '</span>' : '') + '</div>';
+          }
+        });
+        barHtml += '</div><div class="intensity-bar-legend">';
+        zones.forEach(function (z) {
+          if (zoneKm[z] > 0) {
+            var color = INTENSITY_COLORS[z] || INTENSITY_COLORS.z2;
+            var label = t(INTENSITY_LABELS[z]).split(" - ")[0];
+            barHtml += '<span class="intensity-legend-item"><span class="intensity-legend-dot" style="background:' + color.text + '"></span>' + label + ' ' + zoneKm[z] + ' km</span>';
+          }
+        });
+        barHtml += '</div>';
+        intensityBarEl.innerHTML = barHtml;
+      } else {
+        intensityBarEl.innerHTML = '';
+      }
+    }
 
     // Apply transition animation
     var transClass = calendarTransitionDir === "back" ? "transitioning transition-back" : "transitioning";
@@ -906,6 +971,8 @@ function openDayEditModal(dayIndex, generatedDay) {
   dayEditForm.elements.workoutType.value = saved ? saved.workout_type : generatedDay.type;
   dayEditForm.elements.workoutName.value = saved ? (saved.workout_name || "") : t(generatedDay.labelKey);
   dayEditForm.elements.distance.value = saved ? (saved.distance_miles || "") : (generatedDay.distance || "");
+  dayEditForm.elements.intensity.value = saved && saved.intensity ? saved.intensity : (generatedDay.intensity || "z2");
+  dayEditForm.elements.description.value = saved ? (saved.description || "") : (generatedDay.description || "");
   dayEditForm.elements.notes.value = saved ? (saved.notes || "") : "";
 
   // Set title with day name
@@ -967,6 +1034,8 @@ if (dayEditForm) {
         workout_type: dayEditForm.elements.workoutType.value,
         workout_name: dayEditForm.elements.workoutName.value || null,
         distance_miles: parseFloat(dayEditForm.elements.distance.value) || null,
+        intensity: dayEditForm.elements.intensity.value || null,
+        description: dayEditForm.elements.description.value || null,
         notes: dayEditForm.elements.notes.value || null,
       });
 
@@ -1207,21 +1276,21 @@ function renderLongRunChart(activities) {
   var dates = longRuns.map(function (lr) {
     return new Date(lr[0]).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   });
-  var distances = longRuns.map(function (lr) { return Math.round(lr[1].distance / 1609.344 * 10) / 10; });
-  var elevations = longRuns.map(function (lr) { return Math.round(lr[1].elevation * 3.28084); });
+  var distances = longRuns.map(function (lr) { return Math.round(lr[1].distance / 1000 * 10) / 10; });
+  var elevations = longRuns.map(function (lr) { return Math.round(lr[1].elevation); });
 
   var traces = [
     {
       x: dates,
       y: distances,
-      name: "Long run (mi)",
+      name: "Long run (km)",
       type: "bar",
       marker: { color: "#3b82f6", borderRadius: 4 },
     },
     {
       x: dates,
       y: elevations,
-      name: "Elevation (ft)",
+      name: "Elevation (m)",
       type: "scatter",
       mode: "lines+markers",
       yaxis: "y2",
@@ -1237,8 +1306,8 @@ function renderLongRunChart(activities) {
     margin: { t: 20, r: 50, b: 40, l: 40 },
     legend: { orientation: "h", y: 1.1 },
     xaxis: { gridcolor: "rgba(148,163,184,0.15)" },
-    yaxis: { title: "Miles", gridcolor: "rgba(148,163,184,0.15)" },
-    yaxis2: { title: "Feet", overlaying: "y", side: "right", gridcolor: "transparent" },
+    yaxis: { title: "Kilometers", gridcolor: "rgba(148,163,184,0.15)" },
+    yaxis2: { title: "Meters", overlaying: "y", side: "right", gridcolor: "transparent" },
     barmode: "group",
   };
 
@@ -1361,13 +1430,13 @@ function buildAICoachPayload() {
       cachedAllActivities.forEach(function (a) {
         var ws = Compute.getWeekStart(new Date(a.started_at));
         if (ws.toISOString().split("T")[0] === key) {
-          var dist = (Number(a.distance) || 0) / 1609.344;
+          var dist = (Number(a.distance) || 0) / 1000;
           if (dist > longestRun) longestRun = dist;
         }
       });
       return {
         weekOf: key,
-        distance: w.distance / 1609.344,
+        distance: w.distance / 1000,
         runs: w.count,
         longestRun: longestRun,
       };
@@ -1385,7 +1454,7 @@ function buildAICoachPayload() {
       .map(function (a) {
         return {
           name: a.name,
-          distance: (Number(a.distance) || 0) / 1609.344,
+          distance: (Number(a.distance) || 0) / 1000,
           duration: Number(a.moving_time) || 0,
           effort: a.effort_rating || null,
         };
@@ -1702,7 +1771,7 @@ if (planForm) {
         formNote.style.color = "";
         showAuthModal();
       } else {
-        formNote.textContent = "Drafting a " + availability + "-day plan for " + race + " on " + date + " with ~" + mileage + " mi/week. Configure Supabase to save plans.";
+        formNote.textContent = "Drafting a " + availability + "-day plan for " + race + " on " + date + " with ~" + mileage + " km/week. Configure Supabase to save plans.";
         formNote.style.color = "";
       }
       return;
@@ -1853,12 +1922,11 @@ if (manualEntryForm) {
     submitBtn.disabled = true;
     note.textContent = "Saving\u2026";
 
-    var distMiles = parseFloat(manualEntryForm.elements.distance.value) || 0;
-    var distMeters = distMiles * 1609.344;
+    var distKm = parseFloat(manualEntryForm.elements.distance.value) || 0;
+    var distMeters = distKm * 1000;
     var durationMin = parseInt(manualEntryForm.elements.duration.value, 10) || 0;
     var durationSec = durationMin * 60;
-    var elevFt = parseInt(manualEntryForm.elements.elevation.value, 10) || 0;
-    var elevMeters = elevFt / 3.28084;
+    var elevMeters = parseInt(manualEntryForm.elements.elevation.value, 10) || 0;
     var dateVal = manualEntryForm.elements.date.value;
     var effort = parseInt(manualEntryForm.elements.effort.value, 10);
 

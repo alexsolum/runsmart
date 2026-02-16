@@ -124,8 +124,8 @@ describe("computeLongRuns", () => {
 });
 
 describe("format helpers", () => {
-  it("formatDistance converts meters to miles", () => {
-    expect(Compute.formatDistance(1609.344)).toBe("1.0 mi");
+  it("formatDistance converts meters to km", () => {
+    expect(Compute.formatDistance(1000)).toBe("1.0 km");
     expect(Compute.formatDistance(0)).toBe("\u2014");
   });
 
@@ -135,13 +135,13 @@ describe("format helpers", () => {
     expect(Compute.formatDuration(0)).toBe("\u2014");
   });
 
-  it("formatPace converts sec/km to /mi", () => {
+  it("formatPace formats sec/km as /km", () => {
     const result = Compute.formatPace(300); // 5:00/km
-    expect(result).toMatch(/\d+:\d+ \/mi/);
+    expect(result).toMatch(/\d+:\d+ \/km/);
   });
 
-  it("formatElevation converts meters to feet", () => {
-    expect(Compute.formatElevation(100)).toMatch(/ft$/);
+  it("formatElevation shows meters", () => {
+    expect(Compute.formatElevation(100)).toMatch(/m$/);
     expect(Compute.formatElevation(0)).toBe("\u2014");
   });
 

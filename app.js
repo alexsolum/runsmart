@@ -90,6 +90,18 @@ var weeklyCalGrid = document.getElementById("weekly-cal-grid");
 var weeklyCalPrev = document.getElementById("weekly-cal-prev");
 var weeklyCalNext = document.getElementById("weekly-cal-next");
 
+// Day edit modal DOM refs
+var dayEditModal = document.getElementById("day-edit-modal");
+var dayEditClose = document.getElementById("day-edit-close");
+var dayEditForm = document.getElementById("day-edit-form");
+var dayEditReset = document.getElementById("day-edit-reset");
+var dayEditNote = dayEditForm ? dayEditForm.querySelector(".day-edit-note") : null;
+var dayEditTitle = document.getElementById("day-edit-title");
+
+// Current editing context
+var editingDayIndex = -1;
+var editingWeekEntries = {};
+
 // Coach DOM refs
 var coachInsightsEl = document.getElementById("coach-insights");
 
@@ -324,6 +336,58 @@ async function createCheckin(checkin) {
     .select();
   if (result.error) throw result.error;
   return result.data[0];
+}
+
+// ---- Weekly plan entry functions ----
+
+var cachedWeekEntries = {};
+
+async function loadWeekEntries(planId, weekNumber) {
+  var cacheKey = planId + "-" + weekNumber;
+  if (cachedWeekEntries[cacheKey]) return cachedWeekEntries[cacheKey];
+
+  var result = await db
+    .from("weekly_plan_entries")
+    .select("*")
+    .eq("plan_id", planId)
+    .eq("week_number", weekNumber);
+  if (result.error) throw result.error;
+
+  var entries = {};
+  result.data.forEach(function (e) {
+    entries[e.day_of_week] = e;
+  });
+  cachedWeekEntries[cacheKey] = entries;
+  return entries;
+}
+
+async function upsertWeekEntry(entry) {
+  var payload = { ...entry, user_id: currentUser.id, updated_at: new Date().toISOString() };
+  var result = await db
+    .from("weekly_plan_entries")
+    .upsert([payload], { onConflict: "plan_id,week_number,day_of_week" })
+    .select();
+  if (result.error) throw result.error;
+
+  // Invalidate cache
+  var cacheKey = entry.plan_id + "-" + entry.week_number;
+  delete cachedWeekEntries[cacheKey];
+
+  return result.data[0];
+}
+
+async function deleteWeekEntry(planId, weekNumber, dayOfWeek) {
+  var result = await db
+    .from("weekly_plan_entries")
+    .delete()
+    .eq("plan_id", planId)
+    .eq("week_number", weekNumber)
+    .eq("day_of_week", dayOfWeek);
+  if (result.error) throw result.error;
+
+  // Invalidate cache
+  var cacheKey = planId + "-" + weekNumber;
+  delete cachedWeekEntries[cacheKey];
 }
 
 // ---- HTML escape ----
@@ -697,35 +761,197 @@ function renderCalendarWeek() {
     (weekData.recovery ? '<span class="pill" style="background:#dcfce7;color:#166534">' + t("gantt.recoveryWeek") + '</span>' : '') +
     (weekData.isCurrent ? '<span class="pill">' + t("cal.currentWeek") + '</span>' : '');
 
-  // Day grid
-  var calDays = computeWeeklyCalendar(weekData, availability, b2b);
-  var today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Load saved entries then render
+  var planId = cachedCalendarPlan.id;
+  var weekNum = weekData.week;
+  var canEdit = currentUser && db;
+
+  var renderDays = function (savedEntries) {
+    editingWeekEntries = savedEntries || {};
+
+    // Day grid
+    var calDays = computeWeeklyCalendar(weekData, availability, b2b);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+
+    weeklyCalGrid.innerHTML = calDays.map(function (day, i) {
+      var dayDate = day.date;
+      var isToday = dayDate.getFullYear() === today.getFullYear() &&
+        dayDate.getMonth() === today.getMonth() &&
+        dayDate.getDate() === today.getDate();
+
+      // Apply saved overrides
+      var saved = savedEntries[i];
+      var displayType = saved ? saved.workout_type : day.type;
+      var displayName = saved ? (saved.workout_name || t(CAL_TYPE_LABELS[saved.workout_type] || saved.workout_type)) : t(day.labelKey);
+      var displayDist = saved ? saved.distance_miles : day.distance;
+      var displayNotes = saved ? saved.notes : null;
+      var isEdited = !!saved;
+
+      var isRest = displayType === "rest";
+
+      var cls = "weekly-cal-day";
+      if (isToday) cls += " is-today";
+      if (isRest) cls += " is-rest";
+      if (canEdit) cls += " is-editable";
+      if (isEdited) cls += " is-edited";
+
+      var typeCls = "type-" + displayType;
+      var typeLabel = t(CAL_TYPE_LABELS[displayType] || displayType);
+
+      return '<div class="' + cls + '" data-day-index="' + i + '">' +
+        '<div class="weekly-cal-day-name">' + dayNames[i] + '</div>' +
+        '<div class="weekly-cal-day-date">' + dayDate.toLocaleDateString(locale, dateOpts) + '</div>' +
+        '<span class="weekly-cal-workout-badge ' + typeCls + '">' + typeLabel + '</span>' +
+        '<div class="weekly-cal-workout-name">' + escapeHtml(displayName) + '</div>' +
+        '<div class="weekly-cal-workout-dist">' + (displayDist > 0 ? displayDist + " mi" : "\u2014") + '</div>' +
+        (displayNotes ? '<div class="weekly-cal-day-notes">' + escapeHtml(displayNotes) + '</div>' : '') +
+        '</div>';
+    }).join("");
+
+    // Attach click handlers for editing
+    if (canEdit) {
+      weeklyCalGrid.querySelectorAll(".weekly-cal-day[data-day-index]").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var idx = parseInt(card.dataset.dayIndex, 10);
+          openDayEditModal(idx, calDays[idx]);
+        });
+      });
+    }
+  };
+
+  // Try to load saved entries from DB, fallback to empty
+  if (canEdit && planId) {
+    loadWeekEntries(planId, weekNum).then(renderDays).catch(function () { renderDays({}); });
+  } else {
+    renderDays({});
+  }
+}
+
+// ---- Day edit modal ----
+
+function openDayEditModal(dayIndex, generatedDay) {
+  if (!dayEditModal || !dayEditForm) return;
+
+  editingDayIndex = dayIndex;
+  var saved = editingWeekEntries[dayIndex];
+
+  // Populate form with saved values or generated defaults
+  dayEditForm.elements.dayIndex.value = dayIndex;
+  dayEditForm.elements.workoutType.value = saved ? saved.workout_type : generatedDay.type;
+  dayEditForm.elements.workoutName.value = saved ? (saved.workout_name || "") : t(generatedDay.labelKey);
+  dayEditForm.elements.distance.value = saved ? (saved.distance_miles || "") : (generatedDay.distance || "");
+  dayEditForm.elements.notes.value = saved ? (saved.notes || "") : "";
+
+  // Set title with day name
   var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+  dayEditTitle.textContent = t("cal.editTitle") + " \u2014 " + dayNames[dayIndex];
 
-  weeklyCalGrid.innerHTML = calDays.map(function (day, i) {
-    var dayDate = day.date;
-    var isToday = dayDate.getFullYear() === today.getFullYear() &&
-      dayDate.getMonth() === today.getMonth() &&
-      dayDate.getDate() === today.getDate();
-    var isRest = day.type === "rest";
+  if (dayEditNote) {
+    dayEditNote.textContent = "";
+    dayEditNote.style.color = "";
+  }
 
-    var cls = "weekly-cal-day";
-    if (isToday) cls += " is-today";
-    if (isRest) cls += " is-rest";
+  dayEditModal.hidden = false;
+}
 
-    var typeCls = "type-" + day.type;
-    var typeLabel = t(CAL_TYPE_LABELS[day.type] || day.type);
-    var workoutName = t(day.labelKey);
+function closeDayEditModal() {
+  if (dayEditModal) dayEditModal.hidden = true;
+  editingDayIndex = -1;
+}
 
-    return '<div class="' + cls + '">' +
-      '<div class="weekly-cal-day-name">' + dayNames[i] + '</div>' +
-      '<div class="weekly-cal-day-date">' + dayDate.toLocaleDateString(locale, dateOpts) + '</div>' +
-      '<span class="weekly-cal-workout-badge ' + typeCls + '">' + typeLabel + '</span>' +
-      '<div class="weekly-cal-workout-name">' + workoutName + '</div>' +
-      '<div class="weekly-cal-workout-dist">' + (day.distance > 0 ? day.distance + " mi" : "\u2014") + '</div>' +
-      '</div>';
-  }).join("");
+// Day edit close button
+if (dayEditClose) {
+  dayEditClose.addEventListener("click", closeDayEditModal);
+}
+
+// Day edit modal overlay click
+if (dayEditModal) {
+  dayEditModal.addEventListener("click", function (e) {
+    if (e.target === dayEditModal) closeDayEditModal();
+  });
+}
+
+// Day edit form submit
+if (dayEditForm) {
+  dayEditForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    if (!currentUser || !cachedCalendarPlan || !cachedKoopPlan) return;
+
+    var weekData = cachedKoopPlan.weeks[calendarWeekIndex];
+    if (!weekData) return;
+
+    var dayIdx = parseInt(dayEditForm.elements.dayIndex.value, 10);
+    var dayDate = new Date(weekData.date);
+    dayDate.setDate(dayDate.getDate() + dayIdx);
+
+    var submitBtn = dayEditForm.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    if (dayEditNote) {
+      dayEditNote.textContent = t("cal.editSaving");
+      dayEditNote.style.color = "";
+    }
+
+    try {
+      await upsertWeekEntry({
+        plan_id: cachedCalendarPlan.id,
+        week_number: weekData.week,
+        day_of_week: dayIdx,
+        date: dayDate.toISOString().split("T")[0],
+        workout_type: dayEditForm.elements.workoutType.value,
+        workout_name: dayEditForm.elements.workoutName.value || null,
+        distance_miles: parseFloat(dayEditForm.elements.distance.value) || null,
+        notes: dayEditForm.elements.notes.value || null,
+      });
+
+      if (dayEditNote) {
+        dayEditNote.textContent = t("cal.editSaved");
+        dayEditNote.style.color = "var(--success)";
+      }
+
+      // Re-render calendar to reflect changes
+      renderCalendarWeek();
+
+      setTimeout(closeDayEditModal, 600);
+    } catch (err) {
+      if (dayEditNote) {
+        dayEditNote.textContent = "Error: " + err.message;
+        dayEditNote.style.color = "#ef4444";
+      }
+    }
+    submitBtn.disabled = false;
+  });
+}
+
+// Day edit reset button
+if (dayEditReset) {
+  dayEditReset.addEventListener("click", async function () {
+    if (!currentUser || !cachedCalendarPlan || !cachedKoopPlan) return;
+
+    var weekData = cachedKoopPlan.weeks[calendarWeekIndex];
+    if (!weekData) return;
+
+    var dayIdx = parseInt(dayEditForm.elements.dayIndex.value, 10);
+
+    // Only delete if there's a saved entry
+    if (!editingWeekEntries[dayIdx]) {
+      closeDayEditModal();
+      return;
+    }
+
+    try {
+      await deleteWeekEntry(cachedCalendarPlan.id, weekData.week, dayIdx);
+      renderCalendarWeek();
+      closeDayEditModal();
+    } catch (err) {
+      if (dayEditNote) {
+        dayEditNote.textContent = "Error: " + err.message;
+        dayEditNote.style.color = "#ef4444";
+      }
+    }
+  });
 }
 
 // Calendar navigation

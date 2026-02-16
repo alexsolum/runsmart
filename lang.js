@@ -206,6 +206,8 @@ var TRANSLATIONS = {
     "ph.niggles": "e.g. left achilles tightness",
     "ph.notes": "How was your week?",
     "ph.activityName": "Morning trail run",
+    "ph.workoutName": "e.g. Easy run",
+    "ph.dayNotes": "Optional notes for this day",
 
     // Sidebar
     "sidebar.dashboard": "Dashboard",
@@ -269,6 +271,15 @@ var TRANSLATIONS = {
     "cal.totalVolume": "total volume",
     "cal.longRunLabel": "long run",
     "cal.currentWeek": "Current week",
+    "cal.editTitle": "Edit workout",
+    "cal.editType": "Workout type",
+    "cal.editName": "Workout name",
+    "cal.editDistance": "Distance (mi)",
+    "cal.editNotes": "Notes",
+    "cal.editSave": "Save",
+    "cal.editReset": "Reset to plan",
+    "cal.editSaving": "Saving\u2026",
+    "cal.editSaved": "Saved!",
 
     // Language
     "lang.en": "English",
@@ -480,6 +491,8 @@ var TRANSLATIONS = {
     "ph.niggles": "f.eks. stramhet i venstre akillessene",
     "ph.notes": "Hvordan var uken din?",
     "ph.activityName": "Morgen stil\u00f8p",
+    "ph.workoutName": "f.eks. Rolig l\u00f8p",
+    "ph.dayNotes": "Valgfrie notater for denne dagen",
 
     // Sidebar
     "sidebar.dashboard": "Dashbord",
@@ -543,6 +556,15 @@ var TRANSLATIONS = {
     "cal.totalVolume": "totalt volum",
     "cal.longRunLabel": "langtur",
     "cal.currentWeek": "Denne uken",
+    "cal.editTitle": "Rediger trening",
+    "cal.editType": "Treningstype",
+    "cal.editName": "Treningsnavn",
+    "cal.editDistance": "Distanse (mi)",
+    "cal.editNotes": "Notater",
+    "cal.editSave": "Lagre",
+    "cal.editReset": "Tilbakestill til plan",
+    "cal.editSaving": "Lagrer\u2026",
+    "cal.editSaved": "Lagret!",
 
     // Language
     "lang.en": "English",

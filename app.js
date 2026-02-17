@@ -1,38 +1,43 @@
+import {
+  getWeekStart,
+  computeWeeklySummary,
+  computeTrainingBlocks,
+  computeCurrentBlock,
+  computeTrainingLoad,
+  computeLongRuns,
+  computeKoopPlan,
+  computeWeeklyCalendar,
+  generateCoachingInsights,
+  formatDistance,
+  formatDuration,
+  formatPace,
+  formatElevation,
+  trendArrow,
+  KOOP_PHASES,
+  KOOP_PHASE_KEYS,
+} from "./src/domain/compute.js";
+import {
+  t,
+  useI18n,
+  getCurrentLanguage,
+} from "./src/i18n/translations.js";
+
 // ---- Supabase client ----
 
 var isSupabaseConfigured =
-  typeof SUPABASE_URL !== "undefined" &&
-  SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
-  typeof SUPABASE_ANON_KEY !== "undefined" &&
-  SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
+  typeof window.SUPABASE_URL !== "undefined" &&
+  window.SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+  typeof window.SUPABASE_ANON_KEY !== "undefined" &&
+  window.SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 
 var isStravaConfigured =
-  typeof STRAVA_CLIENT_ID !== "undefined" &&
-  STRAVA_CLIENT_ID !== "YOUR_STRAVA_CLIENT_ID";
+  typeof window.STRAVA_CLIENT_ID !== "undefined" &&
+  window.STRAVA_CLIENT_ID !== "YOUR_STRAVA_CLIENT_ID";
 
 var db = null;
 if (isSupabaseConfigured) {
-  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 }
-
-// ---- Aliases from Compute module ----
-
-var getWeekStart = Compute.getWeekStart;
-var computeWeeklySummary = Compute.computeWeeklySummary;
-var computeTrainingBlocks = Compute.computeTrainingBlocks;
-var computeCurrentBlock = Compute.computeCurrentBlock;
-var computeTrainingLoad = Compute.computeTrainingLoad;
-var computeLongRuns = Compute.computeLongRuns;
-var computeKoopPlan = Compute.computeKoopPlan;
-var computeWeeklyCalendar = Compute.computeWeeklyCalendar;
-var generateCoachingInsights = Compute.generateCoachingInsights;
-var formatDistance = Compute.formatDistance;
-var formatDuration = Compute.formatDuration;
-var formatPace = Compute.formatPace;
-var formatElevation = Compute.formatElevation;
-var trendArrow = Compute.trendArrow;
-var KOOP_PHASES = Compute.KOOP_PHASES;
-var KOOP_PHASE_KEYS = Compute.KOOP_PHASE_KEYS;
 
 // ---- DOM refs ----
 
@@ -56,6 +61,7 @@ var stravaDisconnectBtn = document.getElementById("strava-disconnect-btn");
 var stravaDisconnected = document.getElementById("strava-disconnected");
 var stravaConnected = document.getElementById("strava-connected");
 var lastSyncTime = document.getElementById("last-sync-time");
+var stravaSyncFeedback = document.getElementById("strava-sync-feedback");
 var activitiesSection = document.getElementById("activities-section");
 var activitiesList = document.getElementById("activities-list");
 
@@ -114,12 +120,17 @@ var sidebarLinks = document.querySelectorAll(".sidebar-link");
 
 var currentAuthMode = "signin";
 var currentUser = null;
-var cachedPlans = [];
-var cachedAllActivities = [];
-var cachedCheckins = [];
-var cachedKoopPlan = null;
-var cachedCalendarPlan = null;
-var calendarWeekIndex = 0;
+var appState = {
+  plans: [],
+  allActivities: [],
+  checkins: [],
+  koopPlan: null,
+  calendarPlan: null,
+  calendarWeekIndex: 0,
+  weekEntriesCache: {},
+};
+
+var i18n = useI18n();
 
 // ---- Auth functions ----
 
@@ -137,8 +148,8 @@ async function signUp(email, password) {
 
 async function signInWithGoogle() {
   var redirectTo =
-    typeof AUTH_REDIRECT_URL === "string" && AUTH_REDIRECT_URL.trim()
-      ? AUTH_REDIRECT_URL.trim()
+    typeof window.AUTH_REDIRECT_URL === "string" && window.AUTH_REDIRECT_URL.trim()
+      ? window.AUTH_REDIRECT_URL.trim()
       : window.location.origin + window.location.pathname;
 
   const { error } = await db.auth.signInWithOAuth({
@@ -207,7 +218,7 @@ function startStravaOAuth() {
   var scope = "activity:read_all";
   var url =
     "https://www.strava.com/oauth/authorize" +
-    "?client_id=" + encodeURIComponent(STRAVA_CLIENT_ID) +
+    "?client_id=" + encodeURIComponent(window.STRAVA_CLIENT_ID) +
     "&redirect_uri=" + encodeURIComponent(redirectUri) +
     "&response_type=code" +
     "&scope=" + encodeURIComponent(scope) +
@@ -220,12 +231,12 @@ async function exchangeStravaCode(code) {
   var session = sessionResult.data.session;
   if (!session) throw new Error("No active session — please sign in first");
 
-  var res = await fetch(SUPABASE_URL + "/functions/v1/strava-auth", {
+  var res = await fetch(window.SUPABASE_URL + "/functions/v1/strava-auth", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: window.SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({ code: code }),
   });
@@ -248,12 +259,12 @@ async function syncStrava() {
   var session = sessionResult.data.session;
   if (!session) throw new Error("No active session — please sign in first");
 
-  var res = await fetch(SUPABASE_URL + "/functions/v1/strava-sync", {
+  var res = await fetch(window.SUPABASE_URL + "/functions/v1/strava-sync", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: window.SUPABASE_ANON_KEY,
     },
   });
 
@@ -356,11 +367,10 @@ async function createCheckin(checkin) {
 
 // ---- Weekly plan entry functions ----
 
-var cachedWeekEntries = {};
 
 async function loadWeekEntries(planId, weekNumber) {
   var cacheKey = planId + "-" + weekNumber;
-  if (cachedWeekEntries[cacheKey]) return cachedWeekEntries[cacheKey];
+  if (appState.weekEntriesCache[cacheKey]) return appState.weekEntriesCache[cacheKey];
 
   var result = await db
     .from("weekly_plan_entries")
@@ -373,7 +383,7 @@ async function loadWeekEntries(planId, weekNumber) {
   result.data.forEach(function (e) {
     entries[e.day_of_week] = e;
   });
-  cachedWeekEntries[cacheKey] = entries;
+  appState.weekEntriesCache[cacheKey] = entries;
   return entries;
 }
 
@@ -387,7 +397,7 @@ async function upsertWeekEntry(entry) {
 
   // Invalidate cache
   var cacheKey = entry.plan_id + "-" + entry.week_number;
-  delete cachedWeekEntries[cacheKey];
+  delete appState.weekEntriesCache[cacheKey];
 
   return result.data[0];
 }
@@ -403,7 +413,7 @@ async function deleteWeekEntry(planId, weekNumber, dayOfWeek) {
 
   // Invalidate cache
   var cacheKey = planId + "-" + weekNumber;
-  delete cachedWeekEntries[cacheKey];
+  delete appState.weekEntriesCache[cacheKey];
 }
 
 // ---- HTML escape ----
@@ -442,6 +452,40 @@ function openSidebar() {
 function closeSidebar() {
   sidebar.classList.remove("open");
   sidebarOverlay.classList.remove("active");
+}
+
+
+function setFeedback(el, message, tone) {
+  if (!el) return;
+  el.textContent = message || "";
+  el.classList.remove("is-success", "is-error", "is-loading");
+  if (tone) el.classList.add("is-" + tone);
+}
+
+function validatePlanField(name) {
+  if (!planForm) return true;
+  var field = planForm.elements[name];
+  if (!field) return true;
+  var errorEl = planForm.querySelector('[data-field-error="' + name + '"]');
+  var wrap = field.closest('.form-field');
+  var value = (field.value || '').trim();
+  var error = '';
+
+  if (name === 'race' && value.length < 3) error = 'Race must be at least 3 characters.';
+  if (name === 'date') {
+    var dt = new Date(value + 'T00:00:00');
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
+    if (!value || isNaN(dt.getTime()) || dt <= now) error = 'Please choose a future race date.';
+  }
+  if (name === 'mileage') {
+    var num = parseInt(value, 10);
+    if (value && (isNaN(num) || num < 15 || num > 200)) error = 'Mileage must be between 15 and 200 km.';
+  }
+
+  if (errorEl) errorEl.textContent = error;
+  if (wrap) wrap.classList.toggle('has-error', Boolean(error));
+  return !error;
 }
 
 // ---- UI: Auth ----
@@ -495,12 +539,14 @@ function showStravaDisconnected() {
   stravaDisconnected.hidden = false;
   stravaConnected.hidden = true;
   activitiesSection.hidden = true;
+  setFeedback(stravaSyncFeedback, "Strava is not connected.", "error");
 }
 
 function showStravaConnected(updatedAt) {
   stravaDisconnected.hidden = true;
   stravaConnected.hidden = false;
   activitiesSection.hidden = false;
+  setFeedback(stravaSyncFeedback, "Connected and ready to sync.", "success");
   if (updatedAt) {
     lastSyncTime.textContent = new Date(updatedAt).toLocaleString();
   }
@@ -510,12 +556,12 @@ function showStravaConnected(updatedAt) {
 
 async function refreshPlans() {
   try {
-    cachedPlans = await loadPlans();
-    renderPlans(cachedPlans);
-    renderRaceCountdown(cachedPlans);
-    renderBlockCalendar(cachedPlans);
-    renderGanttPlanner(cachedPlans);
-    renderWeeklyCalendar(cachedPlans);
+    appState.plans = await loadPlans();
+    renderPlans(appState.plans);
+    renderRaceCountdown(appState.plans);
+    renderBlockCalendar(appState.plans);
+    renderGanttPlanner(appState.plans);
+    renderWeeklyCalendar(appState.plans);
   } catch (err) {
     plansList.innerHTML = '<p class="muted">Could not load plans.</p>';
   }
@@ -524,7 +570,7 @@ async function refreshPlans() {
 function renderPlans(plans) {
   if (!plans.length) {
     plansList.innerHTML =
-      '<p class="muted">No plans yet. Use the form above to create your first plan.</p>';
+      '<p class="empty-state">No plans yet. Use the form above to create your first plan.</p>';
     return;
   }
 
@@ -671,7 +717,7 @@ function renderGanttPlanner(plans) {
     var phaseColor = w.phase === "race" ? "#ef4444" : (KOOP_PHASES[w.phase] ? KOOP_PHASES[w.phase].color : "#94a3b8");
     var phaseName = w.phase === "race" ? t("gantt.raceWeek") : t(KOOP_PHASE_KEYS[w.phase]);
 
-    var dateStr = w.date.toLocaleDateString(currentLang === "no" ? "nb-NO" : "en-US", { month: "short", day: "numeric" });
+    var dateStr = w.date.toLocaleDateString(getCurrentLanguage() === "no" ? "nb-NO" : "en-US", { month: "short", day: "numeric" });
 
     return '<tr class="' + cls + '" data-week-index="' + (w.week - 1) + '" style="cursor:pointer">' +
       '<td>' + (w.isCurrent ? '<strong>' + w.week + '</strong>' : w.week) + '</td>' +
@@ -688,8 +734,8 @@ function renderGanttPlanner(plans) {
   ganttBody.querySelectorAll("tr[data-week-index]").forEach(function (row) {
     row.addEventListener("click", function () {
       var idx = parseInt(row.dataset.weekIndex, 10);
-      if (cachedKoopPlan && idx >= 0 && idx < cachedKoopPlan.weeks.length) {
-        calendarWeekIndex = idx;
+      if (appState.koopPlan && idx >= 0 && idx < appState.koopPlan.weeks.length) {
+        appState.calendarWeekIndex = idx;
         renderCalendarWeek();
         weeklyCalendar.scrollIntoView({ behavior: "smooth", block: "start" });
       }
@@ -735,21 +781,21 @@ function renderWeeklyCalendar(plans) {
 
   if (!futurePlans.length) {
     weeklyCalendar.hidden = true;
-    cachedKoopPlan = null;
-    cachedCalendarPlan = null;
+    appState.koopPlan = null;
+    appState.calendarPlan = null;
     return;
   }
 
   var plan = futurePlans[0];
-  cachedCalendarPlan = plan;
-  cachedKoopPlan = computeKoopPlan(plan);
+  appState.calendarPlan = plan;
+  appState.koopPlan = computeKoopPlan(plan);
 
   // Default to current week
   var currentIdx = -1;
-  cachedKoopPlan.weeks.forEach(function (w, i) {
+  appState.koopPlan.weeks.forEach(function (w, i) {
     if (w.isCurrent) currentIdx = i;
   });
-  calendarWeekIndex = currentIdx >= 0 ? currentIdx : 0;
+  appState.calendarWeekIndex = currentIdx >= 0 ? currentIdx : 0;
 
   weeklyCalendar.hidden = false;
   renderCalendarWeek();
@@ -759,11 +805,11 @@ var calendarTransitionDir = "forward"; // "forward" or "back"
 
 function renderPhaseProgressBar() {
   var progressEl = document.getElementById("weekly-cal-progress");
-  if (!progressEl || !cachedKoopPlan) return;
+  if (!progressEl || !appState.koopPlan) return;
 
-  var phases = cachedKoopPlan.phases;
-  var totalWeeks = cachedKoopPlan.totalWeeks;
-  var currentWeek = cachedKoopPlan.weeks[calendarWeekIndex];
+  var phases = appState.koopPlan.phases;
+  var totalWeeks = appState.koopPlan.totalWeeks;
+  var currentWeek = appState.koopPlan.weeks[appState.calendarWeekIndex];
   if (!currentWeek) return;
 
   var elapsed = 0;
@@ -786,19 +832,19 @@ function renderPhaseProgressBar() {
 }
 
 function renderCalendarWeek() {
-  if (!cachedKoopPlan || !cachedCalendarPlan) return;
+  if (!appState.koopPlan || !appState.calendarPlan) return;
 
-  var weeks = cachedKoopPlan.weeks;
-  var weekData = weeks[calendarWeekIndex];
+  var weeks = appState.koopPlan.weeks;
+  var weekData = weeks[appState.calendarWeekIndex];
   if (!weekData) return;
 
-  var availability = cachedCalendarPlan.availability || 5;
-  var b2b = cachedCalendarPlan.b2b_long_runs || false;
+  var availability = appState.calendarPlan.availability || 5;
+  var b2b = appState.calendarPlan.b2b_long_runs || false;
 
   // Navigation label
   var weekDate = weekData.date;
   var dateOpts = { month: "short", day: "numeric" };
-  var locale = currentLang === "no" ? "nb-NO" : "en-US";
+  var locale = getCurrentLanguage() === "no" ? "nb-NO" : "en-US";
   var phaseName = weekData.phase === "race"
     ? t("gantt.raceWeek")
     : t(KOOP_PHASE_KEYS[weekData.phase]);
@@ -807,8 +853,8 @@ function renderCalendarWeek() {
     weekDate.toLocaleDateString(locale, dateOpts) + " \u2014 " + phaseName;
 
   // Disable prev/next at boundaries
-  weeklyCalPrev.disabled = calendarWeekIndex <= 0;
-  weeklyCalNext.disabled = calendarWeekIndex >= weeks.length - 1;
+  weeklyCalPrev.disabled = appState.calendarWeekIndex <= 0;
+  weeklyCalNext.disabled = appState.calendarWeekIndex >= weeks.length - 1;
 
   // Meta info
   var phaseColor = weekData.phase === "race"
@@ -831,7 +877,7 @@ function renderCalendarWeek() {
   var intensityBarEl = document.getElementById("weekly-intensity-bar");
 
   // Load saved entries then render
-  var planId = cachedCalendarPlan.id;
+  var planId = appState.calendarPlan.id;
   var weekNum = weekData.week;
   var canEdit = currentUser && db;
 
@@ -842,7 +888,7 @@ function renderCalendarWeek() {
     var calDays = computeWeeklyCalendar(weekData, availability, b2b);
     var today = new Date();
     today.setHours(0, 0, 0, 0);
-    var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+    var dayNames = getCurrentLanguage() === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
 
     var gridHtml = calDays.map(function (day, i) {
       var dayDate = day.date;
@@ -976,7 +1022,7 @@ function openDayEditModal(dayIndex, generatedDay) {
   dayEditForm.elements.notes.value = saved ? (saved.notes || "") : "";
 
   // Set title with day name
-  var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+  var dayNames = getCurrentLanguage() === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
   dayEditTitle.textContent = t("cal.editTitle") + " \u2014 " + dayNames[dayIndex];
 
   if (dayEditNote) {
@@ -1009,9 +1055,9 @@ if (dayEditForm) {
   dayEditForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    if (!currentUser || !cachedCalendarPlan || !cachedKoopPlan) return;
+    if (!currentUser || !appState.calendarPlan || !appState.koopPlan) return;
 
-    var weekData = cachedKoopPlan.weeks[calendarWeekIndex];
+    var weekData = appState.koopPlan.weeks[appState.calendarWeekIndex];
     if (!weekData) return;
 
     var dayIdx = parseInt(dayEditForm.elements.dayIndex.value, 10);
@@ -1027,7 +1073,7 @@ if (dayEditForm) {
 
     try {
       await upsertWeekEntry({
-        plan_id: cachedCalendarPlan.id,
+        plan_id: appState.calendarPlan.id,
         week_number: weekData.week,
         day_of_week: dayIdx,
         date: dayDate.toISOString().split("T")[0],
@@ -1061,9 +1107,9 @@ if (dayEditForm) {
 // Day edit reset button
 if (dayEditReset) {
   dayEditReset.addEventListener("click", async function () {
-    if (!currentUser || !cachedCalendarPlan || !cachedKoopPlan) return;
+    if (!currentUser || !appState.calendarPlan || !appState.koopPlan) return;
 
-    var weekData = cachedKoopPlan.weeks[calendarWeekIndex];
+    var weekData = appState.koopPlan.weeks[appState.calendarWeekIndex];
     if (!weekData) return;
 
     var dayIdx = parseInt(dayEditForm.elements.dayIndex.value, 10);
@@ -1075,7 +1121,7 @@ if (dayEditReset) {
     }
 
     try {
-      await deleteWeekEntry(cachedCalendarPlan.id, weekData.week, dayIdx);
+      await deleteWeekEntry(appState.calendarPlan.id, weekData.week, dayIdx);
       renderCalendarWeek();
       closeDayEditModal();
     } catch (err) {
@@ -1090,9 +1136,9 @@ if (dayEditReset) {
 // Calendar navigation
 if (weeklyCalPrev) {
   weeklyCalPrev.addEventListener("click", function () {
-    if (calendarWeekIndex > 0) {
+    if (appState.calendarWeekIndex > 0) {
       calendarTransitionDir = "back";
-      calendarWeekIndex--;
+      appState.calendarWeekIndex--;
       renderCalendarWeek();
     }
   });
@@ -1100,9 +1146,9 @@ if (weeklyCalPrev) {
 
 if (weeklyCalNext) {
   weeklyCalNext.addEventListener("click", function () {
-    if (cachedKoopPlan && calendarWeekIndex < cachedKoopPlan.weeks.length - 1) {
+    if (appState.koopPlan && appState.calendarWeekIndex < appState.koopPlan.weeks.length - 1) {
       calendarTransitionDir = "forward";
-      calendarWeekIndex++;
+      appState.calendarWeekIndex++;
       renderCalendarWeek();
     }
   });
@@ -1170,11 +1216,11 @@ function renderActivities(activities) {
 
 async function refreshAllActivitiesAndCharts() {
   try {
-    cachedAllActivities = await loadAllActivities();
-    renderWeeklyDashboard(cachedAllActivities);
-    renderTrainingLoadChart(cachedAllActivities);
-    renderLongRunChart(cachedAllActivities);
-    updateInsightStats(cachedAllActivities);
+    appState.allActivities = await loadAllActivities();
+    renderWeeklyDashboard(appState.allActivities);
+    renderTrainingLoadChart(appState.allActivities);
+    renderLongRunChart(appState.allActivities);
+    updateInsightStats(appState.allActivities);
     renderCoachInsights();
   } catch (err) {
     // silently fail for charts
@@ -1381,9 +1427,9 @@ var aiCoachInsightsEl = document.getElementById("ai-coach-insights");
 
 function renderCoachInsights() {
   var insights = generateCoachingInsights({
-    activities: cachedAllActivities,
-    checkins: cachedCheckins,
-    plans: cachedPlans,
+    activities: appState.allActivities,
+    checkins: appState.checkins,
+    plans: appState.plans,
   });
 
   // Show/hide AI coaching button based on login status
@@ -1421,14 +1467,14 @@ function buildAICoachPayload() {
   // Weekly summary (last 4 weeks)
   var weeklySummary = [];
   if (cachedAllActivities && cachedAllActivities.length) {
-    var summaryData = Compute.computeWeeklySummary(cachedAllActivities);
+    var summaryData = computeWeeklySummary(cachedAllActivities);
     var weekKeys = Object.keys(summaryData).sort().reverse().slice(0, 4).reverse();
     weeklySummary = weekKeys.map(function (key) {
       var w = summaryData[key];
       // Find longest run for this week
       var longestRun = 0;
       cachedAllActivities.forEach(function (a) {
-        var ws = Compute.getWeekStart(new Date(a.started_at));
+        var ws = getWeekStart(new Date(a.started_at));
         if (ws.toISOString().split("T")[0] === key) {
           var dist = (Number(a.distance) || 0) / 1000;
           if (dist > longestRun) longestRun = dist;
@@ -1447,8 +1493,8 @@ function buildAICoachPayload() {
   var recentActivities = [];
   var sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  if (cachedAllActivities) {
-    recentActivities = cachedAllActivities
+  if (appState.allActivities) {
+    recentActivities = appState.allActivities
       .filter(function (a) { return new Date(a.started_at) >= sevenDaysAgo; })
       .slice(0, 10)
       .map(function (a) {
@@ -1463,8 +1509,8 @@ function buildAICoachPayload() {
 
   // Latest check-in
   var latestCheckin = null;
-  if (cachedCheckins && cachedCheckins.length) {
-    var c = cachedCheckins[0];
+  if (appState.checkins && appState.checkins.length) {
+    var c = appState.checkins[0];
     latestCheckin = {
       fatigue: c.fatigue,
       sleepQuality: c.sleep_quality,
@@ -1475,11 +1521,11 @@ function buildAICoachPayload() {
 
   // Plan context
   var planContext = null;
-  if (cachedCalendarPlan && cachedKoopPlan) {
-    var currentWeekData = cachedKoopPlan.weeks[calendarWeekIndex];
+  if (appState.calendarPlan && appState.koopPlan) {
+    var currentWeekData = appState.koopPlan.weeks[appState.calendarWeekIndex];
     planContext = {
-      race: cachedCalendarPlan.race,
-      raceDate: cachedCalendarPlan.race_date,
+      race: appState.calendarPlan.race,
+      raceDate: appState.calendarPlan.race_date,
       phase: currentWeekData ? currentWeekData.phase : "unknown",
       weekNumber: currentWeekData ? currentWeekData.week : 0,
       targetMileage: currentWeekData ? currentWeekData.mileage : 0,
@@ -1501,12 +1547,12 @@ async function fetchAICoaching() {
 
   var payload = buildAICoachPayload();
 
-  var res = await fetch(SUPABASE_URL + "/functions/v1/gemini-coach", {
+  var res = await fetch(window.SUPABASE_URL + "/functions/v1/gemini-coach", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: window.SUPABASE_ANON_KEY,
     },
     body: JSON.stringify(payload),
   });
@@ -1579,8 +1625,8 @@ if (aiCoachBtn) {
 
 async function refreshCheckins() {
   try {
-    cachedCheckins = await loadCheckins();
-    renderCheckins(cachedCheckins);
+    appState.checkins = await loadCheckins();
+    renderCheckins(appState.checkins);
     renderCoachInsights();
   } catch (err) {
     // silently fail
@@ -1755,6 +1801,14 @@ if (googleSigninBtn) {
 
 // Plan form submit
 if (planForm) {
+  ["race", "date", "mileage"].forEach(function (name) {
+    var field = planForm.elements[name];
+    if (field) {
+      field.addEventListener("blur", function () { validatePlanField(name); });
+      field.addEventListener("input", function () { validatePlanField(name); });
+    }
+  });
+
   planForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
@@ -1767,18 +1821,20 @@ if (planForm) {
 
     if (!currentUser) {
       if (isSupabaseConfigured) {
-        formNote.textContent = "Sign in to save your plan.";
-        formNote.style.color = "";
+        setFeedback(formNote, "Sign in to save your plan.", "error");
         showAuthModal();
       } else {
-        formNote.textContent = "Drafting a " + availability + "-day plan for " + race + " on " + date + " with ~" + mileage + " km/week. Configure Supabase to save plans.";
-        formNote.style.color = "";
+        setFeedback(formNote, "Drafting a " + availability + "-day plan for " + race + " on " + date + " with ~" + mileage + " km/week. Configure Supabase to save plans.", "loading");
       }
       return;
     }
 
-    formNote.textContent = "Creating your plan\u2026";
-    formNote.style.color = "";
+    if (!["race", "date", "mileage"].every(validatePlanField)) {
+      setFeedback(formNote, "Please fix the highlighted fields.", "error");
+      return;
+    }
+
+    setFeedback(formNote, "Creating your plan…", "loading");
 
     try {
       await createPlan({
@@ -1789,13 +1845,11 @@ if (planForm) {
         constraints: constraints || null,
         b2b_long_runs: b2b,
       });
-      formNote.textContent = "Plan created for " + race + "!";
-      formNote.style.color = "var(--success)";
+      setFeedback(formNote, "Plan created for " + race + "!", "success");
       planForm.reset();
       refreshPlans();
     } catch (err) {
-      formNote.textContent = "Error: " + err.message;
-      formNote.style.color = "#dc2626";
+      setFeedback(formNote, "Error: " + err.message, "error");
     }
   });
 }
@@ -1830,29 +1884,37 @@ if (stravaSyncBtn) {
   stravaSyncBtn.addEventListener("click", async function () {
     stravaSyncBtn.disabled = true;
     stravaSyncBtn.textContent = "Syncing\u2026";
+    stravaSyncBtn.dataset.loading = "true";
+    setFeedback(stravaSyncFeedback, "Sync in progress…", "loading");
     try {
       var result = await syncStrava();
       lastSyncTime.textContent = new Date().toLocaleString();
       if (result && result.synced > 0) {
         stravaSyncBtn.textContent = result.synced + " synced";
+        setFeedback(stravaSyncFeedback, "Synced " + result.synced + " new activities.", "success");
       } else if (result && result.total === 0) {
         stravaSyncBtn.textContent = "No new activities";
+        setFeedback(stravaSyncFeedback, "No new activities found.", "loading");
       } else {
         stravaSyncBtn.textContent = "0 synced (" + (result ? result.total : 0) + " found)";
+        setFeedback(stravaSyncFeedback, "Found activities, but none required sync.", "loading");
       }
       refreshActivities();
       refreshAllActivitiesAndCharts();
       setTimeout(function () {
         stravaSyncBtn.textContent = "Sync now";
         stravaSyncBtn.disabled = false;
+        delete stravaSyncBtn.dataset.loading;
       }, 3000);
     } catch (err) {
       console.error("Strava sync error:", err);
       stravaSyncBtn.textContent = "Sync failed";
+      setFeedback(stravaSyncFeedback, "Sync failed: " + err.message, "error");
       alert("Strava sync failed: " + err.message);
       setTimeout(function () {
         stravaSyncBtn.textContent = "Sync now";
         stravaSyncBtn.disabled = false;
+        delete stravaSyncBtn.dataset.loading;
       }, 2000);
     }
   });
@@ -1882,7 +1944,7 @@ if (checkinForm) {
     note.textContent = "Saving\u2026";
 
     var weekOf = getWeekStart(new Date()).toISOString().split("T")[0];
-    var planId = cachedPlans.length ? cachedPlans[0].id : null;
+    var planId = appState.plans.length ? appState.plans[0].id : null;
 
     try {
       await createCheckin({
@@ -2017,18 +2079,18 @@ function handleStravaCallback() {
 
 document.querySelectorAll(".lang-option").forEach(function (btn) {
   btn.addEventListener("click", function () {
-    setLanguage(btn.dataset.lang);
+    i18n.setLanguage(btn.dataset.lang);
     // Re-render dynamic content with new language
-    if (cachedPlans.length) {
-      renderRaceCountdown(cachedPlans);
-      renderBlockCalendar(cachedPlans);
-      renderGanttPlanner(cachedPlans);
-      renderWeeklyCalendar(cachedPlans);
+    if (appState.plans.length) {
+      renderRaceCountdown(appState.plans);
+      renderBlockCalendar(appState.plans);
+      renderGanttPlanner(appState.plans);
+      renderWeeklyCalendar(appState.plans);
     }
-    if (cachedAllActivities.length) {
-      renderWeeklyDashboard(cachedAllActivities);
-      renderTrainingLoadChart(cachedAllActivities);
-      renderLongRunChart(cachedAllActivities);
+    if (appState.allActivities.length) {
+      renderWeeklyDashboard(appState.allActivities);
+      renderTrainingLoadChart(appState.allActivities);
+      renderLongRunChart(appState.allActivities);
     }
     renderCoachInsights();
   });
@@ -2037,8 +2099,8 @@ document.querySelectorAll(".lang-option").forEach(function (btn) {
 // ---- Initialize ----
 
 // Apply saved language on load
-document.documentElement.lang = currentLang;
-applyTranslations();
+document.documentElement.lang = i18n.getLanguage();
+i18n.applyTranslations();
 
 if (db) {
   db.auth.onAuthStateChange(function (_event, session) {

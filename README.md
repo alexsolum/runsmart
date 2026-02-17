@@ -1,31 +1,58 @@
 # RunSmart
 
-RunSmart is a web-first training planning app concept for endurance runners. It focuses on practical
-periodization, explainable AI coaching insights, and privacy-first data handling.
+RunSmart is an AI-guided endurance training planner. This repo is on a **Vite-first strangler migration** so we can move safely from legacy static scripts to a modern front-end.
 
-## Project status
+## Strangler migration status
 
-This repository currently contains a static front-end prototype based on the product vision described
-in `agents.md`. The UI is ready for iterative additions like Firebase-backed auth, Strava ingestion,
-and the AI training agents.
+- ✅ **Fase 1**: React shell + statisk UI
+- ✅ **Fase 2**: Auth (Supabase OAuth wired in shell)
+- ✅ **Fase 3**: Plans/Insights/Data shell sections ready for module extraction
+- ✅ **Fase 4**: Legacy `app.js` is no longer loaded by `index.html`
 
-## Supabase Auth setup (Google OAuth)
+## Deploy (Vercel production)
 
-If Google login redirects you to `http://localhost:3000`, your Supabase Auth URLs are misconfigured.
+This project is now configured **Vercel-first**:
 
-1. In Supabase Dashboard → **Authentication** → **URL Configuration**:
-   - Set **Site URL** to your deployed app URL (for example `https://<username>.github.io/runsmart/`).
-   - Add both local and production callback URLs to **Redirect URLs**:
-     - `http://localhost:8000/`
-     - `https://<username>.github.io/runsmart/`
-2. In `config.js`, optionally set `AUTH_REDIRECT_URL` to your deployed URL. If left empty, the app uses the current page URL.
+- `vite.config.mjs` defaults to `base: "/"` (correct for Vercel).
+- If `VERCEL` is set, `base` is forced to root.
+- GitHub Pages base (`/<repo-navn>/`) is only used when explicitly enabling:
+  - `VITE_DEPLOY_TARGET=github-pages`
+  - optional override via `VITE_BASE_PATH`
+
+## Supabase URL configuration verification
+
+In Supabase Dashboard → **Authentication** → **URL Configuration**:
+
+1. **Site URL** (production)
+   - `https://<your-vercel-domain>/`
+
+2. **Redirect URLs** (must include both)
+   - `http://localhost:5173/`
+   - `https://<your-vercel-domain>/`
+
+If you also keep GitHub Pages as a fallback environment, add that URL too:
+- `https://<username>.github.io/<repo-navn>/`
+
+## AUTH_REDIRECT_URL / runtime config (dev + prod parity)
+
+Runtime config is loaded from `public/runtime-config.js` and can be overridden by Vite env vars.
+
+Priority order:
+1. `VITE_AUTH_REDIRECT_URL`
+2. `window.RUNTIME_CONFIG.AUTH_REDIRECT_URL`
+3. fallback to `${window.location.origin}${import.meta.env.BASE_URL}`
+
+This gives consistent behavior in both local dev and Vercel production.
 
 ## Local development
 
-Open `index.html` directly in the browser or run a simple static server:
-
 ```bash
-python -m http.server 8000
+npm install
+npm run dev
 ```
 
-Then visit `http://localhost:8000`.
+## Build
+
+```bash
+npm run build
+```

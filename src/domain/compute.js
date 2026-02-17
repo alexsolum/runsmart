@@ -1,8 +1,6 @@
 // ---- Pure computation functions (testable, no DOM) ----
 
-// eslint-disable-next-line no-unused-vars
-var Compute = (function () {
-  "use strict";
+"use strict";
 
   // ---- Date helpers ----
 
@@ -589,31 +587,23 @@ var Compute = (function () {
     return days;
   }
 
-  // ---- Public API ----
-
-  return {
-    getWeekStart: getWeekStart,
-    computeWeeklySummary: computeWeeklySummary,
-    computeTrainingBlocks: computeTrainingBlocks,
-    computeCurrentBlock: computeCurrentBlock,
-    computeTrainingLoad: computeTrainingLoad,
-    computeLongRuns: computeLongRuns,
-    computeKoopPlan: computeKoopPlan,
-    computeWeeklyCalendar: computeWeeklyCalendar,
-    generateCoachingInsights: generateCoachingInsights,
-    formatDistance: formatDistance,
-    formatDuration: formatDuration,
-    formatPace: formatPace,
-    formatElevation: formatElevation,
-    rpeClass: rpeClass,
-    trendArrow: trendArrow,
-    KOOP_PHASES: KOOP_PHASES,
-    KOOP_PHASE_KEYS: KOOP_PHASE_KEYS,
-    KOOP_WORKOUTS: KOOP_WORKOUTS,
-  };
-})();
-
-// Support both browser and Node.js
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = Compute;
-}
+export {
+  getWeekStart,
+  computeWeeklySummary,
+  computeTrainingBlocks,
+  computeCurrentBlock,
+  computeTrainingLoad,
+  computeLongRuns,
+  computeKoopPlan,
+  computeWeeklyCalendar,
+  generateCoachingInsights,
+  formatDistance,
+  formatDuration,
+  formatPace,
+  formatElevation,
+  rpeClass,
+  trendArrow,
+  KOOP_PHASES,
+  KOOP_PHASE_KEYS,
+  KOOP_WORKOUTS,
+};

@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-// compute.js uses an IIFE that attaches to `var Compute`.
-// In Node we use the CommonJS export.
-const Compute = require("../compute.js");
+import * as Compute from "../src/domain/compute.js";
 
 describe("getWeekStart", () => {
   it("returns Monday for a Wednesday", () => {
@@ -253,5 +251,23 @@ describe("rpeClass", () => {
     expect(Compute.rpeClass(7)).toBe("moderate");
     expect(Compute.rpeClass(8)).toBe("hard");
     expect(Compute.rpeClass(10)).toBe("hard");
+  });
+});
+
+
+describe("computeWeeklyCalendar", () => {
+  it("creates race-week calendar with race day on Sunday", () => {
+    const week = { phase: "race", week: 10, mileage: 30, longRun: 20, workoutKey: "gantt.raceDay", recovery: false };
+    const days = Compute.computeWeeklyCalendar(week, 6, false);
+    expect(days).toHaveLength(7);
+    expect(days[6].type).toBe("race");
+    expect(days[6].labelKey).toBe("cal.raceDay");
+  });
+
+  it("adds medium-long Saturday for eligible B2B weeks", () => {
+    const week = { phase: "specificPrep", week: 8, mileage: 80, longRun: 28, workoutKey: "gantt.raceSimulation", recovery: false };
+    const days = Compute.computeWeeklyCalendar(week, 6, true);
+    expect(days[5].type).toBe("medium-long");
+    expect(days[5].labelKey).toBe("cal.mediumLong");
   });
 });

@@ -1,18 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RunSmart Training Planner</title>
-    <link rel="stylesheet" href="styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
   </head>
   <body>
     <!-- Sidebar navigation -->
@@ -146,38 +143,47 @@
               <p data-i18n="planning.adjustmentsDesc">Every change is tied to fatigue, consistency, and execution feedback.</p>
             </article>
           </div>
-          <form class="plan-form" aria-label="Generate training plan">
+          <form class="plan-form ui-card" aria-label="Generate training plan" novalidate>
             <h3 data-i18n="planning.quickPlan">Quick plan builder</h3>
-            <label>
+            <label class="form-field">
               <span data-i18n="planning.goalRace">Goal race</span>
-              <input type="text" name="race" data-i18n="ph.goalRace" data-i18n-attr="placeholder" placeholder="Trail 50K" required />
+              <input class="ui-input" type="text" name="race" data-i18n="ph.goalRace" data-i18n-attr="placeholder" placeholder="Trail 50K" required />
+              <small class="field-help">Be specific (distance + terrain), e.g. "Trail 50K mountain".</small>
+              <small class="field-error" data-field-error="race"></small>
             </label>
-            <label>
+            <label class="form-field">
               <span data-i18n="planning.raceDate">Race date</span>
-              <input type="date" name="date" required />
+              <input class="ui-input" type="date" name="date" required />
+              <small class="field-help">Choose a future date so periodization can be generated correctly.</small>
+              <small class="field-error" data-field-error="date"></small>
             </label>
-            <label>
+            <label class="form-field">
               <span data-i18n="planning.weeklyAvailability">Weekly availability</span>
-              <select name="availability">
+              <select class="ui-select" name="availability">
                 <option value="5">5 days</option>
                 <option value="6">6 days</option>
                 <option value="7">7 days</option>
               </select>
+              <small class="field-help">We'll adapt intensity and recovery based on available training days.</small>
             </label>
-            <label>
+            <label class="form-field">
               <span data-i18n="planning.currentMileage">Current weekly volume (km)</span>
-              <input type="number" name="mileage" min="15" max="200" value="65" />
+              <input class="ui-input" type="number" name="mileage" min="15" max="200" value="65" />
+              <small class="field-error" data-field-error="mileage"></small>
             </label>
-            <label>
+            <label class="form-field">
               <span data-i18n="planning.constraints">Key constraints</span>
-              <textarea name="constraints" rows="3" data-i18n="ph.constraints" data-i18n-attr="placeholder" placeholder="Work travel in week 6, prefer long runs on Sundays"></textarea>
+              <textarea class="ui-textarea" name="constraints" rows="3" data-i18n="ph.constraints" data-i18n-attr="placeholder" placeholder="Work travel in week 6, prefer long runs on Sundays"></textarea>
+              <small class="field-help">Add schedule limits, injury concerns, or preferred workout days.</small>
             </label>
             <label class="checkbox-label">
               <input type="checkbox" name="b2b" />
               <span data-i18n="planning.b2b">Back-to-back long run weekends</span>
             </label>
-            <button class="cta" type="submit" data-i18n="planning.createDraft">Create draft plan</button>
-            <p class="form-note" role="status" aria-live="polite"></p>
+            <div class="sticky-actions">
+              <button class="cta ui-button ui-button--primary" type="submit" data-i18n="planning.createDraft">Create draft plan</button>
+            </div>
+            <p class="form-note feedback" role="status" aria-live="polite"></p>
           </form>
         </div>
         <div class="my-plans" id="my-plans" hidden>
@@ -234,18 +240,18 @@
           <p data-i18n="insights.desc">Understand readiness, spot risk early, and see the impact of your consistency.</p>
         </div>
         <div class="insight-cards">
-          <div class="insight">
-            <span class="pill" data-i18n="insights.trainingLoad">Training load</span>
+          <div class="insight ui-card">
+            <span class="pill ui-badge ui-badge--primary" data-i18n="insights.trainingLoad">Training load</span>
             <h4 data-i18n="insights.acuteVsChronic">Acute vs chronic balance</h4>
             <p data-i18n="insights.acuteDesc">Visualize fatigue and form trends so you can confidently push or recover.</p>
           </div>
-          <div class="insight">
-            <span class="pill" data-i18n="insights.performance">Performance</span>
+          <div class="insight ui-card">
+            <span class="pill ui-badge ui-badge--success" data-i18n="insights.performance">Performance</span>
             <h4 data-i18n="insights.raceForecast">Race readiness forecast</h4>
             <p data-i18n="insights.raceDesc">Track long-run durability, vertical progression, and race-specific confidence signals.</p>
           </div>
-          <div class="insight">
-            <span class="pill" data-i18n="insights.risk">Risk</span>
+          <div class="insight ui-card">
+            <span class="pill ui-badge ui-badge--warning" data-i18n="insights.risk">Risk</span>
             <h4 data-i18n="insights.overtraining">Overtraining alerts</h4>
             <p data-i18n="insights.overtrainingDesc">Detect sudden spikes and missed recovery before they derail the block.</p>
           </div>
@@ -269,15 +275,15 @@
             </p>
           </div>
           <div class="stats" id="insight-stats">
-            <div>
+            <div class="stat-tile">
               <span class="label" data-i18n="insights.formTrend">Form trend</span>
               <strong id="stat-form">&mdash;</strong>
             </div>
-            <div>
+            <div class="stat-tile">
               <span class="label" data-i18n="insights.readiness">Readiness</span>
               <strong id="stat-readiness">&mdash;</strong>
             </div>
-            <div>
+            <div class="stat-tile">
               <span class="label" data-i18n="insights.riskScore">Risk score</span>
               <strong id="stat-risk">&mdash;</strong>
             </div>
@@ -336,15 +342,17 @@
           </div>
           <div id="strava-panel">
             <h4 data-i18n="data.strava">Strava</h4>
+            <p id="strava-sync-feedback" class="feedback" role="status" aria-live="polite"></p>
             <div id="strava-disconnected">
+              <span class="ui-badge ui-badge--warning">Disconnected</span>
               <p class="muted" data-i18n="data.stravaConnect">Connect your Strava account to import training data.</p>
-              <button class="cta" id="strava-connect-btn" data-i18n="data.connectStrava">Connect Strava</button>
+              <button class="cta ui-button ui-button--primary" id="strava-connect-btn" data-i18n="data.connectStrava">Connect Strava</button>
             </div>
             <div id="strava-connected" hidden>
               <div class="sync-list">
                 <div>
                   <span class="label" data-i18n="data.status">Status</span>
-                  <strong class="positive" data-i18n="data.connected">Connected</strong>
+                  <strong class="positive"><span class="ui-badge ui-badge--success" data-i18n="data.connected">Connected</span></strong>
                 </div>
                 <div>
                   <span class="label" data-i18n="data.lastSync">Last sync</span>
@@ -352,7 +360,7 @@
                 </div>
               </div>
               <div class="strava-actions">
-                <button class="cta" id="strava-sync-btn" data-i18n="data.syncNow">Sync now</button>
+                <button class="cta ui-button ui-button--primary" id="strava-sync-btn" data-i18n="data.syncNow">Sync now</button>
                 <button class="ghost" id="strava-disconnect-btn" data-i18n="data.disconnect">Disconnect</button>
               </div>
             </div>

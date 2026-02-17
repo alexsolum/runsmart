@@ -1,6 +1,6 @@
 // ---- Internationalization ----
 
-var TRANSLATIONS = {
+export const TRANSLATIONS = {
   en: {
     // Nav
     "nav.planning": "Planning",
@@ -608,21 +608,58 @@ var TRANSLATIONS = {
   },
 };
 
-var currentLang = localStorage.getItem("runsmart-lang") || "en";
+let currentLang = localStorage.getItem("runsmart-lang") || "en";
 
-function t(key) {
+const i18nSubscribers = new Set();
+
+function notifyI18nSubscribers() {
+  i18nSubscribers.forEach(function (callback) {
+    callback(currentLang);
+  });
+}
+
+function createI18nProvider() {
+  return {
+    getLanguage: function () { return currentLang; },
+    setLanguage: function (lang) {
+      setLanguage(lang);
+    },
+    t: t,
+    applyTranslations: applyTranslations,
+    subscribe: function (callback) {
+      i18nSubscribers.add(callback);
+      return function unsubscribe() {
+        i18nSubscribers.delete(callback);
+      };
+    },
+  };
+}
+
+const i18nProvider = createI18nProvider();
+
+export function useI18n() {
+  return i18nProvider;
+}
+
+export function getCurrentLanguage() {
+  return currentLang;
+}
+
+
+export function t(key) {
   var dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
   return dict[key] || TRANSLATIONS.en[key] || key;
 }
 
-function setLanguage(lang) {
+export function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem("runsmart-lang", lang);
   document.documentElement.lang = lang;
   applyTranslations();
+  notifyI18nSubscribers();
 }
 
-function applyTranslations() {
+export function applyTranslations() {
   document.querySelectorAll("[data-i18n]").forEach(function (el) {
     var key = el.getAttribute("data-i18n");
     var translated = t(key);
@@ -641,3 +678,5 @@ function applyTranslations() {
     btn.classList.toggle("active", btn.dataset.lang === currentLang);
   });
 }
+
+export { createI18nProvider };

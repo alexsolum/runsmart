@@ -56,6 +56,7 @@ var stravaDisconnectBtn = document.getElementById("strava-disconnect-btn");
 var stravaDisconnected = document.getElementById("strava-disconnected");
 var stravaConnected = document.getElementById("strava-connected");
 var lastSyncTime = document.getElementById("last-sync-time");
+var stravaSyncFeedback = document.getElementById("strava-sync-feedback");
 var activitiesSection = document.getElementById("activities-section");
 var activitiesList = document.getElementById("activities-list");
 
@@ -446,6 +447,40 @@ function closeSidebar() {
   sidebarOverlay.classList.remove("active");
 }
 
+
+function setFeedback(el, message, tone) {
+  if (!el) return;
+  el.textContent = message || "";
+  el.classList.remove("is-success", "is-error", "is-loading");
+  if (tone) el.classList.add("is-" + tone);
+}
+
+function validatePlanField(name) {
+  if (!planForm) return true;
+  var field = planForm.elements[name];
+  if (!field) return true;
+  var errorEl = planForm.querySelector('[data-field-error="' + name + '"]');
+  var wrap = field.closest('.form-field');
+  var value = (field.value || '').trim();
+  var error = '';
+
+  if (name === 'race' && value.length < 3) error = 'Race must be at least 3 characters.';
+  if (name === 'date') {
+    var dt = new Date(value + 'T00:00:00');
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
+    if (!value || isNaN(dt.getTime()) || dt <= now) error = 'Please choose a future race date.';
+  }
+  if (name === 'mileage') {
+    var num = parseInt(value, 10);
+    if (value && (isNaN(num) || num < 15 || num > 200)) error = 'Mileage must be between 15 and 200 km.';
+  }
+
+  if (errorEl) errorEl.textContent = error;
+  if (wrap) wrap.classList.toggle('has-error', Boolean(error));
+  return !error;
+}
+
 // ---- UI: Auth ----
 
 function updateAuthUI(user) {
@@ -497,12 +532,14 @@ function showStravaDisconnected() {
   stravaDisconnected.hidden = false;
   stravaConnected.hidden = true;
   activitiesSection.hidden = true;
+  setFeedback(stravaSyncFeedback, "Strava is not connected.", "error");
 }
 
 function showStravaConnected(updatedAt) {
   stravaDisconnected.hidden = true;
   stravaConnected.hidden = false;
   activitiesSection.hidden = false;
+  setFeedback(stravaSyncFeedback, "Connected and ready to sync.", "success");
   if (updatedAt) {
     lastSyncTime.textContent = new Date(updatedAt).toLocaleString();
   }
@@ -526,7 +563,7 @@ async function refreshPlans() {
 function renderPlans(plans) {
   if (!plans.length) {
     plansList.innerHTML =
-      '<p class="muted">No plans yet. Use the form above to create your first plan.</p>';
+      '<p class="empty-state">No plans yet. Use the form above to create your first plan.</p>';
     return;
   }
 
@@ -1757,6 +1794,14 @@ if (googleSigninBtn) {
 
 // Plan form submit
 if (planForm) {
+  ["race", "date", "mileage"].forEach(function (name) {
+    var field = planForm.elements[name];
+    if (field) {
+      field.addEventListener("blur", function () { validatePlanField(name); });
+      field.addEventListener("input", function () { validatePlanField(name); });
+    }
+  });
+
   planForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
@@ -1769,18 +1814,20 @@ if (planForm) {
 
     if (!currentUser) {
       if (isSupabaseConfigured) {
-        formNote.textContent = "Sign in to save your plan.";
-        formNote.style.color = "";
+        setFeedback(formNote, "Sign in to save your plan.", "error");
         showAuthModal();
       } else {
-        formNote.textContent = "Drafting a " + availability + "-day plan for " + race + " on " + date + " with ~" + mileage + " km/week. Configure Supabase to save plans.";
-        formNote.style.color = "";
+        setFeedback(formNote, "Drafting a " + availability + "-day plan for " + race + " on " + date + " with ~" + mileage + " km/week. Configure Supabase to save plans.", "loading");
       }
       return;
     }
 
-    formNote.textContent = "Creating your plan\u2026";
-    formNote.style.color = "";
+    if (!["race", "date", "mileage"].every(validatePlanField)) {
+      setFeedback(formNote, "Please fix the highlighted fields.", "error");
+      return;
+    }
+
+    setFeedback(formNote, "Creating your plan…", "loading");
 
     try {
       await createPlan({
@@ -1791,13 +1838,11 @@ if (planForm) {
         constraints: constraints || null,
         b2b_long_runs: b2b,
       });
-      formNote.textContent = "Plan created for " + race + "!";
-      formNote.style.color = "var(--success)";
+      setFeedback(formNote, "Plan created for " + race + "!", "success");
       planForm.reset();
       refreshPlans();
     } catch (err) {
-      formNote.textContent = "Error: " + err.message;
-      formNote.style.color = "#dc2626";
+      setFeedback(formNote, "Error: " + err.message, "error");
     }
   });
 }
@@ -1832,29 +1877,37 @@ if (stravaSyncBtn) {
   stravaSyncBtn.addEventListener("click", async function () {
     stravaSyncBtn.disabled = true;
     stravaSyncBtn.textContent = "Syncing\u2026";
+    stravaSyncBtn.dataset.loading = "true";
+    setFeedback(stravaSyncFeedback, "Sync in progress…", "loading");
     try {
       var result = await syncStrava();
       lastSyncTime.textContent = new Date().toLocaleString();
       if (result && result.synced > 0) {
         stravaSyncBtn.textContent = result.synced + " synced";
+        setFeedback(stravaSyncFeedback, "Synced " + result.synced + " new activities.", "success");
       } else if (result && result.total === 0) {
         stravaSyncBtn.textContent = "No new activities";
+        setFeedback(stravaSyncFeedback, "No new activities found.", "loading");
       } else {
         stravaSyncBtn.textContent = "0 synced (" + (result ? result.total : 0) + " found)";
+        setFeedback(stravaSyncFeedback, "Found activities, but none required sync.", "loading");
       }
       refreshActivities();
       refreshAllActivitiesAndCharts();
       setTimeout(function () {
         stravaSyncBtn.textContent = "Sync now";
         stravaSyncBtn.disabled = false;
+        delete stravaSyncBtn.dataset.loading;
       }, 3000);
     } catch (err) {
       console.error("Strava sync error:", err);
       stravaSyncBtn.textContent = "Sync failed";
+      setFeedback(stravaSyncFeedback, "Sync failed: " + err.message, "error");
       alert("Strava sync failed: " + err.message);
       setTimeout(function () {
         stravaSyncBtn.textContent = "Sync now";
         stravaSyncBtn.disabled = false;
+        delete stravaSyncBtn.dataset.loading;
       }, 2000);
     }
   });

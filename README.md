@@ -5,8 +5,24 @@ RunSmart is an AI-guided endurance training planner. This repo is on a **Vite-fi
 ## Current frontend runtime
 
 - Vite serves and builds the app from `index.html`.
-- Current runtime still uses `src/main.js` with CDN React/ReactDOM while migration is in progress.
+- Runtime entrypoint is `src/main.jsx` with bundled React via Vite.
 - Runtime secrets/config values are loaded from `public/runtime-config.js`.
+
+
+## If Vercel deploy shows a blank page
+
+Most common causes after switching `index.html`:
+
+1. **Entrypoint mismatch**
+   - Ensure `index.html` uses `<div id="root"></div>` and `src/main.jsx`.
+2. **Supabase config missing at runtime**
+   - Confirm either `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` are set in Vercel, or `public/runtime-config.js` has `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+3. **Auth redirect not allowed in Supabase**
+   - Add your Vercel URL in Supabase Auth redirect URLs.
+4. **Cache stale deploy assets**
+   - Redeploy and hard refresh once.
+
+This app now renders even when Supabase config is missing, so missing config should not produce a white screen anymore.
 
 ## Complete changeover checklist (Vite + Vercel)
 
@@ -27,6 +43,14 @@ RunSmart is an AI-guided endurance training planner. This repo is on a **Vite-fi
    - Verify auth flow redirects back to the deployed URL
 
 ## Deploy (Vercel production)
+
+This project is configured **Vercel-first**:
+
+- `vite.config.mjs` defaults to `base: "/"` (correct for Vercel).
+- If `VERCEL` is set, `base` is forced to root.
+- GitHub Pages base (`/<repo-navn>/`) is only used when explicitly enabled:
+  - `VITE_DEPLOY_TARGET=github-pages`
+  - optional override via `VITE_BASE_PATH`
 
 This project is configured **Vercel-first**:
 

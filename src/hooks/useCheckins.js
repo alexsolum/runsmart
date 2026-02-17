@@ -28,6 +28,7 @@ export function useCheckins(userId) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const loadCheckins = useCallback(async () => {
+    if (!client) return [];
     dispatch({ type: "pending" });
     const query = client.from("athlete_feedback").select("*").order("week_of", { ascending: false }).limit(8);
     const { data, error } = userId ? await query.eq("user_id", userId) : await query;
@@ -41,6 +42,7 @@ export function useCheckins(userId) {
 
   const createCheckin = useCallback(
     async (checkin) => {
+      if (!client) throw new Error("Supabase is not configured");
       if (!userId) throw new Error("User is required to create check-in");
       dispatch({ type: "pending" });
       const { data, error } = await client

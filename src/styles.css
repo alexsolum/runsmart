@@ -1,0 +1,7 @@
+body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #f5f7fb; color: #10203a; }
+.container { max-width: 860px; margin: 2rem auto; padding: 1.25rem; background: #fff; border-radius: 12px; }
+h1 { margin-top: 0; }
+section { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #dde3ee; }
+button { padding: 0.6rem 0.9rem; border-radius: 8px; border: 0; background: #2f65ff; color: #fff; cursor: pointer; }
+button:disabled { background: #9aa7c7; cursor: not-allowed; }
+code { background: #eef2ff; padding: 0.1rem 0.3rem; border-radius: 4px; }

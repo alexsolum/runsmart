@@ -52,6 +52,14 @@ This project is configured **Vercel-first**:
   - `VITE_DEPLOY_TARGET=github-pages`
   - optional override via `VITE_BASE_PATH`
 
+This project is configured **Vercel-first**:
+
+- `vite.config.mjs` defaults to `base: "/"` (correct for Vercel).
+- If `VERCEL` is set, `base` is forced to root.
+- GitHub Pages base (`/<repo-navn>/`) is only used when explicitly enabled:
+  - `VITE_DEPLOY_TARGET=github-pages`
+  - optional override via `VITE_BASE_PATH`
+
 ## AUTH_REDIRECT_URL / runtime config (dev + prod parity)
 
 Runtime config is loaded from `public/runtime-config.js` and can be overridden by Vite env vars.

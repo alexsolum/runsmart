@@ -1,38 +1,43 @@
+import {
+  getWeekStart,
+  computeWeeklySummary,
+  computeTrainingBlocks,
+  computeCurrentBlock,
+  computeTrainingLoad,
+  computeLongRuns,
+  computeKoopPlan,
+  computeWeeklyCalendar,
+  generateCoachingInsights,
+  formatDistance,
+  formatDuration,
+  formatPace,
+  formatElevation,
+  trendArrow,
+  KOOP_PHASES,
+  KOOP_PHASE_KEYS,
+} from "./src/domain/compute.js";
+import {
+  t,
+  useI18n,
+  getCurrentLanguage,
+} from "./src/i18n/translations.js";
+
 // ---- Supabase client ----
 
 var isSupabaseConfigured =
-  typeof SUPABASE_URL !== "undefined" &&
-  SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
-  typeof SUPABASE_ANON_KEY !== "undefined" &&
-  SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
+  typeof window.SUPABASE_URL !== "undefined" &&
+  window.SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+  typeof window.SUPABASE_ANON_KEY !== "undefined" &&
+  window.SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 
 var isStravaConfigured =
-  typeof STRAVA_CLIENT_ID !== "undefined" &&
-  STRAVA_CLIENT_ID !== "YOUR_STRAVA_CLIENT_ID";
+  typeof window.STRAVA_CLIENT_ID !== "undefined" &&
+  window.STRAVA_CLIENT_ID !== "YOUR_STRAVA_CLIENT_ID";
 
 var db = null;
 if (isSupabaseConfigured) {
-  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 }
-
-// ---- Aliases from Compute module ----
-
-var getWeekStart = Compute.getWeekStart;
-var computeWeeklySummary = Compute.computeWeeklySummary;
-var computeTrainingBlocks = Compute.computeTrainingBlocks;
-var computeCurrentBlock = Compute.computeCurrentBlock;
-var computeTrainingLoad = Compute.computeTrainingLoad;
-var computeLongRuns = Compute.computeLongRuns;
-var computeKoopPlan = Compute.computeKoopPlan;
-var computeWeeklyCalendar = Compute.computeWeeklyCalendar;
-var generateCoachingInsights = Compute.generateCoachingInsights;
-var formatDistance = Compute.formatDistance;
-var formatDuration = Compute.formatDuration;
-var formatPace = Compute.formatPace;
-var formatElevation = Compute.formatElevation;
-var trendArrow = Compute.trendArrow;
-var KOOP_PHASES = Compute.KOOP_PHASES;
-var KOOP_PHASE_KEYS = Compute.KOOP_PHASE_KEYS;
 
 // ---- DOM refs ----
 
@@ -125,6 +130,8 @@ var appState = {
   weekEntriesCache: {},
 };
 
+var i18n = useI18n();
+
 // ---- Auth functions ----
 
 async function signIn(email, password) {
@@ -141,8 +148,8 @@ async function signUp(email, password) {
 
 async function signInWithGoogle() {
   var redirectTo =
-    typeof AUTH_REDIRECT_URL === "string" && AUTH_REDIRECT_URL.trim()
-      ? AUTH_REDIRECT_URL.trim()
+    typeof window.AUTH_REDIRECT_URL === "string" && window.AUTH_REDIRECT_URL.trim()
+      ? window.AUTH_REDIRECT_URL.trim()
       : window.location.origin + window.location.pathname;
 
   const { error } = await db.auth.signInWithOAuth({
@@ -211,7 +218,7 @@ function startStravaOAuth() {
   var scope = "activity:read_all";
   var url =
     "https://www.strava.com/oauth/authorize" +
-    "?client_id=" + encodeURIComponent(STRAVA_CLIENT_ID) +
+    "?client_id=" + encodeURIComponent(window.STRAVA_CLIENT_ID) +
     "&redirect_uri=" + encodeURIComponent(redirectUri) +
     "&response_type=code" +
     "&scope=" + encodeURIComponent(scope) +
@@ -224,12 +231,12 @@ async function exchangeStravaCode(code) {
   var session = sessionResult.data.session;
   if (!session) throw new Error("No active session — please sign in first");
 
-  var res = await fetch(SUPABASE_URL + "/functions/v1/strava-auth", {
+  var res = await fetch(window.SUPABASE_URL + "/functions/v1/strava-auth", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: window.SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({ code: code }),
   });
@@ -252,12 +259,12 @@ async function syncStrava() {
   var session = sessionResult.data.session;
   if (!session) throw new Error("No active session — please sign in first");
 
-  var res = await fetch(SUPABASE_URL + "/functions/v1/strava-sync", {
+  var res = await fetch(window.SUPABASE_URL + "/functions/v1/strava-sync", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: window.SUPABASE_ANON_KEY,
     },
   });
 
@@ -710,7 +717,7 @@ function renderGanttPlanner(plans) {
     var phaseColor = w.phase === "race" ? "#ef4444" : (KOOP_PHASES[w.phase] ? KOOP_PHASES[w.phase].color : "#94a3b8");
     var phaseName = w.phase === "race" ? t("gantt.raceWeek") : t(KOOP_PHASE_KEYS[w.phase]);
 
-    var dateStr = w.date.toLocaleDateString(currentLang === "no" ? "nb-NO" : "en-US", { month: "short", day: "numeric" });
+    var dateStr = w.date.toLocaleDateString(getCurrentLanguage() === "no" ? "nb-NO" : "en-US", { month: "short", day: "numeric" });
 
     return '<tr class="' + cls + '" data-week-index="' + (w.week - 1) + '" style="cursor:pointer">' +
       '<td>' + (w.isCurrent ? '<strong>' + w.week + '</strong>' : w.week) + '</td>' +
@@ -837,7 +844,7 @@ function renderCalendarWeek() {
   // Navigation label
   var weekDate = weekData.date;
   var dateOpts = { month: "short", day: "numeric" };
-  var locale = currentLang === "no" ? "nb-NO" : "en-US";
+  var locale = getCurrentLanguage() === "no" ? "nb-NO" : "en-US";
   var phaseName = weekData.phase === "race"
     ? t("gantt.raceWeek")
     : t(KOOP_PHASE_KEYS[weekData.phase]);
@@ -881,7 +888,7 @@ function renderCalendarWeek() {
     var calDays = computeWeeklyCalendar(weekData, availability, b2b);
     var today = new Date();
     today.setHours(0, 0, 0, 0);
-    var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+    var dayNames = getCurrentLanguage() === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
 
     var gridHtml = calDays.map(function (day, i) {
       var dayDate = day.date;
@@ -1015,7 +1022,7 @@ function openDayEditModal(dayIndex, generatedDay) {
   dayEditForm.elements.notes.value = saved ? (saved.notes || "") : "";
 
   // Set title with day name
-  var dayNames = currentLang === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
+  var dayNames = getCurrentLanguage() === "no" ? DAY_NAMES_NO : DAY_NAMES_EN;
   dayEditTitle.textContent = t("cal.editTitle") + " \u2014 " + dayNames[dayIndex];
 
   if (dayEditNote) {
@@ -1459,15 +1466,15 @@ function renderCoachInsights() {
 function buildAICoachPayload() {
   // Weekly summary (last 4 weeks)
   var weeklySummary = [];
-  if (appState.allActivities && appState.allActivities.length) {
-    var summaryData = Compute.computeWeeklySummary(appState.allActivities);
+  if (cachedAllActivities && cachedAllActivities.length) {
+    var summaryData = computeWeeklySummary(cachedAllActivities);
     var weekKeys = Object.keys(summaryData).sort().reverse().slice(0, 4).reverse();
     weeklySummary = weekKeys.map(function (key) {
       var w = summaryData[key];
       // Find longest run for this week
       var longestRun = 0;
-      appState.allActivities.forEach(function (a) {
-        var ws = Compute.getWeekStart(new Date(a.started_at));
+      cachedAllActivities.forEach(function (a) {
+        var ws = getWeekStart(new Date(a.started_at));
         if (ws.toISOString().split("T")[0] === key) {
           var dist = (Number(a.distance) || 0) / 1000;
           if (dist > longestRun) longestRun = dist;
@@ -1540,12 +1547,12 @@ async function fetchAICoaching() {
 
   var payload = buildAICoachPayload();
 
-  var res = await fetch(SUPABASE_URL + "/functions/v1/gemini-coach", {
+  var res = await fetch(window.SUPABASE_URL + "/functions/v1/gemini-coach", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: "Bearer " + session.access_token,
-      apikey: SUPABASE_ANON_KEY,
+      apikey: window.SUPABASE_ANON_KEY,
     },
     body: JSON.stringify(payload),
   });
@@ -2072,7 +2079,7 @@ function handleStravaCallback() {
 
 document.querySelectorAll(".lang-option").forEach(function (btn) {
   btn.addEventListener("click", function () {
-    setLanguage(btn.dataset.lang);
+    i18n.setLanguage(btn.dataset.lang);
     // Re-render dynamic content with new language
     if (appState.plans.length) {
       renderRaceCountdown(appState.plans);
@@ -2092,8 +2099,8 @@ document.querySelectorAll(".lang-option").forEach(function (btn) {
 // ---- Initialize ----
 
 // Apply saved language on load
-document.documentElement.lang = currentLang;
-applyTranslations();
+document.documentElement.lang = i18n.getLanguage();
+i18n.applyTranslations();
 
 if (db) {
   db.auth.onAuthStateChange(function (_event, session) {

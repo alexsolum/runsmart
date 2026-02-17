@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getAuthRedirectUrl } from "../config/runtime";
 import { getSupabaseClient } from "../lib/supabaseClient";
-
-function readRedirectUrl() {
-  const configured = typeof globalThis !== "undefined" ? globalThis.AUTH_REDIRECT_URL : "";
-  if (typeof configured === "string" && configured.trim()) return configured.trim();
-  if (typeof window !== "undefined") return window.location.origin + window.location.pathname;
-  return undefined;
-}
 
 export function useAuth() {
   const client = useMemo(() => getSupabaseClient(), []);
@@ -76,7 +70,7 @@ export function useAuth() {
     const { error: oauthError } = await client.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: readRedirectUrl(),
+        redirectTo: getAuthRedirectUrl(),
       },
     });
 

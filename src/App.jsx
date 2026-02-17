@@ -1,37 +1,34 @@
-import { useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import Topbar from './components/Topbar';
-import LegacyModals from './components/LegacyModals';
-import HeroPage from './pages/HeroPage';
-import PlanningPage from './pages/PlanningPage';
-import InsightsPage from './pages/InsightsPage';
-import DataPage from './pages/DataPage';
-import CoachPage from './pages/CoachPage';
-import RoadmapPage from './pages/RoadmapPage';
-import HtmlSection from './components/HtmlSection';
-import markup from './legacy/markup';
-import { loadLegacyScripts } from './legacy/loadLegacyScripts';
+import { useEffect } from "react";
+import { AppDataProvider, useAppData } from "./context/AppDataContext";
 
-export default function App() {
+function Dashboard() {
+  const { auth, plans, activities, checkins } = useAppData();
+
   useEffect(() => {
-    loadLegacyScripts();
-  }, []);
+    if (!auth.user) return;
+    plans.loadPlans();
+    activities.loadActivities({ limit: 20, ascending: false });
+    checkins.loadCheckins();
+  }, [auth.user, plans, activities, checkins]);
+
+  if (auth.loading) return <p>Laster bruker...</p>;
+  if (!auth.user) return <p>Logg inn for å se data.</p>;
 
   return (
-    <>
-      <Sidebar />
-      <HtmlSection html={markup.overlay} />
-      <div className="main-wrapper">
-        <Topbar />
-        <HeroPage />
-        <PlanningPage />
-        <InsightsPage />
-        <DataPage />
-        <CoachPage />
-        <RoadmapPage />
-        <HtmlSection html={markup.footer} />
-      </div>
-      <LegacyModals />
-    </>
+    <section>
+      <h2>{auth.user.email}</h2>
+      <p>Planer: {plans.plans.length}</p>
+      <p>Aktiviteter: {activities.activities.length}</p>
+      <p>Check-ins: {checkins.checkins.length}</p>
+      {(plans.error || activities.error || checkins.error) && <p>Kunne ikke laste alt innhold.</p>}
+    </section>
+  );
+}
+
+export default function App() {
+  return (
+    <AppDataProvider>
+      <Dashboard />
+    </AppDataProvider>
   );
 }

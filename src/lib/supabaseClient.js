@@ -8,8 +8,5 @@ export const supabaseClient = isSupabaseConfigured
   : null;
 
 export function getSupabaseClient() {
-  if (!supabaseClient) {
-    throw new Error("Supabase is not configured. Add runtime-config.js values or VITE_SUPABASE_* env vars.");
-  }
   return supabaseClient;
 }

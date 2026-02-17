@@ -35,6 +35,7 @@ export function usePlans(userId) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const loadPlans = useCallback(async () => {
+    if (!client) return [];
     dispatch({ type: "pending" });
     const query = client.from("training_plans").select("*").order("created_at", { ascending: false });
     const { data, error } = userId ? await query.eq("user_id", userId) : await query;
@@ -48,6 +49,7 @@ export function usePlans(userId) {
 
   const createPlan = useCallback(
     async (plan) => {
+      if (!client) throw new Error("Supabase is not configured");
       if (!userId) throw new Error("User is required to create plan");
       dispatch({ type: "pending" });
       const payload = { ...plan, user_id: userId };
@@ -64,6 +66,7 @@ export function usePlans(userId) {
 
   const deletePlan = useCallback(
     async (id) => {
+      if (!client) throw new Error("Supabase is not configured");
       dispatch({ type: "pending" });
       const { error } = await client.from("training_plans").delete().eq("id", id);
       if (error) {

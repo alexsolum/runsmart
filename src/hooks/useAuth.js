@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAuthRedirectUrl } from "../config/runtime";
-import { getSupabaseClient } from "../lib/supabaseClient";
+import { getSupabaseClient, isSupabaseConfigured } from "../lib/supabaseClient";
 
 export function useAuth() {
   const client = useMemo(() => getSupabaseClient(), []);
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
   useEffect(() => {
+    if (!client) {
+      setLoading(false);
+      return undefined;
+    }
+
     let mounted = true;
 
     client.auth.getSession().then(({ data, error: sessionError }) => {
@@ -34,8 +39,13 @@ export function useAuth() {
     };
   }, [client]);
 
+  const missingConfigError = new Error(
+    "Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or runtime-config.js values).",
+  );
+
   const signIn = useCallback(
     async (email, password) => {
+      if (!client) throw missingConfigError;
       setError(null);
       setSuccess(null);
       const { data, error: signInError } = await client.auth.signInWithPassword({ email, password });
@@ -51,6 +61,7 @@ export function useAuth() {
 
   const signUp = useCallback(
     async (email, password) => {
+      if (!client) throw missingConfigError;
       setError(null);
       setSuccess(null);
       const { data, error: signUpError } = await client.auth.signUp({ email, password });
@@ -65,6 +76,7 @@ export function useAuth() {
   );
 
   const signInWithGoogle = useCallback(async () => {
+    if (!client) throw missingConfigError;
     setError(null);
     setSuccess(null);
     const { error: oauthError } = await client.auth.signInWithOAuth({
@@ -82,6 +94,7 @@ export function useAuth() {
   }, [client]);
 
   const signOut = useCallback(async () => {
+    if (!client) throw missingConfigError;
     setError(null);
     setSuccess(null);
     const { error: signOutError } = await client.auth.signOut();
@@ -102,5 +115,6 @@ export function useAuth() {
     signUp,
     signInWithGoogle,
     signOut,
+    isConfigured: Boolean(client),
   };
 }

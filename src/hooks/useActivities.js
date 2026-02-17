@@ -38,6 +38,7 @@ export function useActivities(userId) {
 
   const loadActivities = useCallback(
     async ({ limit = 20, ascending = false } = {}) => {
+      if (!client) return [];
       dispatch({ type: "pending" });
       const query = client
         .from("activities")
@@ -57,6 +58,7 @@ export function useActivities(userId) {
 
   const createManualActivity = useCallback(
     async (activity) => {
+      if (!client) throw new Error("Supabase is not configured");
       if (!userId) throw new Error("User is required to create activity");
       dispatch({ type: "pending" });
       const { data, error } = await client
@@ -76,6 +78,7 @@ export function useActivities(userId) {
 
   const updateActivityRpe = useCallback(
     async (id, effortRating) => {
+      if (!client) throw new Error("Supabase is not configured");
       dispatch({ type: "pending" });
       const { data, error } = await client
         .from("activities")

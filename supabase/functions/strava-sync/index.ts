@@ -11,19 +11,42 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function getBearerToken(req: Request) {
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+  return token;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization") || "";
-    const authClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: { user }, error: userErr } = await authClient.auth.getUser();
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+    if (!serviceRoleKey || !supabaseUrl) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return new Response(
+        JSON.stringify({ error: "Missing bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const { data: userData, error: userErr } = await supabase.auth.getUser(accessToken);
+    const user = userData?.user;
 
     if (userErr || !user) {
       const detail = userErr?.message || "Unauthorized";
@@ -32,11 +55,6 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     // Load stored Strava connection
     const { data: conn, error: connErr } = await supabase
@@ -53,7 +71,7 @@ Deno.serve(async (req) => {
     }
 
     // Refresh the access token if it has expired
-    let accessToken = conn.access_token;
+    let stravaAccessToken = conn.access_token;
 
     if (conn.expires_at < Math.floor(Date.now() / 1000)) {
       const refreshRes = await fetch("https://www.strava.com/oauth/token", {
@@ -79,7 +97,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      accessToken = refreshData.access_token;
+      stravaAccessToken = refreshData.access_token;
 
       await supabase
         .from("strava_connections")
@@ -96,7 +114,7 @@ Deno.serve(async (req) => {
     const after = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
     const stravaRes = await fetch(
       `https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=100`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { headers: { Authorization: `Bearer ${stravaAccessToken}` } },
     );
 
     if (!stravaRes.ok) {

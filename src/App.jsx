@@ -6,12 +6,14 @@ import CoachPage from "./pages/CoachPage";
 import RoadmapPage from "./pages/RoadmapPage";
 import DataPage from "./pages/DataPage";
 import InsightsPage from "./pages/InsightsPage";
+import DailyLogPage from "./pages/DailyLogPage";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", component: HeroPage },
   { key: "planning", label: "Planning", component: PlanningPage },
   { key: "coach", label: "Coach", component: CoachPage },
   { key: "insights", label: "Insights", component: InsightsPage },
+  { key: "daily-log", label: "Daily Log", component: DailyLogPage },
   { key: "data", label: "Data", component: DataPage },
   { key: "roadmap", label: "Roadmap", component: RoadmapPage },
 ];

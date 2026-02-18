@@ -15,13 +15,39 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 
 const SYSTEM_INSTRUCTION =
   `You are an expert endurance running coach specializing in trail and ultramarathon training. ` +
-  `Analyze the athlete's training data and provide 2-4 actionable coaching insights.\n\n` +
+  `Your coaching style should be evidence-informed and Jason Koop-inspired: long-run centric, structured progression, durability, specificity, and practical execution. ` +
+  `Analyze the athlete's training data and provide 3-5 actionable coaching insights.\n\n` +
   `Each insight MUST be a JSON object with these exact fields:\n` +
   `- "type": one of "danger", "warning", "positive", "info"\n` +
   `- "icon": one of "warning", "alert", "battery", "fatigue", "balance", "trending", "decline", "spike", "longrun", "rest", "motivation", "injury", "race", "taper"\n` +
   `- "title": short heading (5-8 words)\n` +
-  `- "body": 1-2 sentence explanation with specific reasoning tied to their data\n\n` +
+  `- "body": 2-4 sentences with specific reasoning tied to their data, plus concrete training recommendations\n\n` +
+  `Coaching requirements:\n` +
+  `1) Adapt to athlete level inferred from training consistency, weekly volume, and long-run history.\n` +
+  `2) Include at least two specific workout suggestions across the full response, each with purpose + execution (duration or distance + intensity).\n` +
+  `3) Prioritize safe progression: avoid sudden load spikes, protect recovery, and flag injury-risk signals.\n` +
+  `4) Include one weekly planning recommendation (how to structure the coming week).\n` +
+  `5) Use metric units (km/min).\n\n` +
   `Respond ONLY with a valid JSON array of insight objects. No markdown fences, no explanation outside the array.`;
+
+function formatDelta(current: number, previous: number): string {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return "n/a";
+  const pct = ((current - previous) / previous) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`;
+}
+
+function inferAthleteLevel(weeklySummary: WeeklySummary[]): string {
+  if (!weeklySummary.length) return "unknown";
+
+  const avgDistance =
+    weeklySummary.reduce((sum, week) => sum + week.distance, 0) / weeklySummary.length;
+  const avgRuns =
+    weeklySummary.reduce((sum, week) => sum + week.runs, 0) / weeklySummary.length;
+
+  if (avgDistance >= 90 || avgRuns >= 6) return "advanced";
+  if (avgDistance >= 55 || avgRuns >= 4) return "intermediate";
+  return "developing";
+}
 
 interface WeeklySummary {
   weekOf: string;
@@ -62,14 +88,31 @@ interface RequestBody {
 function buildPrompt(data: RequestBody): string {
   const lines: string[] = [];
 
+  const athleteLevel = inferAthleteLevel(data.weeklySummary || []);
+  lines.push(`Inferred athlete level: ${athleteLevel}`);
+  lines.push("Provide recommendations that feel realistic for this athlete's recent training.");
+  lines.push("");
+
   // Weekly summary
   if (data.weeklySummary && data.weeklySummary.length > 0) {
     lines.push("Training summary (last 4 weeks):");
     data.weeklySummary.forEach((w) => {
       lines.push(
-        `- Week of ${w.weekOf}: ${w.distance.toFixed(1)}mi, ${w.runs} runs, longest ${w.longestRun.toFixed(1)}mi`,
+        `- Week of ${w.weekOf}: ${w.distance.toFixed(1)}km, ${w.runs} runs, longest ${w.longestRun.toFixed(1)}km`,
       );
     });
+
+    const latestWeek = data.weeklySummary[data.weeklySummary.length - 1];
+    const previousWeek = data.weeklySummary[data.weeklySummary.length - 2];
+    if (latestWeek && previousWeek) {
+      lines.push(
+        `Volume trend: ${latestWeek.distance.toFixed(1)}km vs ${previousWeek.distance.toFixed(1)}km (${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week)`,
+      );
+      lines.push(
+        `Longest run trend: ${latestWeek.longestRun.toFixed(1)}km vs ${previousWeek.longestRun.toFixed(1)}km (${formatDelta(latestWeek.longestRun, previousWeek.longestRun)} week-over-week)`,
+      );
+    }
+
     lines.push("");
   }
 
@@ -77,7 +120,7 @@ function buildPrompt(data: RequestBody): string {
   if (data.planContext) {
     const p = data.planContext;
     lines.push(
-      `Current plan: ${p.race} on ${p.raceDate}, week ${p.weekNumber}, phase: ${p.phase}, target ${p.targetMileage}mi this week`,
+      `Current plan: ${p.race} on ${p.raceDate}, week ${p.weekNumber}, phase: ${p.phase}, target ${p.targetMileage}km this week`,
     );
     lines.push("");
   }
@@ -98,11 +141,17 @@ function buildPrompt(data: RequestBody): string {
     data.recentActivities.forEach((a) => {
       const mins = Math.round(a.duration / 60);
       lines.push(
-        `- ${a.name}: ${a.distance.toFixed(1)}mi, ${mins}min` +
+        `- ${a.name}: ${a.distance.toFixed(1)}km, ${mins}min` +
           (a.effort ? `, effort ${a.effort}/10` : ""),
       );
     });
+    lines.push("");
   }
+
+  lines.push("Output focus:");
+  lines.push("- Give week-planning guidance (e.g., 2 quality days + long run + recovery)." );
+  lines.push("- Suggest sessions that connect logically to recent training and current phase.");
+  lines.push("- Mention progression/regression alternatives if fatigue or niggles are high.");
 
   return lines.join("\n");
 }

@@ -1,3 +1,4 @@
+import React from 'react';
 import HtmlSection from './HtmlSection';
 import markup from '../legacy/markup';
 

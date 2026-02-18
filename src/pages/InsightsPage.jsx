@@ -1,6 +1,7 @@
+import React from 'react';
 import HtmlSection from '../components/HtmlSection';
 import markup from '../legacy/markup';
 
 export default function InsightsPage() {
-  return <HtmlSection html={markup.insights} />;
+  return <HtmlSection html={markup.insights} activatePage />;
 }

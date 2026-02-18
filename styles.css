@@ -1553,13 +1553,52 @@ h2 {
 }
 
 #training-load-section,
-#long-run-section {
+#weekly-load-section,
+#long-run-section,
+#fitness-level-section {
   margin-top: 32px;
 }
 
 #training-load-section h4,
-#long-run-section h4 {
+#weekly-load-section h4,
+#long-run-section h4,
+#fitness-level-section h4 {
   margin-bottom: 0;
+}
+
+
+.metric-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.fitness-meter {
+  margin-top: 12px;
+  width: 100%;
+  height: 14px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.fitness-meter__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #60a5fa 0%, #2563eb 100%);
+}
+
+.fitness-meter__fill--longrun {
+  background: linear-gradient(90deg, #facc15 0%, #f97316 100%);
 }
 
 

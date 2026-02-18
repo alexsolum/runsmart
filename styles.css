@@ -1562,6 +1562,16 @@ h2 {
   margin-bottom: 0;
 }
 
+
+.d3-chart {
+  margin-top: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  min-height: 300px;
+}
+
 /* Check-in form */
 
 #checkin-section {

@@ -126,3 +126,120 @@
     z-index: 20;
   }
 }
+
+.daily-log-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.daily-log-form,
+.daily-log-history {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.daily-log-form h3,
+.daily-log-history h3 {
+  margin: 0 0 12px;
+}
+
+.daily-log-form label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.daily-log-form label span {
+  display: block;
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.daily-log-form input,
+.daily-log-form select,
+.daily-log-form textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+  background: #fff;
+}
+
+.daily-log-form textarea {
+  resize: vertical;
+}
+
+.daily-log-form .cta[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.daily-log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.daily-log-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.daily-log-item header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.daily-log-item p {
+  margin: 4px 0;
+}
+
+.daily-log-pill {
+  text-transform: capitalize;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.daily-log-pill.is-great {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.daily-log-pill.is-good {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.daily-log-pill.is-okay {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.daily-log-pill.is-flat {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.daily-log-pill.is-fatigued {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+@media (max-width: 960px) {
+  .daily-log-grid {
+    grid-template-columns: 1fr;
+  }
+}

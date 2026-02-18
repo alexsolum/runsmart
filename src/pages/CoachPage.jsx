@@ -1,6 +1,7 @@
+import React from 'react';
 import HtmlSection from '../components/HtmlSection';
 import markup from '../legacy/markup';
 
 export default function CoachPage() {
-  return <HtmlSection html={markup.coach} />;
+  return <HtmlSection html={markup.coach} activatePage />;
 }

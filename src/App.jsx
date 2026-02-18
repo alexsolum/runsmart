@@ -22,11 +22,22 @@ function Shell() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!auth.user) return;
-    plans.loadPlans();
-    activities.loadActivities({ limit: 20, ascending: false });
-    checkins.loadCheckins();
-  }, [auth.user, plans, activities, checkins]);
+    if (!auth.user?.id) return;
+
+    const loadAll = async () => {
+      try {
+        await Promise.all([
+          plans.loadPlans(),
+          activities.loadActivities({ limit: 20, ascending: false }),
+          checkins.loadCheckins(),
+        ]);
+      } catch (loadError) {
+        console.error("Failed to load initial app data", loadError);
+      }
+    };
+
+    loadAll();
+  }, [auth.user?.id, plans.loadPlans, activities.loadActivities, checkins.loadCheckins]);
 
   const ActiveComponent = useMemo(
     () => NAV_ITEMS.find((item) => item.key === activePage)?.component ?? HeroPage,

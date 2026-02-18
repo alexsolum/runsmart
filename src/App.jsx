@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AppDataProvider, useAppData } from "./context/AppDataContext";
 import HeroPage from "./pages/HeroPage";
 import PlanningPage from "./pages/PlanningPage";

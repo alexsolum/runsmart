@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useActivities } from "../hooks/useActivities";
 import { useCheckins } from "../hooks/useCheckins";

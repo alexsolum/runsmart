@@ -11,12 +11,35 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function getBearerToken(req: Request) {
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+  return token;
+}
+
+function getRequestApiKey(req: Request) {
+  return req.headers.get("apikey") || req.headers.get("x-api-key") || "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+    if (!supabaseUrl) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_URL" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { code } = await req.json();
     if (!code) {
       return new Response(
@@ -24,6 +47,47 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return new Response(
+        JSON.stringify({ error: "Missing bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const requestApiKey = getRequestApiKey(req)
+      || Deno.env.get("SUPABASE_ANON_KEY")
+      || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
+      || "";
+
+    if (!requestApiKey) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: missing request apikey and SUPABASE_ANON_KEY/SUPABASE_PUBLISHABLE_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const authClient = createClient(supabaseUrl, requestApiKey);
+    const { data: userData, error: userErr } = await authClient.auth.getUser(accessToken);
+    const user = userData?.user;
+
+    if (userErr || !user) {
+      const detail = userErr?.message || "Unauthorized";
+      return new Response(
+        JSON.stringify({ error: detail }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_SERVICE_ROLE_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Exchange the authorization code for tokens
     const tokenRes = await fetch("https://www.strava.com/oauth/token", {
@@ -48,28 +112,6 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    // Authenticate the calling user via the request JWT
-    const authHeader = req.headers.get("Authorization") || "";
-    const authClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: { user }, error: userErr } = await authClient.auth.getUser();
-
-    if (userErr || !user) {
-      const detail = userErr?.message || "Unauthorized";
-      return new Response(
-        JSON.stringify({ error: detail }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     // Upsert the connection (one row per user)
     const { error: upsertErr } = await supabase

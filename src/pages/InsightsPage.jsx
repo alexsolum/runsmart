@@ -74,6 +74,45 @@ function TrainingLoadChart({ series }) {
   );
 }
 
+function WeeklyLoadChart({ points }) {
+  const width = 760;
+  const height = 270;
+  const margin = { top: 22, right: 12, bottom: 42, left: 44 };
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+  const band = innerW / points.length;
+  const barW = Math.min(36, band * 0.62);
+  const maxLoad = Math.max(...points.map((d) => d.load), 1);
+  const y = (v) => margin.top + (1 - v / maxLoad) * innerH;
+  const x = (i) => margin.left + i * band + (band - barW) / 2;
+
+  return (
+    <div className="d3-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Weekly training load">
+        {[0, 0.25, 0.5, 0.75, 1].map((f) => {
+          const val = maxLoad * f;
+          return (
+            <g key={f}>
+              <line x1={margin.left} y1={y(val)} x2={width - margin.right} y2={y(val)} stroke="#e2e8f0" strokeWidth="1" />
+              <text x={margin.left - 8} y={y(val) + 4} textAnchor="end" fill="#64748b" fontSize="11">
+                {Math.round(val)}
+              </text>
+            </g>
+          );
+        })}
+        {points.map((point, i) => (
+          <g key={point.label}>
+            <rect x={x(i)} y={y(point.load)} width={barW} height={height - margin.bottom - y(point.load)} rx="6" fill="#0ea5e9" />
+            <text x={x(i) + barW / 2} y={height - 14} textAnchor="middle" fill="#64748b" fontSize="11">
+              {point.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function LongRunChart({ points }) {
   const width = 760;
   const height = 290;
@@ -115,7 +154,7 @@ function LongRunChart({ points }) {
 }
 
 export default function InsightsPage() {
-  const { activities, checkins } = useAppData();
+  const { activities, checkins, plans } = useAppData();
 
   const trainingLoadSeries = useMemo(
     () =>
@@ -135,6 +174,45 @@ export default function InsightsPage() {
       })),
     [activities.activities],
   );
+
+  const weeklyLoadPoints = useMemo(() => {
+    const weekly = new Map();
+    activities.activities.forEach((activity) => {
+      const date = new Date(activity.started_at);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      const weekStart = new Date(date);
+      weekStart.setDate(diff);
+      weekStart.setHours(0, 0, 0, 0);
+      const key = weekStart.toISOString().split("T")[0];
+      const curr = weekly.get(key) || 0;
+      weekly.set(key, curr + (Number(activity.moving_time) || 0) / 60);
+    });
+
+    return Array.from(weekly.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-8)
+      .map(([weekStart, load]) => ({
+        label: fmtDate(weekStart),
+        load: Math.round(load),
+      }));
+  }, [activities.activities]);
+
+  const latestLoad = trainingLoadSeries.at(-1);
+  const ctl = latestLoad?.ctl ?? 0;
+  const fitnessScore = Math.max(0, Math.min(100, Math.round((ctl / 90) * 100)));
+  const fitnessLevel = ctl < 20 ? "Building" : ctl < 40 ? "Developing" : ctl < 60 ? "Strong" : "Peak";
+
+  const targetLongRunKm = useMemo(() => {
+    const currentMileage = Number(plans.plans[0]?.current_mileage) || 0;
+    if (currentMileage > 0) {
+      return Math.max(12, Math.round(currentMileage * 0.35));
+    }
+    const longest = Math.max(...longRunPoints.map((point) => point.distanceKm), 0);
+    return longest > 0 ? Math.round(longest * 1.15) : 20;
+  }, [longRunPoints, plans.plans]);
+  const latestLongRunKm = longRunPoints.at(-1)?.distanceKm ?? 0;
+  const longRunCompletion = Math.max(0, Math.min(100, Math.round((latestLongRunKm / Math.max(1, targetLongRunKm)) * 100)));
 
   const latest = checkins.checkins[0];
   const latestText = latest
@@ -185,9 +263,38 @@ export default function InsightsPage() {
         </div>
       )}
 
+      {weeklyLoadPoints.length >= 3 && (
+        <div id="weekly-load-section">
+          <h4>Weekly load</h4>
+          <p className="muted">Rolling 8-week view of accumulated training minutes.</p>
+          <WeeklyLoadChart points={weeklyLoadPoints} />
+        </div>
+      )}
+
+      <div id="fitness-level-section" className="metric-card">
+        <h4>Fitness level</h4>
+        <p className="muted">Calculated from current chronic load (CTL).</p>
+        <div className="fitness-meter" role="img" aria-label={`Fitness level ${fitnessScore} out of 100`}>
+          <div className="fitness-meter__fill" style={{ width: `${fitnessScore}%` }} />
+        </div>
+        <div className="metric-row">
+          <span>Level: {fitnessLevel}</span>
+          <strong>{fitnessScore}/100</strong>
+        </div>
+      </div>
+
       {longRunPoints.length >= 2 && (
         <div id="long-run-section">
           <h4>Long run progression</h4>
+          <div className="metric-row">
+            <span>
+              Long run progress: <strong>{latestLongRunKm.toFixed(1)} km</strong> / {targetLongRunKm} km target
+            </span>
+            <strong>{longRunCompletion}%</strong>
+          </div>
+          <div className="fitness-meter" role="img" aria-label={`Long run progress ${longRunCompletion} percent`}>
+            <div className="fitness-meter__fill fitness-meter__fill--longrun" style={{ width: `${longRunCompletion}%` }} />
+          </div>
           <LongRunChart points={longRunPoints} />
         </div>
       )}

@@ -20,6 +20,10 @@ function getBearerToken(req: Request) {
   return token;
 }
 
+function getRequestApiKey(req: Request) {
+  return req.headers.get("apikey") || req.headers.get("x-api-key") || "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -29,9 +33,9 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
 
-    if (!serviceRoleKey || !supabaseUrl) {
+    if (!supabaseUrl) {
       return new Response(
-        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }),
+        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_URL" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -44,8 +48,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const { data: userData, error: userErr } = await supabase.auth.getUser(accessToken);
+    const requestApiKey = getRequestApiKey(req)
+      || Deno.env.get("SUPABASE_ANON_KEY")
+      || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
+      || "";
+
+    if (!requestApiKey) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: missing request apikey and SUPABASE_ANON_KEY/SUPABASE_PUBLISHABLE_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const authClient = createClient(supabaseUrl, requestApiKey);
+    const { data: userData, error: userErr } = await authClient.auth.getUser(accessToken);
     const user = userData?.user;
 
     if (userErr || !user) {
@@ -55,6 +71,15 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    if (!serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_SERVICE_ROLE_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Load stored Strava connection
     const { data: conn, error: connErr } = await supabase

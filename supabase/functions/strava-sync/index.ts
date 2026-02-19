@@ -20,26 +20,42 @@ function getBearerToken(req: Request) {
   return token;
 }
 
+function missingEnvVars() {
+  return [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "STRAVA_CLIENT_ID",
+    "STRAVA_CLIENT_SECRET",
+  ].filter((key) => !Deno.env.get(key));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-
-    if (!serviceRoleKey || !supabaseUrl) {
+    const missingVars = missingEnvVars();
+    if (missingVars.length > 0) {
       return new Response(
-        JSON.stringify({ error: "Server misconfiguration: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }),
+        JSON.stringify({
+          error: "Server misconfiguration: missing required Edge Function secrets",
+          missing: missingVars,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+
     const accessToken = getBearerToken(req);
     if (!accessToken) {
       return new Response(
-        JSON.stringify({ error: "Missing bearer token" }),
+        JSON.stringify({
+          error: "Missing bearer token",
+          hint: "Send Authorization: Bearer <supabase access_token> from the logged-in user session",
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -51,7 +67,11 @@ Deno.serve(async (req) => {
     if (userErr || !user) {
       const detail = userErr?.message || "Unauthorized";
       return new Response(
-        JSON.stringify({ error: detail }),
+        JSON.stringify({
+          error: detail,
+          hint:
+            "JWT validation failed. Verify frontend uses the same Supabase project URL+anon key as this Edge Function deployment.",
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

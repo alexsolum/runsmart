@@ -84,3 +84,60 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Feilsøking: JWT-feil i Strava-auth (Supabase Edge Functions)
+
+Hvis Strava-connect feiler med meldinger som `invalid JWT`, `JWT expired`, `Missing bearer token` eller `Unauthorized`, sjekk dette i rekkefølge:
+
+1. **Frontend peker til riktig Supabase-prosjekt**
+   - `SUPABASE_URL` og `SUPABASE_ANON_KEY` i `public/runtime-config.js` (eller `VITE_*` i miljøvariabler) må være fra samme prosjekt som Edge Functions er deployet til.
+2. **Bruker er faktisk logget inn før Strava-connect starter**
+   - Edge Functions krever `Authorization: Bearer <access_token>` fra en gyldig Supabase-session.
+3. **Required secrets finnes i Supabase Edge Functions**
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `STRAVA_CLIENT_ID`
+   - `STRAVA_CLIENT_SECRET`
+4. **Redirect URL er tillatt i både Strava og Supabase Auth**
+   - Lokal: `http://localhost:5173/`
+   - Prod: `https://<domene>/`
+
+### Nyttige CLI-kommandoer
+
+```bash
+# logg inn og link prosjekt
+supabase login
+supabase link --project-ref <project_ref>
+
+# sett/oppdater edge secrets
+supabase secrets set \
+  SUPABASE_URL=https://<project_ref>.supabase.co \
+  SUPABASE_SERVICE_ROLE_KEY=<service_role_key> \
+  STRAVA_CLIENT_ID=<strava_client_id> \
+  STRAVA_CLIENT_SECRET=<strava_client_secret>
+
+# deploy funksjonene på nytt
+supabase functions deploy strava-auth
+supabase functions deploy strava-sync
+
+# sjekk logs mens du tester innlogging
+supabase functions logs --name strava-auth
+supabase functions logs --name strava-sync
+```
+
+### Rask verifisering av token mot funksjon
+
+Kjør dette med en aktiv bruker sin `access_token` (ikke anon key):
+
+```bash
+curl -i \
+  -X POST "https://<project_ref>.supabase.co/functions/v1/strava-sync" \
+  -H "Authorization: Bearer <access_token>" \
+  -H "apikey: <anon_key>" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+- `401 + Missing bearer token`: Authorization-header mangler/er feil format.
+- `401 + JWT validation failed`: frontend-token hører ikke til samme Supabase-prosjekt eller er utløpt.
+- `500 + missing required Edge Function secrets`: secrets mangler i Supabase.

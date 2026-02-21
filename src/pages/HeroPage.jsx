@@ -8,6 +8,11 @@ const DATE_FILTERS = [
 ];
 const TYPE_FILTERS = ["All", "Run", "Ride", "Workout"];
 const TIMELINE_FILTERS = ["Today", "Week", "Month"];
+const OVERLAY_FILTERS = [
+  { key: "distance", label: "Distance" },
+  { key: "load", label: "Load" },
+  { key: "pace", label: "Pace" },
+];
 
 function getDateFilterRange(filter) {
   const now = new Date();
@@ -23,9 +28,9 @@ function getDateFilterRange(filter) {
 }
 
 function formatDistance(meters) {
+  if (!meters) return "—";
   return `${(meters / 1000).toFixed(1)} km`;
 }
-
 
 function toDayKey(date) {
   return new Date(date).toISOString().split("T")[0];
@@ -37,6 +42,13 @@ function formatAgo(input) {
   if (h < 24) return `${h}h ago`;
   const d = Math.round(h / 24);
   return `${d}d ago`;
+}
+
+function activityIcon(type) {
+  if (type === "Run") return "🏃";
+  if (type === "Ride") return "🚴";
+  if (type === "Workout") return "🏋️";
+  return "🗓️";
 }
 
 function deltaMeta(current, previous, suffix = "vs last period") {
@@ -73,6 +85,7 @@ export default function HeroPage() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [timelineFilter, setTimelineFilter] = useState("Week");
   const [search, setSearch] = useState("");
+  const [overlayFilter, setOverlayFilter] = useState("distance");
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -82,6 +95,7 @@ export default function HeroPage() {
       if (parsed.dateFilter) setDateFilter(parsed.dateFilter);
       if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
       if (parsed.timelineFilter) setTimelineFilter(parsed.timelineFilter);
+      if (parsed.overlayFilter) setOverlayFilter(parsed.overlayFilter);
       if (typeof parsed.search === "string") setSearch(parsed.search);
     } catch {
       // Ignore malformed local storage values.
@@ -89,11 +103,15 @@ export default function HeroPage() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ dateFilter, typeFilter, timelineFilter, search }),
-    );
-  }, [dateFilter, typeFilter, timelineFilter, search]);
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ dateFilter, typeFilter, timelineFilter, overlayFilter, search }),
+      );
+    } catch {
+      // Ignore storage errors in restricted browsers.
+    }
+  }, [dateFilter, typeFilter, timelineFilter, overlayFilter, search]);
 
   const { start, end } = useMemo(() => getDateFilterRange(dateFilter), [dateFilter]);
 
@@ -168,16 +186,16 @@ export default function HeroPage() {
       return acc;
     }, {});
 
-    const points = Object.entries(grouped).map(([date, values]) => ({
-      date,
-      distance: values.distance / 1000,
-      load: values.load,
-      pace: values.pace.length
-        ? values.pace.reduce((acc, value) => acc + value, 0) / values.pace.length / 60
-        : null,
-    }));
-
-    return points.slice(-8);
+    return Object.entries(grouped)
+      .map(([date, values]) => ({
+        date,
+        distance: values.distance / 1000,
+        load: values.load,
+        pace: values.pace.length
+          ? values.pace.reduce((acc, value) => acc + value, 0) / values.pace.length / 60
+          : null,
+      }))
+      .slice(-8);
   }, [filtered]);
 
   const activityFeed = useMemo(() => {
@@ -222,6 +240,15 @@ export default function HeroPage() {
     return <DashboardSkeleton />;
   }
 
+  if (activities.error) {
+    return (
+      <section className="dashboard-card">
+        <h2>Dashboard temporarily unavailable</h2>
+        <p className="empty-state">We could not load activity data. Please retry from the Data tab or refresh the page.</p>
+      </section>
+    );
+  }
+
   return (
     <div className="dashboard-shell">
       <section className="dashboard-main">
@@ -237,6 +264,7 @@ export default function HeroPage() {
                 <button
                   key={item.key}
                   type="button"
+                  aria-pressed={dateFilter === item.key}
                   className={`dashboard-chip ${dateFilter === item.key ? "is-active" : ""}`}
                   onClick={() => setDateFilter(item.key)}
                 >
@@ -262,32 +290,54 @@ export default function HeroPage() {
               <strong>{metric.value}</strong>
               <span className={`delta delta--${metric.delta.tone}`}>{metric.delta.text}</span>
               <small>{metric.delta.suffix}</small>
+              <small className="kpi-helper">{metric.helper}</small>
             </article>
           ))}
         </section>
 
         <article className="dashboard-card">
           <div className="dashboard-card__head">
-            <h3>Training Trend</h3>
-            <p>Distance, load, and pace overlays</p>
+            <div>
+              <h3>Training Trend</h3>
+              <p>Distance, load, and pace overlays</p>
+            </div>
+            <div className="dashboard-chip-group" role="group" aria-label="Trend overlay selector">
+              {OVERLAY_FILTERS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-pressed={overlayFilter === item.key}
+                  className={`dashboard-chip ${overlayFilter === item.key ? "is-active" : ""}`}
+                  onClick={() => setOverlayFilter(item.key)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="trend-grid" role="img" aria-label="Trend chart for distance, load, and pace over recent sessions">
+          <div className="trend-grid" role="img" aria-label={`Trend chart for ${overlayFilter} over recent sessions`}>
             {weeklySeries.length ? (
               weeklySeries.map((point) => (
                 <div key={point.date} className="trend-row">
                   <span>{new Date(point.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-                  <div>
-                    <label>Distance {point.distance.toFixed(1)} km</label>
-                    <progress max="30" value={point.distance} />
-                  </div>
-                  <div>
-                    <label>Load {Math.round(point.load)} min</label>
-                    <progress max="180" value={point.load} className="load" />
-                  </div>
-                  <div>
-                    <label>Pace {point.pace ? `${point.pace.toFixed(2)} min/km` : "—"}</label>
-                    <progress max="8" value={point.pace ? Math.max(0, 8 - point.pace) : 0} className="pace" />
-                  </div>
+                  {overlayFilter === "distance" && (
+                    <div>
+                      <label>Distance {point.distance.toFixed(1)} km</label>
+                      <progress max="30" value={point.distance} />
+                    </div>
+                  )}
+                  {overlayFilter === "load" && (
+                    <div>
+                      <label>Load {Math.round(point.load)} min</label>
+                      <progress max="180" value={point.load} className="load" />
+                    </div>
+                  )}
+                  {overlayFilter === "pace" && (
+                    <div>
+                      <label>Pace {point.pace ? `${point.pace.toFixed(2)} min/km` : "—"}</label>
+                      <progress max="8" value={point.pace ? Math.max(0, 8 - point.pace) : 0} className="pace" />
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -331,6 +381,7 @@ export default function HeroPage() {
               <button
                 key={item}
                 type="button"
+                aria-pressed={timelineFilter === item}
                 className={`dashboard-chip ${timelineFilter === item ? "is-active" : ""}`}
                 onClick={() => setTimelineFilter(item)}
               >
@@ -349,7 +400,7 @@ export default function HeroPage() {
             {activityFeed.length ? (
               activityFeed.map((item) => (
                 <button type="button" className="timeline-row" key={item.id}>
-                  <span className="timeline-icon" aria-hidden="true">🏃</span>
+                  <span className="timeline-icon" aria-hidden="true">{activityIcon(item.type)}</span>
                   <span className="timeline-main">
                     <strong>{item.name || item.type || "Workout"}</strong>
                     <small>{item.type || "Session"} · {formatDistance(Number(item.distance) || 0)}</small>

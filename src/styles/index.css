@@ -194,6 +194,11 @@
   color: var(--color-text-muted);
 }
 
+.kpi-helper {
+  display: block;
+  margin-top: var(--space-1);
+}
+
 .dashboard-kpi strong {
   display: block;
   margin: var(--space-1) 0;
@@ -229,7 +234,7 @@
 
 .trend-row {
   display: grid;
-  grid-template-columns: 85px repeat(3, minmax(0, 1fr));
+  grid-template-columns: 85px minmax(0, 1fr);
   gap: var(--space-2);
   align-items: center;
   padding-top: var(--space-2);

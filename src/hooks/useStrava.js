@@ -16,22 +16,6 @@ function clearOAuthParamsFromUrl() {
   window.history.replaceState({}, document.title, cleanUrl);
 }
 
-async function parseEdgeFunctionResponse(response, endpoint) {
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch (_error) {
-    throw new Error(`${endpoint} returned ${response.status} with a non-JSON response.`);
-  }
-
-  if (!response.ok) {
-    const detail = payload?.error || payload?.message || JSON.stringify(payload);
-    throw new Error(`${endpoint} ${response.status}: ${detail}`);
-  }
-
-  return payload;
-}
-
 export function useStrava(userId, session, onActivitiesSynced) {
   const client = useMemo(() => getSupabaseClient(), []);
   const [connected, setConnected] = useState(false);
@@ -66,25 +50,51 @@ export function useStrava(userId, session, onActivitiesSynced) {
     return updatedAt;
   }, [client, userId]);
 
+  const getActiveSession = useCallback(async () => {
+    if (!client) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    // After OAuth redirects, auth state hydration can lag behind the first render.
+    // Give Supabase a short window to restore a persisted session.
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const {
+        data: { session: activeSession },
+        error: sessionError,
+      } = await client.auth.getSession();
+
+      if (sessionError) throw sessionError;
+      if (activeSession?.access_token) return activeSession;
+
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 200);
+      });
+    }
+
+    throw new Error("No active session. Please sign in first.");
+  }, [client]);
+
   const callEdgeFunction = useCallback(
     async (functionName, body) => {
-      if (!session?.access_token) {
-        throw new Error("No active session. Please sign in first.");
-      }
+      if (!client) throw new Error("Supabase is not configured.");
 
-      const response = await fetch(`${config.supabaseUrl}/functions/v1/${functionName}`, {
-        method: "POST",
+      const activeSession = session?.access_token ? session : await getActiveSession();
+
+      const { data, error: invokeError } = await client.functions.invoke(functionName, {
+        body,
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: config.supabaseAnonKey,
+          Authorization: `Bearer ${activeSession.access_token}`,
         },
-        body: body ? JSON.stringify(body) : undefined,
       });
 
-      return parseEdgeFunctionResponse(response, functionName);
+      if (invokeError) {
+        throw new Error(`${functionName}: ${invokeError.message}`);
+      }
+
+      return data;
     },
-    [session?.access_token],
+    [client, getActiveSession, session],
   );
 
   const startConnect = useCallback(() => {
@@ -191,7 +201,7 @@ export function useStrava(userId, session, onActivitiesSynced) {
     }
 
     if (!scope || !scope.includes("activity")) return;
-    if (!userId || !session?.access_token) return;
+    if (!userId) return;
 
     oauthHandledRef.current = true;
     clearOAuthParamsFromUrl();

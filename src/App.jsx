@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppDataProvider, useAppData } from "./context/AppDataContext";
+import AuthPage from "./pages/AuthPage";
 import HeroPage from "./pages/HeroPage";
-import PlanningPage from "./pages/PlanningPage";
+import LongTermPlanPage from "./pages/LongTermPlanPage";
+import WeeklyPlanPage from "./pages/WeeklyPlanPage";
 import CoachPage from "./pages/CoachPage";
 import RoadmapPage from "./pages/RoadmapPage";
 import DataPage from "./pages/DataPage";
@@ -10,7 +12,8 @@ import DailyLogPage from "./pages/DailyLogPage";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", component: HeroPage },
-  { key: "planning", label: "Planning", component: PlanningPage },
+  { key: "training-plan", label: "Training Plan", component: LongTermPlanPage },
+  { key: "weekly-plan", label: "Weekly Plan", component: WeeklyPlanPage },
   { key: "coach", label: "Coach", component: CoachPage },
   { key: "insights", label: "Insights", component: InsightsPage },
   { key: "daily-log", label: "Daily Log", component: DailyLogPage },
@@ -66,9 +69,10 @@ function Shell() {
           ))}
         </nav>
         <div className="app-sidebar__meta">
-          {auth.loading && <p>Loading account…</p>}
-          {!auth.loading && auth.user && <p>{auth.user.email}</p>}
-          {!auth.loading && !auth.user && <p>Not signed in</p>}
+          <p className="app-sidebar__email">{auth.user.email}</p>
+          <button type="button" className="app-sidebar__signout" onClick={auth.signOut}>
+            Sign out
+          </button>
         </div>
       </aside>
 
@@ -90,10 +94,28 @@ function Shell() {
   );
 }
 
+function AuthGate() {
+  const { auth } = useAppData();
+
+  if (auth.loading) {
+    return (
+      <div className="auth-page">
+        <p style={{ color: "#64748b" }}>Loading…</p>
+      </div>
+    );
+  }
+
+  if (!auth.user) {
+    return <AuthPage />;
+  }
+
+  return <Shell />;
+}
+
 export default function App() {
   return (
     <AppDataProvider>
-      <Shell />
+      <AuthGate />
     </AppDataProvider>
   );
 }

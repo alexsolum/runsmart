@@ -525,3 +525,592 @@ select:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Auth page ── */
+.auth-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  padding: 24px;
+}
+
+.auth-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-brand {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 24px;
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 20px;
+  color: #0f172a;
+}
+
+.auth-feedback {
+  margin: 0 0 16px;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.auth-feedback--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.auth-feedback--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.auth-label span {
+  color: #475569;
+}
+
+.auth-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.auth-input:disabled {
+  opacity: 0.6;
+}
+
+.auth-submit {
+  margin-top: 4px;
+  padding: 12px;
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.auth-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-toggle {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+}
+
+.auth-toggle-btn {
+  border: 0;
+  background: none;
+  color: #2563eb;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ── Sidebar meta (signed-in state) ── */
+.app-sidebar__email {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sidebar__signout {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: #94a3b8;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app-sidebar__signout:hover {
+  background: rgba(148, 163, 184, 0.15);
+  color: #e2e8f0;
+}
+
+/* ── Shared page header ── */
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-header h2 {
+  margin: 0 0 4px;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.muted { color: var(--color-text-muted); }
+
+.cta {
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cta:hover:not(:disabled) { background: #1d4ed8; }
+.cta:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.ghost {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #475569;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ghost:hover:not(:disabled) { background: #f1f5f9; }
+.ghost:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Long-Term Plan (Training Plan) page ── */
+
+.ltp-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.ltp-panel {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.ltp-panel h3 { margin: 0 0 4px; }
+
+.ltp-panel select,
+.ltp-panel input[type="text"],
+.ltp-panel input[type="date"],
+.ltp-panel input[type="number"],
+.ltp-panel textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+  font-size: 13px;
+  background: #fff;
+}
+
+.ltp-panel select:focus,
+.ltp-panel input:focus,
+.ltp-panel textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+.ltp-panel label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.ltp-panel label span {
+  display: block;
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.ltp-panel-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ltp-plan-meta p { margin: 2px 0; }
+
+.ltp-block-form {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+
+.ltp-block-form h4 { margin: 0 0 12px; }
+
+.ltp-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ltp-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px !important;
+}
+
+.ltp-checkbox-label input[type="checkbox"] {
+  width: auto !important;
+}
+
+.ltp-timeline {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.ltp-timeline h3 { margin: 0 0 14px; }
+
+/* Phase Gantt bar */
+.ltp-phase-bar {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 38px;
+  margin-bottom: 16px;
+  gap: 2px;
+  background: #f1f5f9;
+}
+
+.ltp-phase-seg {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: flex 0.3s ease;
+}
+
+/* Block list */
+.ltp-block-list { display: grid; gap: 10px; }
+
+.ltp-block-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.ltp-block-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ltp-block-card-actions { display: flex; gap: 6px; }
+
+.ltp-block-card p {
+  margin: 3px 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+/* Phase badge */
+.ltp-phase-badge {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #fff;
+}
+
+.ltp-phase-badge.is-Base,   .ltp-phase-seg.is-Base     { background: #0ea5e9; }
+.ltp-phase-badge.is-Build,  .ltp-phase-seg.is-Build    { background: #2563eb; }
+.ltp-phase-badge.is-Peak,   .ltp-phase-seg.is-Peak     { background: #7c3aed; }
+.ltp-phase-badge.is-Taper,  .ltp-phase-seg.is-Taper    { background: #d97706; }
+.ltp-phase-badge.is-Recovery, .ltp-phase-seg.is-Recovery { background: #16a34a; }
+
+@media (max-width: 960px) {
+  .ltp-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Weekly Plan page ── */
+
+.wpp-header {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.wpp-week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.wpp-week-label {
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 220px;
+  text-align: center;
+}
+
+.wpp-summary {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.wpp-summary-stat { font-size: 13px; color: #475569; }
+.wpp-summary-stat strong { color: #0f172a; font-weight: 700; }
+
+/* 7-day grid */
+.wpp-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.wpp-day {
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  padding: 10px;
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpp-day.is-today {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.wpp-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wpp-day-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wpp-day-add-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s;
+}
+
+.wpp-day-add-btn:hover:not(:disabled) { background: #e2e8f0; }
+
+.wpp-entry-list { display: grid; gap: 6px; }
+
+.wpp-entry {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  font-size: 12px;
+}
+
+.wpp-entry.is-completed { opacity: 0.55; }
+.wpp-entry.is-completed .wpp-type-badge { text-decoration: line-through; }
+
+.wpp-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.wpp-entry-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.wpp-icon-btn {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  color: #94a3b8;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.wpp-icon-btn:hover:not(:disabled) { background: #e2e8f0; color: #475569; }
+
+.wpp-entry-desc {
+  color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+/* Workout type badges */
+.wpp-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.wpp-type-badge.is-Easy        { background: #dcfce7; color: #166534; }
+.wpp-type-badge.is-Long-Run    { background: #dbeafe; color: #1d4ed8; }
+.wpp-type-badge.is-Tempo       { background: #ede9fe; color: #5b21b6; }
+.wpp-type-badge.is-Intervals   { background: #fce7f3; color: #9d174d; }
+.wpp-type-badge.is-Recovery    { background: #f0fdf4; color: #15803d; }
+.wpp-type-badge.is-Strength    { background: #fef3c7; color: #92400e; }
+.wpp-type-badge.is-Cross-Train { background: #e0f2fe; color: #075985; }
+.wpp-type-badge.is-Rest        { background: #f1f5f9; color: #475569; }
+
+/* Inline add-workout form */
+.wpp-add-form {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.wpp-add-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.wpp-add-form select,
+.wpp-add-form input,
+.wpp-add-form textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  background: #fff;
+}
+
+.wpp-add-form select:focus,
+.wpp-add-form input:focus,
+.wpp-add-form textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.12);
+}
+
+.wpp-add-form-actions { display: flex; gap: 6px; }
+
+@media (max-width: 960px) {
+  .wpp-day-grid  { grid-template-columns: repeat(2, 1fr); }
+  .wpp-header    { flex-direction: column; align-items: flex-start; }
+  .wpp-week-nav  { margin-left: 0; width: 100%; justify-content: space-between; }
+  .wpp-week-label { min-width: 0; text-align: left; }
+}
+
+@media (max-width: 480px) {
+  .wpp-day-grid { grid-template-columns: 1fr; }
+}

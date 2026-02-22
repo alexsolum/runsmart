@@ -79,7 +79,7 @@ export function useStrava(userId, session, onActivitiesSynced) {
     async (functionName, body) => {
       if (!client) throw new Error("Supabase is not configured.");
 
-      const activeSession = session?.access_token ? session : await getActiveSession();
+      const activeSession = await getActiveSession();
 
       const { data, error: invokeError } = await client.functions.invoke(functionName, {
         body,
@@ -94,7 +94,7 @@ export function useStrava(userId, session, onActivitiesSynced) {
 
       return data;
     },
-    [client, getActiveSession, session],
+    [client, getActiveSession],
   );
 
   const startConnect = useCallback(() => {

@@ -132,6 +132,66 @@
     return Object.entries(weeks).sort(function (a, b) { return a[0].localeCompare(b[0]); });
   }
 
+  // ---- Heart rate zone aggregation ----
+
+  function computeWeeklyHRZones(activities) {
+    var weekly = {};
+    activities.forEach(function(a) {
+      var z1 = Number(a.hr_zone_1_seconds) || 0;
+      var z2 = Number(a.hr_zone_2_seconds) || 0;
+      var z3 = Number(a.hr_zone_3_seconds) || 0;
+      var z4 = Number(a.hr_zone_4_seconds) || 0;
+      var z5 = Number(a.hr_zone_5_seconds) || 0;
+      if (z1 + z2 + z3 + z4 + z5 === 0) return;
+      var ws = getWeekStart(new Date(a.started_at));
+      var key = ws.toISOString().split("T")[0];
+      if (!weekly[key]) weekly[key] = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
+      weekly[key].z1 += z1;
+      weekly[key].z2 += z2;
+      weekly[key].z3 += z3;
+      weekly[key].z4 += z4;
+      weekly[key].z5 += z5;
+    });
+    return Object.entries(weekly)
+      .sort(function(a, b) { return a[0].localeCompare(b[0]); })
+      .slice(-8)
+      .map(function(entry) {
+        var w = entry[1];
+        return {
+          weekStart: entry[0],
+          z1: w.z1, z2: w.z2, z3: w.z3, z4: w.z4, z5: w.z5,
+          total: w.z1 + w.z2 + w.z3 + w.z4 + w.z5,
+        };
+      });
+  }
+
+  function computeRecentActivityZones(activities) {
+    return activities
+      .filter(function(a) {
+        return (Number(a.hr_zone_1_seconds) || 0) +
+               (Number(a.hr_zone_2_seconds) || 0) +
+               (Number(a.hr_zone_3_seconds) || 0) +
+               (Number(a.hr_zone_4_seconds) || 0) +
+               (Number(a.hr_zone_5_seconds) || 0) > 0;
+      })
+      .sort(function(a, b) { return new Date(b.started_at) - new Date(a.started_at); })
+      .slice(0, 10)
+      .map(function(a) {
+        var z1 = Number(a.hr_zone_1_seconds) || 0;
+        var z2 = Number(a.hr_zone_2_seconds) || 0;
+        var z3 = Number(a.hr_zone_3_seconds) || 0;
+        var z4 = Number(a.hr_zone_4_seconds) || 0;
+        var z5 = Number(a.hr_zone_5_seconds) || 0;
+        return {
+          id: a.id,
+          name: a.name,
+          date: a.started_at,
+          z1: z1, z2: z2, z3: z3, z4: z4, z5: z5,
+          total: z1 + z2 + z3 + z4 + z5,
+        };
+      });
+  }
+
   // ---- Format helpers ----
 
   function formatDistance(meters) {
@@ -596,6 +656,8 @@ export {
   computeLongRuns,
   computeKoopPlan,
   computeWeeklyCalendar,
+  computeWeeklyHRZones,
+  computeRecentActivityZones,
   generateCoachingInsights,
   formatDistance,
   formatDuration,

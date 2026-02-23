@@ -1,9 +1,113 @@
 import React, { useMemo } from "react";
 import { useAppData } from "../context/AppDataContext";
-import { computeLongRuns, computeTrainingLoad } from "../domain/compute";
+import { computeLongRuns, computeTrainingLoad, computeWeeklyHRZones, computeRecentActivityZones } from "../domain/compute";
 
 function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+const ZONE_COLORS = ["#94a3b8", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
+const ZONE_LABELS = ["Z1 Recovery", "Z2 Aerobic", "Z3 Tempo", "Z4 Threshold", "Z5 VO\u2082max"];
+const ZONE_KEYS = ["z1", "z2", "z3", "z4", "z5"];
+
+function HRZoneWeeklyChart({ weeks }) {
+  const width = 760;
+  const height = 280;
+  const margin = { top: 36, right: 12, bottom: 42, left: 52 };
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+  const band = innerW / weeks.length;
+  const barW = Math.min(40, band * 0.65);
+  const maxTotal = Math.max(...weeks.map((w) => w.total), 1);
+  const x = (i) => margin.left + i * band + (band - barW) / 2;
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * maxTotal);
+  const y = (v) => margin.top + (1 - v / maxTotal) * innerH;
+  const chartBottom = margin.top + innerH;
+
+  return (
+    <div className="d3-chart">
+      <div className="hr-zone-legend">
+        {ZONE_LABELS.map((label, i) => (
+          <div key={label} className="hr-zone-legend-item">
+            <div className="hr-zone-legend-dot" style={{ background: ZONE_COLORS[i] }} />
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Heart rate zone distribution by week">
+        {yTicks.map((val) => (
+          <g key={val}>
+            <line x1={margin.left} y1={y(val)} x2={width - margin.right} y2={y(val)} stroke="#e2e8f0" strokeWidth="1" />
+            <text x={margin.left - 8} y={y(val) + 4} textAnchor="end" fill="#64748b" fontSize="11">
+              {Math.round(val / 60)}m
+            </text>
+          </g>
+        ))}
+        {weeks.map((week, i) => {
+          let cumulative = 0;
+          return (
+            <g key={week.weekStart}>
+              {ZONE_KEYS.map((key, zi) => {
+                const val = week[key];
+                if (!val) return null;
+                const segH = (val / maxTotal) * innerH;
+                const segY = chartBottom - cumulative - segH;
+                cumulative += segH;
+                return (
+                  <rect key={key} x={x(i)} y={segY} width={barW} height={segH} fill={ZONE_COLORS[zi]}>
+                    <title>{ZONE_LABELS[zi]}: {Math.round(val / 60)}m</title>
+                  </rect>
+                );
+              })}
+              <text x={x(i) + barW / 2} y={height - 14} textAnchor="middle" fill="#64748b" fontSize="11">
+                {fmtDate(week.weekStart)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function HRZoneActivityBreakdown({ activityZones }) {
+  return (
+    <div className="hr-zone-activity-list">
+      {activityZones.map((activity) => {
+        const total = activity.total;
+        return (
+          <div key={activity.id} className="hr-zone-activity-row">
+            <div className="hr-zone-activity-meta">
+              <span className="hr-zone-activity-name">{activity.name}</span>
+              <span className="muted">{fmtDate(activity.date)}</span>
+            </div>
+            <div className="hr-zone-bar" role="img" aria-label={`Zone distribution for ${activity.name}`}>
+              {ZONE_KEYS.map((key, zi) => {
+                const pct = total > 0 ? (activity[key] / total) * 100 : 0;
+                return pct > 0 ? (
+                  <div
+                    key={key}
+                    className="hr-zone-segment"
+                    style={{ width: `${pct}%`, background: ZONE_COLORS[zi] }}
+                    title={`${ZONE_LABELS[zi]}: ${Math.round(activity[key] / 60)}m (${Math.round(pct)}%)`}
+                  />
+                ) : null;
+              })}
+            </div>
+            <div className="hr-zone-activity-legend">
+              {ZONE_KEYS.map((key, zi) =>
+                activity[key] > 0 ? (
+                  <span key={key} className="zone-label-small" style={{ color: ZONE_COLORS[zi] }}>
+                    Z{zi + 1} {Math.round(activity[key] / 60)}m
+                  </span>
+                ) : null,
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function TrainingLoadChart({ series }) {
@@ -198,6 +302,9 @@ export default function InsightsPage() {
       }));
   }, [activities.activities]);
 
+  const weeklyZones = useMemo(() => computeWeeklyHRZones(activities.activities), [activities.activities]);
+  const activityZones = useMemo(() => computeRecentActivityZones(activities.activities), [activities.activities]);
+
   const latestLoad = trainingLoadSeries.at(-1);
   const ctl = latestLoad?.ctl ?? 0;
   const fitnessScore = Math.max(0, Math.min(100, Math.round((ctl / 90) * 100)));
@@ -268,6 +375,23 @@ export default function InsightsPage() {
           <h4>Weekly load</h4>
           <p className="muted">Rolling 8-week view of accumulated training minutes.</p>
           <WeeklyLoadChart points={weeklyLoadPoints} />
+        </div>
+      )}
+
+      {(weeklyZones.length >= 1 || activityZones.length >= 1) && (
+        <div id="hr-zones-section">
+          <h4>Heart rate zone distribution</h4>
+          <p className="muted">Time spent in each training zone — use this to balance aerobic base (Z1–Z2) against intensity (Z3–Z5) week by week.</p>
+          {weeklyZones.length >= 2 && <HRZoneWeeklyChart weeks={weeklyZones} />}
+          {activityZones.length >= 1 && (
+            <>
+              <h4 style={{ marginTop: "24px" }}>Zone breakdown per workout</h4>
+              <p className="muted">Last {activityZones.length} activities with heart rate data.</p>
+              <div className="metric-card" style={{ marginTop: "12px" }}>
+                <HRZoneActivityBreakdown activityZones={activityZones} />
+              </div>
+            </>
+          )}
         </div>
       )}
 

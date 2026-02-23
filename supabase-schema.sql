@@ -181,3 +181,17 @@ create policy "Users can update own plan entries"
 create policy "Users can delete own plan entries"
   on weekly_plan_entries for delete
   using (auth.uid() = user_id);
+
+-- ============================================================
+-- Migration: Heart rate zone columns
+-- Run this block if upgrading an existing deployment that
+-- predates zone tracking (safe to run on a fresh schema too).
+-- ============================================================
+
+alter table activities
+  add column if not exists heart_rate_zone_times jsonb,
+  add column if not exists hr_zone_1_seconds integer,
+  add column if not exists hr_zone_2_seconds integer,
+  add column if not exists hr_zone_3_seconds integer,
+  add column if not exists hr_zone_4_seconds integer,
+  add column if not exists hr_zone_5_seconds integer;

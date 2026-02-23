@@ -583,6 +583,58 @@ select:focus-visible {
   gap: 16px;
 }
 
+.auth-google {
+  width: 100%;
+  border: 1px solid #dbe4f0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-bottom: 16px;
+}
+
+.auth-google:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.auth-google:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-divider {
+  position: relative;
+  text-align: center;
+  margin: 0 0 16px;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  border-top: 1px solid #e2e8f0;
+}
+
+.auth-divider span {
+  position: relative;
+  background: #fff;
+  padding: 0 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .auth-label {
   display: grid;
   gap: 6px;

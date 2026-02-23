@@ -33,7 +33,7 @@ function Shell() {
       try {
         await Promise.all([
           plans.loadPlans(),
-          activities.loadActivities({ limit: 20, ascending: false }),
+          activities.loadActivities({ limit: 200, ascending: false }),
           checkins.loadCheckins(),
         ]);
       } catch (loadError) {

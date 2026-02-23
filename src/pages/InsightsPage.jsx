@@ -6,6 +6,23 @@ function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function SkeletonBlock({ height = 240 }) {
+  return <div className="skeleton-block" style={{ height }} aria-hidden="true" />;
+}
+
+function KpiCard({ label, value, delta, deltaDir, note }) {
+  return (
+    <div className="kpi-card">
+      <p className="kpi-card__label">{label}</p>
+      <p className="kpi-card__value">{value}</p>
+      {delta != null && (
+        <p className={`kpi-card__delta kpi-card__delta--${deltaDir ?? "neutral"}`}>{delta}</p>
+      )}
+      {note && <p className="kpi-card__note">{note}</p>}
+    </div>
+  );
+}
+
 const ZONE_COLORS = ["#94a3b8", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
 const ZONE_LABELS = ["Z1 Recovery", "Z2 Aerobic", "Z3 Tempo", "Z4 Threshold", "Z5 VO\u2082max"];
 const ZONE_KEYS = ["z1", "z2", "z3", "z4", "z5"];
@@ -258,7 +275,7 @@ function LongRunChart({ points }) {
 }
 
 export default function InsightsPage() {
-  const { activities, checkins, plans } = useAppData();
+  const { activities, checkins, plans, strava } = useAppData();
 
   const trainingLoadSeries = useMemo(
     () =>
@@ -305,6 +322,74 @@ export default function InsightsPage() {
   const weeklyZones = useMemo(() => computeWeeklyHRZones(activities.activities), [activities.activities]);
   const activityZones = useMemo(() => computeRecentActivityZones(activities.activities), [activities.activities]);
 
+  const kpiData = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() + diffToMonday);
+    thisMonday.setHours(0, 0, 0, 0);
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+
+    let thisWeekDist = 0;
+    let lastWeekDist = 0;
+    const weeksWithRuns = new Set();
+
+    activities.activities.forEach((a) => {
+      const d = new Date(a.started_at);
+      const dist = Number(a.distance) || 0;
+      if (d >= thisMonday) thisWeekDist += dist;
+      else if (d >= lastMonday) lastWeekDist += dist;
+
+      const mondayOfWeek = new Date(d);
+      const diff = (d.getDay() === 0 ? -6 : 1) - d.getDay();
+      mondayOfWeek.setDate(d.getDate() + diff);
+      mondayOfWeek.setHours(0, 0, 0, 0);
+      const wk = mondayOfWeek.toISOString().split("T")[0];
+      weeksWithRuns.add(wk);
+    });
+
+    const thisWeekKm = (thisWeekDist / 1000).toFixed(1);
+    const distDeltaKm = ((thisWeekDist - lastWeekDist) / 1000).toFixed(1);
+    const distDir = thisWeekDist > lastWeekDist ? "up" : thisWeekDist < lastWeekDist ? "down" : "neutral";
+    const distDelta = distDir === "neutral" ? "Same as last week" : `${distDir === "up" ? "+" : ""}${distDeltaKm} km vs last week`;
+
+    const last8Mondays = Array.from({ length: 8 }, (_, i) => {
+      const m = new Date(thisMonday);
+      m.setDate(thisMonday.getDate() - i * 7);
+      return m.toISOString().split("T")[0];
+    });
+    const weeksRun = last8Mondays.filter((w) => weeksWithRuns.has(w)).length;
+    const consistencyFrac = `${weeksRun}/8 wks`;
+
+    const latestTL = trainingLoadSeries.at(-1);
+    const ctl4wAgo = trainingLoadSeries.length >= 28 ? trainingLoadSeries[trainingLoadSeries.length - 28] : null;
+    const ctlValue = Math.round(latestTL?.ctl ?? 0);
+    const ctlDelta = ctl4wAgo ? Math.round((latestTL.ctl - ctl4wAgo.ctl) * 10) / 10 : null;
+    const ctlDir = ctlDelta == null ? "neutral" : ctlDelta > 0 ? "up" : ctlDelta < 0 ? "down" : "neutral";
+    const ctlDeltaStr = ctlDelta == null ? null : `${ctlDelta > 0 ? "+" : ""}${ctlDelta} vs 4 weeks ago`;
+
+    const tsb = latestTL?.tsb;
+    const readiness = tsb == null ? "—" : tsb > 5 ? "Fresh" : tsb > -5 ? "Neutral" : "Fatigued";
+    const tsbStr = tsb == null ? null : `TSB ${tsb > 0 ? "+" : ""}${tsb.toFixed(1)}`;
+    const readinessDir = tsb == null ? "neutral" : tsb > 5 ? "up" : tsb > -5 ? "neutral" : "down";
+
+    return {
+      thisWeekKm,
+      distDelta,
+      distDir,
+      ctlValue,
+      ctlDeltaStr,
+      ctlDir,
+      consistencyFrac,
+      weeksRun,
+      readiness,
+      tsbStr,
+      readinessDir,
+    };
+  }, [activities.activities, trainingLoadSeries]);
+
   const latestLoad = trainingLoadSeries.at(-1);
   const ctl = latestLoad?.ctl ?? 0;
   const fitnessScore = Math.max(0, Math.min(100, Math.round((ctl / 90) * 100)));
@@ -338,6 +423,9 @@ export default function InsightsPage() {
     return "Low";
   }, [trainingLoadSeries]);
 
+  const hasData = activities.activities.length > 0;
+  const isLoading = activities.loading;
+
   return (
     <section id="insights" className="page">
       <div className="page-header">
@@ -345,106 +433,153 @@ export default function InsightsPage() {
         <p>Understand readiness, spot risk early, and see the impact of your consistency.</p>
       </div>
 
-      <div className="insight-cards">
-        <div className="insight">
-          <span className="pill">Training load</span>
-          <h4>Acute vs chronic balance</h4>
-          <p>Visualize fatigue and form trends so you can confidently push or recover.</p>
-        </div>
-        <div className="insight">
-          <span className="pill">Performance</span>
-          <h4>Race readiness forecast</h4>
-          <p>Track long-run durability, vertical progression, and race-specific confidence signals.</p>
-        </div>
-        <div className="insight">
-          <span className="pill">Risk</span>
-          <h4>Overtraining alerts</h4>
-          <p>Detect sudden spikes and missed recovery before they derail the block.</p>
-        </div>
+      {/* KPI strip */}
+      <div className="kpi-strip">
+        {isLoading ? (
+          <>
+            <SkeletonBlock height={88} />
+            <SkeletonBlock height={88} />
+            <SkeletonBlock height={88} />
+            <SkeletonBlock height={88} />
+          </>
+        ) : hasData ? (
+          <>
+            <KpiCard
+              label="This week"
+              value={`${kpiData.thisWeekKm} km`}
+              delta={kpiData.distDelta}
+              deltaDir={kpiData.distDir}
+            />
+            <KpiCard
+              label="Training load"
+              value={String(kpiData.ctlValue)}
+              delta={kpiData.ctlDeltaStr}
+              deltaDir={kpiData.ctlDir}
+              note="Chronic load (CTL)"
+            />
+            <KpiCard
+              label="Consistency"
+              value={kpiData.consistencyFrac}
+              note="Weeks with runs (last 8)"
+            />
+            <KpiCard
+              label="Readiness"
+              value={kpiData.readiness}
+              delta={kpiData.tsbStr}
+              deltaDir={kpiData.readinessDir}
+            />
+          </>
+        ) : null}
       </div>
 
-      {trainingLoadSeries.length >= 7 && (
-        <div id="training-load-section">
-          <h4>Training load trend</h4>
-          <TrainingLoadChart series={trainingLoadSeries} />
-        </div>
-      )}
-
-      {weeklyLoadPoints.length >= 3 && (
-        <div id="weekly-load-section">
-          <h4>Weekly load</h4>
-          <p className="muted">Rolling 8-week view of accumulated training minutes.</p>
-          <WeeklyLoadChart points={weeklyLoadPoints} />
-        </div>
-      )}
-
-      {(weeklyZones.length >= 1 || activityZones.length >= 1) && (
-        <div id="hr-zones-section">
-          <h4>Heart rate zone distribution</h4>
-          <p className="muted">Time spent in each training zone — use this to balance aerobic base (Z1–Z2) against intensity (Z3–Z5) week by week.</p>
-          {weeklyZones.length >= 2 && <HRZoneWeeklyChart weeks={weeklyZones} />}
-          {activityZones.length >= 1 && (
-            <>
-              <h4 style={{ marginTop: "24px" }}>Zone breakdown per workout</h4>
-              <p className="muted">Last {activityZones.length} activities with heart rate data.</p>
-              <div className="metric-card" style={{ marginTop: "12px" }}>
-                <HRZoneActivityBreakdown activityZones={activityZones} />
-              </div>
-            </>
+      {/* Empty state */}
+      {!isLoading && !hasData && (
+        <div className="empty-state">
+          <p className="empty-state__title">No training data yet</p>
+          <p className="empty-state__body">
+            Connect Strava and sync your activities to unlock training load charts, zone analysis, and readiness tracking.
+          </p>
+          {strava.startConnect && (
+            <button type="button" className="btn btn--primary" onClick={strava.startConnect} style={{ marginTop: "16px" }}>
+              Connect Strava
+            </button>
           )}
         </div>
       )}
 
-      <div id="fitness-level-section" className="metric-card">
-        <h4>Fitness level</h4>
-        <p className="muted">Calculated from current chronic load (CTL).</p>
-        <div className="fitness-meter" role="img" aria-label={`Fitness level ${fitnessScore} out of 100`}>
-          <div className="fitness-meter__fill" style={{ width: `${fitnessScore}%` }} />
-        </div>
-        <div className="metric-row">
-          <span>Level: {fitnessLevel}</span>
-          <strong>{fitnessScore}/100</strong>
-        </div>
-      </div>
+      {/* Chart sections — skeleton while loading, hidden when empty */}
+      {isLoading ? (
+        <>
+          <SkeletonBlock height={290} />
+          <SkeletonBlock height={270} />
+          <SkeletonBlock height={280} />
+        </>
+      ) : hasData ? (
+        <>
+          {trainingLoadSeries.length >= 7 && (
+            <div id="training-load-section">
+              <h4>Training load trend</h4>
+              <TrainingLoadChart series={trainingLoadSeries} />
+            </div>
+          )}
 
-      {longRunPoints.length >= 2 && (
-        <div id="long-run-section">
-          <h4>Long run progression</h4>
-          <div className="metric-row">
-            <span>
-              Long run progress: <strong>{latestLongRunKm.toFixed(1)} km</strong> / {targetLongRunKm} km target
-            </span>
-            <strong>{longRunCompletion}%</strong>
-          </div>
-          <div className="fitness-meter" role="img" aria-label={`Long run progress ${longRunCompletion} percent`}>
-            <div className="fitness-meter__fill fitness-meter__fill--longrun" style={{ width: `${longRunCompletion}%` }} />
-          </div>
-          <LongRunChart points={longRunPoints} />
-        </div>
-      )}
+          {weeklyLoadPoints.length >= 3 && (
+            <div id="weekly-load-section">
+              <h4>Weekly load</h4>
+              <p className="muted">Rolling 8-week view of accumulated training minutes.</p>
+              <WeeklyLoadChart points={weeklyLoadPoints} />
+            </div>
+          )}
 
-      <div className="insight-summary" id="insight-summary">
-        <div>
-          <h4>Latest check-in</h4>
-          <p className="muted" id="latest-checkin-text">
-            {latestText}
-          </p>
-        </div>
-        <div className="stats" id="insight-stats">
-          <div>
-            <span className="label">Form trend</span>
-            <strong id="stat-form">{formStat == null ? "—" : `${formStat > 0 ? "+" : ""}${formStat.toFixed(1)}`}</strong>
+          {(weeklyZones.length >= 1 || activityZones.length >= 1) && (
+            <div id="hr-zones-section">
+              <h4>Heart rate zone distribution</h4>
+              <p className="muted">Time spent in each training zone — use this to balance aerobic base (Z1–Z2) against intensity (Z3–Z5) week by week.</p>
+              {weeklyZones.length >= 2 && <HRZoneWeeklyChart weeks={weeklyZones} />}
+              {activityZones.length >= 1 && (
+                <>
+                  <h4 style={{ marginTop: "24px" }}>Zone breakdown per workout</h4>
+                  <p className="muted">Last {activityZones.length} activities with heart rate data.</p>
+                  <div className="metric-card" style={{ marginTop: "12px" }}>
+                    <HRZoneActivityBreakdown activityZones={activityZones} />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div id="fitness-level-section" className="metric-card">
+            <h4>Fitness level</h4>
+            <p className="muted">Calculated from current chronic load (CTL).</p>
+            <div className="fitness-meter" role="img" aria-label={`Fitness level ${fitnessScore} out of 100`}>
+              <div className="fitness-meter__fill" style={{ width: `${fitnessScore}%` }} />
+            </div>
+            <div className="metric-row">
+              <span>Level: {fitnessLevel}</span>
+              <strong>{fitnessScore}/100</strong>
+            </div>
           </div>
-          <div>
-            <span className="label">Readiness</span>
-            <strong id="stat-readiness">{readiness}</strong>
+
+          {longRunPoints.length >= 2 && (
+            <div id="long-run-section">
+              <h4>Long run progression</h4>
+              <div className="metric-row">
+                <span>
+                  Long run progress: <strong>{latestLongRunKm.toFixed(1)} km</strong> / {targetLongRunKm} km target
+                </span>
+                <strong>{longRunCompletion}%</strong>
+              </div>
+              <div className="fitness-meter" role="img" aria-label={`Long run progress ${longRunCompletion} percent`}>
+                <div className="fitness-meter__fill fitness-meter__fill--longrun" style={{ width: `${longRunCompletion}%` }} />
+              </div>
+              <LongRunChart points={longRunPoints} />
+            </div>
+          )}
+
+          <div className="insight-summary" id="insight-summary">
+            <div>
+              <h4>Latest check-in</h4>
+              <p className="muted" id="latest-checkin-text">
+                {latestText}
+              </p>
+            </div>
+            <div className="stats" id="insight-stats">
+              <div>
+                <span className="label">Form trend</span>
+                <strong id="stat-form">{formStat == null ? "—" : `${formStat > 0 ? "+" : ""}${formStat.toFixed(1)}`}</strong>
+              </div>
+              <div>
+                <span className="label">Readiness</span>
+                <strong id="stat-readiness">{readiness}</strong>
+              </div>
+              <div>
+                <span className="label">Risk score</span>
+                <strong id="stat-risk">{risk}</strong>
+              </div>
+            </div>
           </div>
-          <div>
-            <span className="label">Risk score</span>
-            <strong id="stat-risk">{risk}</strong>
-          </div>
-        </div>
-      </div>
+        </>
+      ) : null}
     </section>
   );
 }

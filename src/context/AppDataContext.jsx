@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useActivities } from "../hooks/useActivities";
 import { useCheckins } from "../hooks/useCheckins";
+import { useDailyLogs } from "../hooks/useDailyLogs";
 import { usePlans } from "../hooks/usePlans";
 import { useStrava } from "../hooks/useStrava";
 import { useTrainingBlocks } from "../hooks/useTrainingBlocks";
@@ -15,6 +16,7 @@ export function AppDataProvider({ children }) {
   const plans = usePlans(userId);
   const activities = useActivities(userId);
   const checkins = useCheckins(userId);
+  const dailyLogs = useDailyLogs(userId);
   const strava = useStrava(userId, auth.session, async () => {
     await activities.loadActivities({ limit: 20, ascending: false });
   });
@@ -27,11 +29,12 @@ export function AppDataProvider({ children }) {
       plans,
       activities,
       checkins,
+      dailyLogs,
       strava,
       trainingBlocks,
       workoutEntries,
     }),
-    [auth, plans, activities, checkins, strava, trainingBlocks, workoutEntries],
+    [auth, plans, activities, checkins, dailyLogs, strava, trainingBlocks, workoutEntries],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

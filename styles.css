@@ -1689,6 +1689,104 @@ h2 {
   font-weight: 600;
 }
 
+/* KPI strip */
+
+.kpi-strip {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.kpi-card {
+  flex: 1;
+  min-width: 140px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.kpi-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.kpi-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+  line-height: 1.1;
+}
+
+.kpi-card__delta {
+  font-size: 12px;
+  margin: 0;
+}
+
+.kpi-card__delta--up {
+  color: #16a34a;
+}
+
+.kpi-card__delta--down {
+  color: #ef4444;
+}
+
+.kpi-card__delta--neutral {
+  color: var(--muted);
+}
+
+.kpi-card__note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+/* Skeleton loader */
+
+.skeleton-block {
+  flex: 1;
+  width: 100%;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--border) 25%, var(--card) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Empty state */
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.empty-state__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.empty-state__body {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 auto;
+  max-width: 400px;
+}
+
 /* Check-in form */
 
 #checkin-section {

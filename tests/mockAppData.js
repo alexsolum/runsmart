@@ -89,6 +89,54 @@ export const SAMPLE_BLOCKS = [
   },
 ];
 
+export const SAMPLE_DAILY_LOGS = [
+  {
+    id: "log-1",
+    user_id: "user-1",
+    log_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    training_quality: 4,
+    workout_notes: "12km easy run",
+    sleep_hours: 7.5,
+    sleep_quality: 4,
+    resting_hr: 52,
+    fatigue: 2,
+    mood: 4,
+    stress: 2,
+    alcohol_units: 0,
+    notes: "Feeling good",
+  },
+  {
+    id: "log-2",
+    user_id: "user-1",
+    log_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    training_quality: 3,
+    workout_notes: "Tempo intervals",
+    sleep_hours: 6.5,
+    sleep_quality: 3,
+    resting_hr: 55,
+    fatigue: 3,
+    mood: 3,
+    stress: 3,
+    alcohol_units: 0,
+    notes: null,
+  },
+  {
+    id: "log-3",
+    user_id: "user-1",
+    log_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    training_quality: null,
+    workout_notes: null,
+    sleep_hours: 8,
+    sleep_quality: 5,
+    resting_hr: 50,
+    fatigue: 1,
+    mood: 5,
+    stress: 1,
+    alcohol_units: 0,
+    notes: "Rest day",
+  },
+];
+
 export const SAMPLE_WORKOUT_ENTRIES = [
   {
     id: "we-1",

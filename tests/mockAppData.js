@@ -124,6 +124,13 @@ export function makeAppData(overrides = {}) {
       user: { id: "user-1", email: "athlete@example.com" },
       session: null,
     },
+    dailyLogs: {
+      logs: [],
+      loading: false,
+      error: null,
+      loadLogs: vi.fn().mockResolvedValue([]),
+      saveLog: vi.fn().mockResolvedValue({ id: "log-new", log_date: new Date().toISOString().split("T")[0] }),
+    },
     activities: {
       activities: SAMPLE_ACTIVITIES,
       loading: false,

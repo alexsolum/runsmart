@@ -6,10 +6,10 @@
 
   function getWeekStart(date) {
     var d = new Date(date);
-    var day = d.getDay();
-    var diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
+    var day = d.getUTCDay();
+    var diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+    d.setUTCDate(diff);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
   }
 

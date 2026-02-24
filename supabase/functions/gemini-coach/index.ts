@@ -78,11 +78,24 @@ interface Checkin {
   niggles: string | null;
 }
 
+interface DailyLog {
+  date: string;
+  sleep_hours: number | null;
+  sleep_quality: number | null;
+  fatigue: number | null;
+  mood: number | null;
+  stress: number | null;
+  training_quality: number | null;
+  resting_hr: number | null;
+  notes: string | null;
+}
+
 interface RequestBody {
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
   latestCheckin: Checkin | null;
   planContext: PlanContext | null;
+  dailyLogs: DailyLog[];
 }
 
 function buildPrompt(data: RequestBody): string {
@@ -132,6 +145,24 @@ function buildPrompt(data: RequestBody): string {
       `Latest check-in: fatigue ${c.fatigue}/5, sleep ${c.sleepQuality}/5, motivation ${c.motivation}/5` +
         (c.niggles ? `, niggles: ${c.niggles}` : ""),
     );
+    lines.push("");
+  }
+
+  // Daily wellness logs (last 7 days)
+  if (data.dailyLogs && data.dailyLogs.length > 0) {
+    lines.push("Daily wellness logs (last 7 days):");
+    data.dailyLogs.forEach((l) => {
+      const parts: string[] = [`- ${l.date}:`];
+      if (l.training_quality != null) parts.push(`training quality ${l.training_quality}/5`);
+      if (l.sleep_hours != null) parts.push(`sleep ${l.sleep_hours}h`);
+      if (l.sleep_quality != null) parts.push(`sleep quality ${l.sleep_quality}/5`);
+      if (l.fatigue != null) parts.push(`fatigue ${l.fatigue}/5`);
+      if (l.mood != null) parts.push(`mood ${l.mood}/5`);
+      if (l.stress != null) parts.push(`stress ${l.stress}/5`);
+      if (l.resting_hr != null) parts.push(`RHR ${l.resting_hr}bpm`);
+      if (l.notes) parts.push(`notes: "${l.notes}"`);
+      lines.push(parts.join(", "));
+    });
     lines.push("");
   }
 

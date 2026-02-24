@@ -279,13 +279,9 @@ a {
 /* ---- Pages ---- */
 
 .page {
-  display: none;
+  display: block;
   padding: 40px 48px;
   flex: 1;
-}
-
-.page.active {
-  display: block;
 }
 
 .page-header {

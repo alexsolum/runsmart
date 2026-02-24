@@ -39,7 +39,7 @@ export default function DataPage() {
   };
 
   return (
-    <section id="data" className="page active">
+    <section id="data" className="page">
       <div className="page-header">
         <h2>Reliable data ingestion</h2>
         <p>Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>

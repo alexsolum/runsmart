@@ -1383,3 +1383,240 @@ select:focus-visible {
 @media (max-width: 480px) {
   .wpp-day-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Coach page ── */
+
+.coach-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.coach-plan-banner {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.coach-plan-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.coach-plan-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.coach-plan-race,
+.coach-plan-phase,
+.coach-plan-target {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.coach-plan-date {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.coach-plan-divider {
+  width: 1px;
+  background: var(--color-border);
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.coach-no-plan {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: #78350f;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.coach-logs-summary {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.coach-logs-heading {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #166534;
+  white-space: nowrap;
+}
+
+.coach-logs-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.coach-log-metric {
+  font-size: 13px;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.coach-log-metric strong {
+  color: #14532d;
+}
+
+.coach-insights-section {
+  margin-top: 4px;
+}
+
+.coach-loading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  padding: 24px 20px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.coach-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: coach-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes coach-spin {
+  to { transform: rotate(360deg); }
+}
+
+.coach-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  padding: 20px;
+  color: #991b1b;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coach-error p { margin: 0; }
+
+.coach-empty {
+  background: #f8fafc;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.coach-empty p { margin: 0; }
+
+.coach-insights-heading {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.coach-insights-list {
+  display: grid;
+  gap: 12px;
+}
+
+.coach-insight-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 8px;
+  border-left-width: 4px;
+}
+
+.coach-insight-card.is-danger  { border-left-color: var(--color-danger);  background: #fff8f8; }
+.coach-insight-card.is-warning { border-left-color: var(--color-warning); background: #fffdf0; }
+.coach-insight-card.is-positive { border-left-color: var(--color-success); background: #f6fef9; }
+.coach-insight-card.is-info    { border-left-color: var(--color-primary); background: #f8faff; }
+
+.coach-insight-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.coach-insight-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.coach-insight-card.is-danger  .coach-insight-icon { color: var(--color-danger); }
+.coach-insight-card.is-warning .coach-insight-icon { color: var(--color-warning); }
+.coach-insight-card.is-positive .coach-insight-icon { color: var(--color-success); }
+.coach-insight-card.is-info    .coach-insight-icon { color: var(--color-primary); }
+
+.coach-insight-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.coach-insight-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #334155;
+  padding-left: 38px;
+}
+
+@media (max-width: 600px) {
+  .coach-plan-banner {
+    padding: 14px 16px;
+  }
+
+  .coach-plan-divider {
+    display: none;
+  }
+
+  .coach-insight-body {
+    padding-left: 0;
+  }
+}

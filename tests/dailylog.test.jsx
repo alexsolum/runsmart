@@ -2,216 +2,231 @@
  * Daily Log page tests
  *
  * Verifies:
- * - The form schema (date, form/feeling, workout, reflection fields)
- * - The save action creates an entry and shows it in the history table
- * - Previous log entries are listed
+ * - Page structure and form schema
+ * - Form fields: log_date, workout_notes, notes, rating inputs
+ * - Save calls dailyLogs.saveLog with the correct payload
+ * - Confirmation message shown after save
+ * - History list renders existing logs
+ * - Empty-state placeholder when no logs exist
  *
- * NOTE: The current implementation persists logs to localStorage.
- * The intended behaviour is to save to the Supabase `daily_logs` table.
- * Once that integration is added, these tests should be updated to mock
- * the Supabase client and assert that `insert()` is called with the correct
- * payload.
+ * DailyLogPage uses useAppData (Supabase-backed via useDailyLogs).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DailyLogPage from "../src/pages/DailyLogPage";
+import { makeAppData } from "./mockAppData";
 
-// DailyLogPage uses window.localStorage directly (no context needed)
-let localStorageStore = {};
+vi.mock("../src/context/AppDataContext", () => ({
+  useAppData: vi.fn(),
+}));
+
+import { useAppData } from "../src/context/AppDataContext";
 
 beforeEach(() => {
-  localStorageStore = {};
-  vi.stubGlobal("localStorage", {
-    getItem: (key) => localStorageStore[key] ?? null,
-    setItem: (key, value) => { localStorageStore[key] = value; },
-    removeItem: (key) => { delete localStorageStore[key]; },
-    clear: () => { localStorageStore = {}; },
-  });
+  vi.clearAllMocks();
+  useAppData.mockReturnValue(makeAppData());
 });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-describe("Daily Log — form schema", () => {
-  beforeEach(() => {
+describe("Daily Log — page structure", () => {
+  it("renders the Daily log heading", () => {
     render(<DailyLogPage />);
-  });
-
-  it("renders the page heading", () => {
     expect(screen.getByRole("heading", { name: /Daily log/i })).toBeInTheDocument();
   });
 
-  it("has a date input field", () => {
-    expect(document.querySelector('input[name="date"][type="date"]')).toBeInTheDocument();
-  });
-
-  it("has a 'Current form' select with Great/Good/Okay/Flat/Fatigued options", () => {
-    const formSelect = document.querySelector('select[name="form"]');
-    expect(formSelect).toBeInTheDocument();
-    const options = Array.from(formSelect.options).map((o) => o.value);
-    expect(options).toContain("great");
-    expect(options).toContain("good");
-    expect(options).toContain("okay");
-    expect(options).toContain("flat");
-    expect(options).toContain("fatigued");
-  });
-
-  it("has a 'Workout completed' text input", () => {
-    const workoutInput = document.querySelector('input[name="workout"]');
-    expect(workoutInput).toBeInTheDocument();
-  });
-
-  it("has a 'How did it go?' textarea", () => {
-    const reflectionArea = document.querySelector('textarea[name="reflection"]');
-    expect(reflectionArea).toBeInTheDocument();
-  });
-
-  it("has a Save button", () => {
-    expect(screen.getByRole("button", { name: /Save daily log/i })).toBeInTheDocument();
+  it("renders the Recent entries heading", () => {
+    render(<DailyLogPage />);
+    expect(screen.getByRole("heading", { name: /Recent entries/i })).toBeInTheDocument();
   });
 });
 
-describe("Daily Log — form validation", () => {
-  it("Save button is disabled when workout and reflection are empty", () => {
+describe("Daily Log — form schema", () => {
+  it("has a date input field named log_date", () => {
     render(<DailyLogPage />);
-    expect(screen.getByRole("button", { name: /Save daily log/i })).toBeDisabled();
+    expect(document.querySelector('input[name="log_date"][type="date"]')).toBeInTheDocument();
   });
 
-  it("Save button is disabled when only workout is filled", async () => {
-    const user = userEvent.setup();
+  it("has a workout_notes text input", () => {
     render(<DailyLogPage />);
-
-    await user.type(document.querySelector('input[name="workout"]'), "10km easy");
-    expect(screen.getByRole("button", { name: /Save daily log/i })).toBeDisabled();
+    expect(document.querySelector('input[name="workout_notes"]')).toBeInTheDocument();
   });
 
-  it("Save button becomes enabled when both workout and reflection are filled", async () => {
-    const user = userEvent.setup();
+  it("has a notes textarea", () => {
     render(<DailyLogPage />);
+    expect(document.querySelector('textarea[name="notes"]')).toBeInTheDocument();
+  });
 
-    await user.type(document.querySelector('input[name="workout"]'), "10km easy");
-    await user.type(document.querySelector('textarea[name="reflection"]'), "Felt good");
-    expect(screen.getByRole("button", { name: /Save daily log/i })).toBeEnabled();
+  it("has a sleep_hours number input", () => {
+    render(<DailyLogPage />);
+    expect(document.querySelector('input[name="sleep_hours"]')).toBeInTheDocument();
+  });
+
+  it("has a resting_hr number input", () => {
+    render(<DailyLogPage />);
+    expect(document.querySelector('input[name="resting_hr"]')).toBeInTheDocument();
+  });
+
+  it("has rating groups for training quality, sleep quality, fatigue, mood, and stress", () => {
+    render(<DailyLogPage />);
+    const ratingGroups = document.querySelectorAll(".rating-group");
+    expect(ratingGroups.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("has a Save log button", () => {
+    render(<DailyLogPage />);
+    expect(screen.getByRole("button", { name: /Save log/i })).toBeInTheDocument();
   });
 });
 
 describe("Daily Log — saving an entry", () => {
-  it("adds entry to the history list after form submission", async () => {
+  it("calls saveLog when the form is submitted", async () => {
+    const saveLog = vi.fn().mockResolvedValue({ id: "log-1", log_date: "2026-02-24" });
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: {
+        logs: [],
+        loading: false,
+        error: null,
+        loadLogs: vi.fn().mockResolvedValue([]),
+        saveLog,
+      },
+    }));
+
     const user = userEvent.setup();
     render(<DailyLogPage />);
 
-    await user.type(document.querySelector('input[name="workout"]'), "Easy 10km");
-    await user.type(document.querySelector('textarea[name="reflection"]'), "Legs felt fresh");
-    await user.click(screen.getByRole("button", { name: /Save daily log/i }));
+    await user.type(document.querySelector('input[name="workout_notes"]'), "10km easy");
+    await user.click(screen.getByRole("button", { name: /Save log/i }));
 
-    const history = screen.getByRole("region", { name: /Recent daily logs/i });
-    expect(within(history).getByText("Easy 10km")).toBeInTheDocument();
-    expect(within(history).getByText("Legs felt fresh")).toBeInTheDocument();
+    expect(saveLog).toHaveBeenCalledWith(
+      expect.objectContaining({ workout_notes: "10km easy" }),
+    );
   });
 
-  it("shows 'Daily log saved.' confirmation message after save", async () => {
+  it("shows 'Log saved.' confirmation after successful save", async () => {
+    const saveLog = vi.fn().mockResolvedValue({ id: "log-1", log_date: "2026-02-24" });
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: {
+        logs: [],
+        loading: false,
+        error: null,
+        loadLogs: vi.fn().mockResolvedValue([]),
+        saveLog,
+      },
+    }));
+
     const user = userEvent.setup();
     render(<DailyLogPage />);
 
-    await user.type(document.querySelector('input[name="workout"]'), "Tempo run");
-    await user.type(document.querySelector('textarea[name="reflection"]'), "Hard but controlled");
-    await user.click(screen.getByRole("button", { name: /Save daily log/i }));
+    await user.click(screen.getByRole("button", { name: /Save log/i }));
 
-    expect(screen.getByRole("status")).toHaveTextContent("Daily log saved.");
+    expect(screen.getByRole("status")).toHaveTextContent("Log saved.");
   });
 
-  it("clears workout and reflection fields after save", async () => {
+  it("shows error message when saveLog throws", async () => {
+    const saveLog = vi.fn().mockRejectedValue(new Error("DB error"));
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: {
+        logs: [],
+        loading: false,
+        error: null,
+        loadLogs: vi.fn().mockResolvedValue([]),
+        saveLog,
+      },
+    }));
+
     const user = userEvent.setup();
     render(<DailyLogPage />);
 
-    const workoutInput = document.querySelector('input[name="workout"]');
-    const reflectionArea = document.querySelector('textarea[name="reflection"]');
+    await user.click(screen.getByRole("button", { name: /Save log/i }));
 
-    await user.type(workoutInput, "Long run 22km");
-    await user.type(reflectionArea, "Solid effort");
-    await user.click(screen.getByRole("button", { name: /Save daily log/i }));
-
-    expect(workoutInput.value).toBe("");
-    expect(reflectionArea.value).toBe("");
+    expect(screen.getByRole("status")).toHaveTextContent(/Error/i);
   });
 
-  it("persists entry to localStorage", async () => {
+  it("includes log_date in the save payload", async () => {
+    const saveLog = vi.fn().mockResolvedValue({});
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: { logs: [], loading: false, error: null, loadLogs: vi.fn().mockResolvedValue([]), saveLog },
+    }));
+
     const user = userEvent.setup();
     render(<DailyLogPage />);
 
-    await user.type(document.querySelector('input[name="workout"]'), "Recovery jog");
-    await user.type(document.querySelector('textarea[name="reflection"]'), "Easy pace, just moving");
-    await user.click(screen.getByRole("button", { name: /Save daily log/i }));
+    await user.click(screen.getByRole("button", { name: /Save log/i }));
 
-    const stored = JSON.parse(localStorageStore["runsmart.dailyLogs"] ?? "[]");
-    expect(stored.length).toBe(1);
-    expect(stored[0].workout).toBe("Recovery jog");
-    expect(stored[0].reflection).toBe("Easy pace, just moving");
-  });
-
-  it("shows the form label (e.g. 'good') on the saved entry card", async () => {
-    const user = userEvent.setup();
-    render(<DailyLogPage />);
-
-    // Default form value is "good"
-    await user.type(document.querySelector('input[name="workout"]'), "Track session");
-    await user.type(document.querySelector('textarea[name="reflection"]'), "Nailed the intervals");
-    await user.click(screen.getByRole("button", { name: /Save daily log/i }));
-
-    const history = screen.getByRole("region", { name: /Recent daily logs/i });
-    expect(within(history).getByText("good")).toBeInTheDocument();
+    expect(saveLog).toHaveBeenCalledWith(
+      expect.objectContaining({ log_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
+    );
   });
 });
 
-describe("Daily Log — history table", () => {
-  it("shows 'No entries yet' placeholder when there are no logs", () => {
+describe("Daily Log — history list", () => {
+  it("shows 'No entries yet' when there are no logs", () => {
     render(<DailyLogPage />);
     expect(screen.getByText(/No entries yet/i)).toBeInTheDocument();
   });
 
-  it("loads and displays previously saved entries from localStorage on mount", () => {
-    const existingLogs = [
+  it("displays existing log entries", () => {
+    const logs = [
       {
-        id: "log-old-1",
-        date: "2026-02-20",
-        form: "flat",
-        workout: "Hilly 8km",
-        reflection: "Quads were sore",
-        createdAt: new Date().toISOString(),
+        id: "log-1",
+        log_date: "2026-02-20",
+        training_quality: 4,
+        workout_notes: "Hilly 8km",
+        sleep_hours: 7.5,
+        sleep_quality: 4,
+        fatigue: 2,
+        mood: 4,
+        stress: 2,
+        alcohol_units: 0,
+        notes: "Felt strong",
       },
     ];
-    localStorageStore["runsmart.dailyLogs"] = JSON.stringify(existingLogs);
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: { logs, loading: false, error: null, loadLogs: vi.fn().mockResolvedValue([]), saveLog: vi.fn().mockResolvedValue({}) },
+    }));
 
     render(<DailyLogPage />);
     expect(screen.getByText("Hilly 8km")).toBeInTheDocument();
-    expect(screen.getByText("Quads were sore")).toBeInTheDocument();
-    expect(screen.getByText("flat")).toBeInTheDocument();
   });
 
-  it("keeps only the 14 most recent entries", async () => {
-    // Pre-fill 14 entries
-    const oldLogs = Array.from({ length: 14 }, (_, i) => ({
-      id: `log-${i}`,
-      date: "2026-01-01",
-      form: "good",
-      workout: `Workout ${i}`,
-      reflection: `Reflection ${i}`,
-      createdAt: new Date().toISOString(),
-    }));
-    localStorageStore["runsmart.dailyLogs"] = JSON.stringify(oldLogs);
-
-    const user = userEvent.setup();
+  it("shows the 'Recent daily logs' region", () => {
     render(<DailyLogPage />);
+    expect(screen.getByRole("region", { name: /Recent daily logs/i })).toBeInTheDocument();
+  });
 
-    // Add one more entry — should push the oldest out
-    await user.type(document.querySelector('input[name="workout"]'), "New entry");
-    await user.type(document.querySelector('textarea[name="reflection"]'), "Fresh legs");
-    await user.click(screen.getByRole("button", { name: /Save daily log/i }));
+  it("shows loading state while logs are fetching", () => {
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: { logs: [], loading: true, error: null, loadLogs: vi.fn().mockResolvedValue([]), saveLog: vi.fn().mockResolvedValue({}) },
+    }));
+    render(<DailyLogPage />);
+    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+  });
+});
 
-    const stored = JSON.parse(localStorageStore["runsmart.dailyLogs"] ?? "[]");
-    expect(stored.length).toBe(14);
-    expect(stored[0].workout).toBe("New entry");
+describe("Daily Log — edit mode", () => {
+  it("shows 'Edit entry' heading when a log already exists for the selected date", () => {
+    const today = new Date().toISOString().split("T")[0];
+    const logs = [
+      { id: "log-1", log_date: today, workout_notes: "Easy jog", training_quality: 3 },
+    ];
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: { logs, loading: false, error: null, loadLogs: vi.fn().mockResolvedValue([]), saveLog: vi.fn().mockResolvedValue({}) },
+    }));
+
+    render(<DailyLogPage />);
+    expect(screen.getByRole("heading", { name: /Edit entry/i })).toBeInTheDocument();
+  });
+
+  it("shows 'Update log' button when editing an existing entry", () => {
+    const today = new Date().toISOString().split("T")[0];
+    const logs = [
+      { id: "log-1", log_date: today, workout_notes: "Easy jog" },
+    ];
+    useAppData.mockReturnValue(makeAppData({
+      dailyLogs: { logs, loading: false, error: null, loadLogs: vi.fn().mockResolvedValue([]), saveLog: vi.fn().mockResolvedValue({}) },
+    }));
+
+    render(<DailyLogPage />);
+    expect(screen.getByRole("button", { name: /Update log/i })).toBeInTheDocument();
   });
 });

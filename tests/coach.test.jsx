@@ -5,11 +5,13 @@
  * - Page header and heading render
  * - Plan context banner shows goal race, phase, and target volume
  * - "No plan" message shown when no training plan exists
- * - Loading state while fetching AI insights
+ * - Loading state while fetching AI insights (triggered by button click)
  * - Insight cards rendered after successful Gemini response
  * - Error message shown when the edge function fails
  * - Daily log wellness summary visible when logs exist
- * - Refresh button re-triggers the fetch
+ * - Refresh button triggers the fetch (no auto-fetch on mount)
+ * - Cached insights restored from sessionStorage on revisit
+ * - Runner profile section renders and is included in the payload
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -86,10 +88,12 @@ function makeCoachAppData(overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
+  localStorage.clear();
 });
 
 describe("Coach page — structure", () => {
-  it("renders the AI Coach heading", async () => {
+  it("renders the AI Coach heading", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
@@ -98,21 +102,27 @@ describe("Coach page — structure", () => {
     expect(screen.getByRole("heading", { name: /AI Coach/i })).toBeInTheDocument();
   });
 
-  it("renders a Refresh coaching button", async () => {
+  it("renders a Refresh coaching button immediately (no auto-fetch)", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
     render(<CoachPage />);
 
-    // Button label changes to "Analyzing…" during auto-fetch; wait for it to return
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Refresh coaching/i })).toBeInTheDocument();
-    });
+    expect(screen.getByRole("button", { name: /Refresh coaching/i })).toBeInTheDocument();
+  });
+
+  it("shows empty-state prompt before any fetch", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    expect(screen.getByText(/Refresh coaching/i, { selector: "strong" })).toBeInTheDocument();
   });
 });
 
 describe("Coach page — plan context banner", () => {
-  it("shows the goal race name from the active plan", async () => {
+  it("shows the goal race name from the active plan", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
@@ -121,7 +131,7 @@ describe("Coach page — plan context banner", () => {
     expect(screen.getByText(SAMPLE_PLAN.race)).toBeInTheDocument();
   });
 
-  it("shows the race date", async () => {
+  it("shows the race date", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
@@ -130,7 +140,7 @@ describe("Coach page — plan context banner", () => {
     expect(screen.getByText(SAMPLE_PLAN.race_date)).toBeInTheDocument();
   });
 
-  it("shows the current phase from training blocks", async () => {
+  it("shows the current phase from training blocks", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
@@ -140,7 +150,7 @@ describe("Coach page — plan context banner", () => {
     expect(screen.getByText("Build")).toBeInTheDocument();
   });
 
-  it("shows target volume from the active block", async () => {
+  it("shows target volume from the active block", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
@@ -202,7 +212,10 @@ describe("Coach page — loading state", () => {
     getSupabaseClient.mockReturnValue(makeMockClient({ invokePending: true }));
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Analyzing your training data/i)).toBeInTheDocument();
@@ -213,7 +226,10 @@ describe("Coach page — loading state", () => {
     getSupabaseClient.mockReturnValue(makeMockClient({ invokePending: true }));
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       const btn = screen.getByRole("button", { name: /Analyzing/i });
@@ -223,11 +239,14 @@ describe("Coach page — loading state", () => {
 });
 
 describe("Coach page — insight cards", () => {
-  it("renders insight card titles after successful fetch", async () => {
+  it("renders insight card titles after clicking Refresh", async () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByText(SAMPLE_INSIGHTS[0].title)).toBeInTheDocument();
@@ -240,7 +259,10 @@ describe("Coach page — insight cards", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByText(SAMPLE_INSIGHTS[0].body)).toBeInTheDocument();
@@ -251,7 +273,10 @@ describe("Coach page — insight cards", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       const cards = document.querySelectorAll(".coach-insight-card");
@@ -263,7 +288,10 @@ describe("Coach page — insight cards", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(document.querySelector(".coach-insight-card.is-positive")).toBeInTheDocument();
@@ -275,7 +303,10 @@ describe("Coach page — insight cards", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: /Coaching insights/i })).toBeInTheDocument();
@@ -290,7 +321,10 @@ describe("Coach page — error state", () => {
     );
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
@@ -303,7 +337,10 @@ describe("Coach page — error state", () => {
     );
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Try again/i })).toBeInTheDocument();
@@ -314,7 +351,10 @@ describe("Coach page — error state", () => {
     getSupabaseClient.mockReturnValue(null);
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
@@ -330,7 +370,7 @@ describe("Coach page — daily log wellness summary", () => {
 
     render(<CoachPage />);
 
-    expect(screen.getByText(/This week's wellness/i)).toBeInTheDocument();
+    expect(screen.getByText(/Last 7 days/i)).toBeInTheDocument();
   });
 
   it("shows log count in wellness summary", () => {
@@ -339,7 +379,6 @@ describe("Coach page — daily log wellness summary", () => {
 
     render(<CoachPage />);
 
-    // The count and label are split across elements; check the container text
     // SAMPLE_DAILY_LOGS has 3 logs all within the last 7 days
     const summary = document.querySelector(".coach-logs-summary");
     expect(summary).toBeInTheDocument();
@@ -363,12 +402,12 @@ describe("Coach page — daily log wellness summary", () => {
 
     render(<CoachPage />);
 
-    expect(screen.queryByText(/This week's wellness/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Last 7 days/i)).not.toBeInTheDocument();
   });
 });
 
 describe("Coach page — refresh button", () => {
-  it("calls the edge function again when Refresh is clicked", async () => {
+  it("calls the edge function once when Refresh is clicked", async () => {
     const mockClient = makeMockClient();
     getSupabaseClient.mockReturnValue(mockClient);
     useAppData.mockReturnValue(makeCoachAppData());
@@ -376,16 +415,129 @@ describe("Coach page — refresh button", () => {
     const user = userEvent.setup();
     render(<CoachPage />);
 
-    // Wait for auto-fetch to complete
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+
     await waitFor(() => {
       expect(screen.getByText(SAMPLE_INSIGHTS[0].title)).toBeInTheDocument();
     });
 
-    // Click refresh
+    expect(mockClient.functions.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls the edge function a second time when Refresh is clicked again", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+    await waitFor(() => {
+      expect(screen.getByText(SAMPLE_INSIGHTS[0].title)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
+describe("Coach page — sessionStorage caching", () => {
+  it("restores cached insights on mount without fetching", () => {
+    sessionStorage.setItem("runsmart-coach-insights", JSON.stringify(SAMPLE_INSIGHTS));
+
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    expect(screen.getByText(SAMPLE_INSIGHTS[0].title)).toBeInTheDocument();
+    expect(mockClient.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not show insights on first visit before clicking Refresh", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    expect(screen.queryByText(SAMPLE_INSIGHTS[0].title)).not.toBeInTheDocument();
+    expect(document.querySelector(".coach-insights-heading")).not.toBeInTheDocument();
+  });
+});
+
+describe("Coach page — runner profile", () => {
+  it("renders the About you section", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    expect(screen.getByText(/About you/i)).toBeInTheDocument();
+  });
+
+  it("renders background and goal textareas", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    expect(screen.getByLabelText(/Running background/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Goal for this plan/i)).toBeInTheDocument();
+  });
+
+  it("sends runnerProfile in the payload when profile fields are filled", async () => {
+    localStorage.setItem(
+      "runsmart-runner-profile",
+      JSON.stringify({ background: "Trail runner, 3 years", goal: "Sub-12h 100K" }),
+    );
+
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
     await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
-    // invoke should have been called twice (auto-fetch + manual)
-    expect(mockClient.functions.invoke).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            runnerProfile: expect.objectContaining({
+              background: "Trail runner, 3 years",
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
+  it("sends null runnerProfile when no profile is set", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            runnerProfile: null,
+          }),
+        }),
+      );
+    });
   });
 });
 
@@ -395,7 +547,10 @@ describe("Coach page — edge function payload", () => {
     getSupabaseClient.mockReturnValue(mockClient);
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(mockClient.functions.invoke).toHaveBeenCalledWith(
@@ -414,7 +569,10 @@ describe("Coach page — edge function payload", () => {
     getSupabaseClient.mockReturnValue(mockClient);
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(mockClient.functions.invoke).toHaveBeenCalledWith(
@@ -435,7 +593,10 @@ describe("Coach page — edge function payload", () => {
     getSupabaseClient.mockReturnValue(mockClient);
     useAppData.mockReturnValue(makeCoachAppData());
 
+    const user = userEvent.setup();
     render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
 
     await waitFor(() => {
       expect(mockClient.functions.invoke).toHaveBeenCalledWith(

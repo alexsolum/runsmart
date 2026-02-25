@@ -1,6 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { getSupabaseClient } from "../lib/supabaseClient";
+
+// ── constants ─────────────────────────────────────────────────────────────────
+
+const INSIGHTS_CACHE_KEY = "runsmart-coach-insights";
+const PROFILE_KEY = "runsmart-runner-profile";
+const DEFAULT_PROFILE = { background: "", goal: "" };
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -12,11 +18,13 @@ function getWeekStartUtc(date) {
   return d;
 }
 
+// Use i=4..1 to cover the last 4 *completed* Mon-Sun weeks, avoiding the
+// partial current week which makes volume look artificially low mid-week.
 function buildWeeklySummaries(activities) {
   const now = new Date();
   const summaries = [];
 
-  for (let i = 3; i >= 0; i--) {
+  for (let i = 4; i >= 1; i--) {
     const weekStart = getWeekStartUtc(new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000));
     const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -98,6 +106,22 @@ function getRecentDailyLogs(logs) {
     }));
 }
 
+function loadProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILE_KEY)) ?? DEFAULT_PROFILE;
+  } catch {
+    return DEFAULT_PROFILE;
+  }
+}
+
+function saveProfile(profile) {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    // ignore storage errors in restricted environments
+  }
+}
+
 // ── icon map ─────────────────────────────────────────────────────────────────
 
 const INSIGHT_ICONS = {
@@ -173,8 +197,8 @@ function DailyLogSummary({ logs }) {
   const avgMood = avg("mood");
 
   return (
-    <div className="coach-logs-summary" aria-label="Weekly wellness summary">
-      <span className="coach-logs-heading">This week&apos;s wellness</span>
+    <div className="coach-logs-summary" aria-label="Wellness summary">
+      <span className="coach-logs-heading">Last 7 days</span>
       <div className="coach-logs-metrics">
         {avgFatigue != null && (
           <span className="coach-log-metric">
@@ -192,8 +216,57 @@ function DailyLogSummary({ logs }) {
           </span>
         )}
         <span className="coach-log-metric">
-          <strong>{recent.length}</strong> log{recent.length !== 1 ? "s" : ""} this week
+          <strong>{recent.length}</strong> log{recent.length !== 1 ? "s" : ""}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function RunnerProfileSection({ profile, onUpdate }) {
+  const [draft, setDraft] = useState(profile);
+
+  function handleSave() {
+    onUpdate(draft);
+  }
+
+  return (
+    <div className="coach-profile-section" aria-label="Runner profile">
+      <div className="coach-profile-header">
+        <h3 className="coach-profile-title">About you</h3>
+        <p className="coach-profile-hint">
+          Sent to the AI coach for more personalized insights.
+        </p>
+      </div>
+      <div className="coach-profile-fields">
+        <div className="coach-profile-field">
+          <label className="coach-profile-label" htmlFor="runner-background">
+            Running background
+          </label>
+          <textarea
+            id="runner-background"
+            className="coach-profile-textarea"
+            rows={3}
+            placeholder="e.g. Running for 3 years, mostly trails, completed a 50K last year"
+            value={draft.background}
+            onChange={(e) => setDraft((d) => ({ ...d, background: e.target.value }))}
+            onBlur={handleSave}
+          />
+        </div>
+        <div className="coach-profile-field">
+          <label className="coach-profile-label" htmlFor="runner-goal">
+            Goal for this plan
+          </label>
+          <textarea
+            id="runner-goal"
+            className="coach-profile-textarea"
+            rows={2}
+            placeholder="e.g. Finish my first 100K under 12 hours, stay healthy, enjoy the process"
+            value={draft.goal}
+            onChange={(e) => setDraft((d) => ({ ...d, goal: e.target.value }))}
+            onBlur={handleSave}
+          />
+        </div>
       </div>
     </div>
   );
@@ -202,13 +275,31 @@ function DailyLogSummary({ logs }) {
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default function CoachPage() {
-  const { plans, activities, dailyLogs, checkins, trainingBlocks, auth } = useAppData();
+  const { plans, activities, dailyLogs, checkins, trainingBlocks } = useAppData();
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const mountedRef = useRef(false);
+  const [runnerProfile, setRunnerProfile] = useState(loadProfile);
 
   const activePlan = plans.plans[0] ?? null;
+
+  // Restore cached insights from previous session so the page isn't blank
+  // on revisit. A fresh fetch is always triggered by the button.
+  useEffect(() => {
+    const cached = sessionStorage.getItem(INSIGHTS_CACHE_KEY);
+    if (cached) {
+      try {
+        setInsights(JSON.parse(cached));
+      } catch {
+        // ignore corrupt cache
+      }
+    }
+  }, []);
+
+  function handleProfileUpdate(updated) {
+    setRunnerProfile(updated);
+    saveProfile(updated);
+  }
 
   const fetchInsights = useCallback(async () => {
     const client = getSupabaseClient();
@@ -221,7 +312,6 @@ export default function CoachPage() {
     setError(null);
 
     try {
-      // Load fresh daily logs and check session concurrently
       const [freshLogs, sessionResult] = await Promise.all([
         dailyLogs.loadLogs().catch(() => dailyLogs.logs),
         client.auth.getSession(),
@@ -237,9 +327,9 @@ export default function CoachPage() {
         latestCheckin: checkins.checkins[0] ?? null,
         planContext: buildPlanContext(activePlan, trainingBlocks.blocks),
         dailyLogs: getRecentDailyLogs(freshLogs ?? []),
+        runnerProfile: (runnerProfile.background || runnerProfile.goal) ? runnerProfile : null,
       };
 
-      // Let the Supabase client handle Authorization automatically from session
       const { data, error: invokeError } = await client.functions.invoke("gemini-coach", {
         body: payload,
       });
@@ -249,22 +339,13 @@ export default function CoachPage() {
       if (!data?.insights) throw new Error("No insights returned from coach.");
 
       setInsights(data.insights);
+      sessionStorage.setItem(INSIGHTS_CACHE_KEY, JSON.stringify(data.insights));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [activities.activities, checkins.checkins, dailyLogs, activePlan, trainingBlocks.blocks]);
-
-  // Auto-fetch once on mount
-  useEffect(() => {
-    if (mountedRef.current) return;
-    mountedRef.current = true;
-    if (auth.user) {
-      fetchInsights();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth.user]);
+  }, [activities.activities, checkins.checkins, dailyLogs, activePlan, trainingBlocks.blocks, runnerProfile]);
 
   return (
     <section className="page coach-page" id="coach">
@@ -295,6 +376,8 @@ export default function CoachPage() {
           </p>
         </div>
       )}
+
+      <RunnerProfileSection profile={runnerProfile} onUpdate={handleProfileUpdate} />
 
       <DailyLogSummary logs={dailyLogs.logs} />
 

@@ -39,34 +39,34 @@ export default function DataPage() {
   };
 
   return (
-    <section id="data" className="page">
-      <div className="page-header">
-        <h2>Reliable data ingestion</h2>
-        <p>Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
+    <section className="page">
+      <div className="mb-5">
+        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Reliable data ingestion</h2>
+        <p className="m-0 text-sm text-slate-500">Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
       </div>
 
-      <div className="data-panel">
-        <div>
-          <h4>Connected sources</h4>
-          <ul>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4 items-start">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Connected sources</h4>
+          <ul className="m-0 pl-5 text-sm text-slate-700 flex flex-col gap-1">
             <li>Strava activity sync</li>
             <li>Manual run + cross-training entry</li>
             <li>Heart-rate &amp; elevation support</li>
           </ul>
         </div>
 
-        <div>
-          <h4>Privacy-first storage</h4>
-          <p>Supabase-backed, athlete-owned data with row-level security.</p>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Privacy-first storage</h4>
+          <p className="m-0 mb-3 text-sm text-slate-600">Supabase-backed, athlete-owned data with row-level security.</p>
           <button className="ghost" type="button">Review data policy</button>
         </div>
 
-        <div id="strava-panel">
-          <h4>Strava</h4>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5" id="strava-panel">
+          <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Strava</h4>
 
           {!strava.connected ? (
             <div id="strava-disconnected">
-              <p className="muted">Connect your Strava account to import training data.</p>
+              <p className="m-0 mb-3 text-sm text-slate-500">Connect your Strava account to import training data.</p>
               <button
                 className="cta"
                 id="strava-connect-btn"
@@ -80,17 +80,17 @@ export default function DataPage() {
             </div>
           ) : (
             <div id="strava-connected">
-              <div className="sync-list">
-                <div>
-                  <span className="label">Status</span>
-                  <strong className="positive">Connected</strong>
+              <div className="grid gap-2 mb-4 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Status</span>
+                  <strong className="text-green-600">Connected</strong>
                 </div>
-                <div>
-                  <span className="label">Last sync</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Last sync</span>
                   <strong id="last-sync-time">{formatLastSync(strava.lastSyncAt)}</strong>
                 </div>
               </div>
-              <div className="strava-actions">
+              <div className="flex gap-2">
                 <button
                   className="cta"
                   id="strava-sync-btn"
@@ -116,10 +116,9 @@ export default function DataPage() {
           {strava.statusMessage && (
             <p
               id="strava-sync-feedback"
-              className="manual-note"
+              className={`mt-3 text-sm ${strava.error ? "text-red-600" : "text-slate-500"}`}
               role="status"
               aria-live="polite"
-              style={{ marginTop: "0.75rem", color: strava.error ? "#dc2626" : "var(--muted)" }}
             >
               {strava.statusMessage}
             </p>

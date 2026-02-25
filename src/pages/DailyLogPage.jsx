@@ -38,45 +38,50 @@ function RatingInput({ name, value, onChange, labels }) {
           {n}
         </button>
       ))}
-      {value && <span className="rating-label muted">{labels[value]}</span>}
+      {value && <span className="text-xs text-slate-500 ml-1">{labels[value]}</span>}
     </div>
   );
 }
 
+const inputClass = "w-full border border-slate-300 rounded-lg px-3 py-2 font-inherit text-sm bg-white box-border focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.15)]";
+
 function MetricChip({ icon, label, value }) {
   if (value == null) return null;
   return (
-    <span className="wellness-metric-chip">
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
       {icon && <span aria-hidden="true">{icon}</span>}
       <span>{label}: <strong>{value}</strong></span>
     </span>
   );
 }
 
-function LogCard({ log }) {
-  const qualityColor =
-    log.training_quality >= 4 ? "is-great"
-    : log.training_quality >= 3 ? "is-good"
-    : log.training_quality != null ? "is-flat"
-    : "";
+// ── Training quality pill colors ──────────────────────────────────────────────
+const PILL_STYLES = {
+  great: "bg-green-100 text-green-800",
+  good:  "bg-blue-100 text-blue-800",
+  okay:  "bg-amber-100 text-amber-800",
+  flat:  "bg-red-100 text-red-800",
+};
 
+function QualityPill({ quality }) {
+  if (quality == null) {
+    return <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 capitalize ${PILL_STYLES.okay}`}>Rest day</span>;
+  }
+  const style = quality >= 4 ? PILL_STYLES.great : quality >= 3 ? PILL_STYLES.good : PILL_STYLES.flat;
+  return <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 capitalize ${style}`}>Training {quality}/5</span>;
+}
+
+function LogCard({ log }) {
   return (
-    <article className="daily-log-item wellness-card">
-      <header className="wellness-card-header">
-        <strong>{fmtDate(log.log_date)}</strong>
-        <div className="wellness-chips">
-          {log.training_quality != null && (
-            <span className={`daily-log-pill ${qualityColor}`}>
-              Training {log.training_quality}/5
-            </span>
-          )}
-          {log.training_quality == null && (
-            <span className="daily-log-pill is-okay">Rest day</span>
-          )}
+    <article className="border border-slate-200 rounded-xl p-3 bg-slate-50 grid gap-2">
+      <header className="flex justify-between items-center gap-2 flex-wrap">
+        <strong className="text-sm">{fmtDate(log.log_date)}</strong>
+        <div className="flex flex-wrap gap-1">
+          <QualityPill quality={log.training_quality} />
         </div>
       </header>
 
-      <div className="wellness-metrics">
+      <div className="flex flex-wrap gap-1.5">
         <MetricChip icon="😴" label="Sleep" value={log.sleep_hours != null ? `${log.sleep_hours}h` : null} />
         <MetricChip icon="🌙" label="Sleep quality" value={log.sleep_quality != null ? `${log.sleep_quality}/5` : null} />
         <MetricChip icon="❤️" label="RHR" value={log.resting_hr != null ? `${log.resting_hr} bpm` : null} />
@@ -87,18 +92,17 @@ function LogCard({ log }) {
       </div>
 
       {log.workout_notes && (
-        <p className="wellness-notes">
+        <p className="m-0 text-xs text-slate-600">
           <strong>Workout:</strong> {log.workout_notes}
         </p>
       )}
-      {log.notes && <p className="wellness-notes muted">{log.notes}</p>}
+      {log.notes && <p className="m-0 text-xs text-slate-500 italic">{log.notes}</p>}
     </article>
   );
 }
 
 // ─── charts ─────────────────────────────────────────────────────────────────
 
-/** Multi-line wellness timeline over the last N logs. */
 function WellnessTimeline({ logs }) {
   const points = useMemo(
     () =>
@@ -116,7 +120,7 @@ function WellnessTimeline({ logs }) {
   const iW = W - mg.left - mg.right;
   const iH = H - mg.top - mg.bottom;
   const x = (i) => mg.left + (i / Math.max(1, points.length - 1)) * iW;
-  const y = (v) => mg.top + (1 - (v - 1) / 4) * iH; // scale 1-5 → H
+  const y = (v) => mg.top + (1 - (v - 1) / 4) * iH;
 
   const series = [
     { key: "training_quality", color: "#2563eb", label: "Training" },
@@ -138,20 +142,18 @@ function WellnessTimeline({ logs }) {
       .join(" ");
   };
 
-  const yTicks = [1, 2, 3, 4, 5];
-
   return (
-    <div className="d3-chart">
-      <div className="hr-zone-legend">
+    <div className="overflow-x-auto">
+      <div className="flex gap-4 flex-wrap mb-2">
         {series.map((s) => (
-          <div key={s.key} className="hr-zone-legend-item">
-            <div className="hr-zone-legend-dot" style={{ background: s.color }} />
+          <div key={s.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ background: s.color }} />
             <span>{s.label}</span>
           </div>
         ))}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label="Wellness metrics over time">
-        {yTicks.map((v) => (
+        {[1, 2, 3, 4, 5].map((v) => (
           <g key={v}>
             <line x1={mg.left} y1={y(v)} x2={W - mg.right} y2={y(v)} stroke="#e2e8f0" strokeWidth="1" />
             <text x={mg.left - 6} y={y(v) + 4} textAnchor="end" fill="#94a3b8" fontSize="11">{v}</text>
@@ -179,10 +181,6 @@ function WellnessTimeline({ logs }) {
   );
 }
 
-/**
- * For a given lifestyle metric (e.g. sleep_quality 1-5),
- * bucket the logs and compute average training_quality per bucket.
- */
 function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels, color }) {
   const data = useMemo(() => {
     const sums = new Map(buckets.map((b) => [b, { sum: 0, count: 0 }]));
@@ -190,8 +188,7 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
       if (l.training_quality == null || l[metricKey] == null) return;
       const bkt = buckets.find((b) => (Array.isArray(b) ? l[metricKey] >= b[0] && l[metricKey] <= b[1] : l[metricKey] === b));
       if (!bkt) return;
-      const key = Array.isArray(bkt) ? bkt : bkt;
-      const entry = sums.get(key);
+      const entry = sums.get(bkt);
       if (entry) {
         entry.sum += l.training_quality;
         entry.count += 1;
@@ -221,8 +218,8 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
   const x = (i) => mg.left + i * band + (band - barW) / 2;
 
   return (
-    <div className="correlation-chart-card">
-      <h5 className="correlation-chart-title">{metricLabel} → Training quality</h5>
+    <div className="bg-white border border-slate-200 rounded-xl p-4">
+      <h5 className="m-0 mb-2.5 text-[13px] font-semibold text-slate-700">{metricLabel} → Training quality</h5>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${metricLabel} vs training quality correlation`}>
         {[1, 2, 3, 4, 5].map((v) => (
           <g key={v}>
@@ -261,17 +258,6 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
   );
 }
 
-// ─── empty state ─────────────────────────────────────────────────────────────
-
-function EmptyHistory() {
-  return (
-    <div className="empty-state" style={{ padding: "32px 0" }}>
-      <p className="empty-state__title">No entries yet</p>
-      <p className="empty-state__body">Start logging daily to unlock the correlation charts.</p>
-    </div>
-  );
-}
-
 // ─── page ────────────────────────────────────────────────────────────────────
 
 const DEFAULT_FORM = {
@@ -288,20 +274,23 @@ const DEFAULT_FORM = {
   notes: "",
 };
 
+const fieldsetClass = "border border-slate-200 rounded-xl px-4 py-3.5 m-0 mb-1";
+const legendClass = "text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-1.5";
+const fieldClass = "grid gap-1.5 mb-3.5 last:mb-0";
+const labelTextClass = "text-[13px] text-slate-500";
+
 export default function DailyLogPage() {
   const { dailyLogs, auth } = useAppData();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Load logs on mount once user is available
   useEffect(() => {
     if (auth.user) {
       dailyLogs.loadLogs().catch(() => {});
     }
   }, [auth.user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When user changes the date, pre-fill form with existing log if it exists
   useEffect(() => {
     const existing = dailyLogs.logs.find((l) => l.log_date === form.log_date);
     if (existing) {
@@ -319,10 +308,7 @@ export default function DailyLogPage() {
         notes: existing.notes ?? "",
       });
     } else {
-      setForm((prev) => ({
-        ...DEFAULT_FORM,
-        log_date: prev.log_date,
-      }));
+      setForm((prev) => ({ ...DEFAULT_FORM, log_date: prev.log_date }));
     }
   }, [form.log_date, dailyLogs.logs]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -369,55 +355,56 @@ export default function DailyLogPage() {
   const isExistingEntry = dailyLogs.logs.some((l) => l.log_date === form.log_date);
 
   return (
-    <section className="page daily-log-page" id="daily-log">
-      <div className="page-header">
-        <h2>Daily log</h2>
-        <p>Track sleep, lifestyle, and training quality to spot what helps you perform.</p>
+    <section className="page" id="daily-log">
+      <div className="mb-5">
+        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Daily log</h2>
+        <p className="m-0 text-sm text-slate-500">Track sleep, lifestyle, and training quality to spot what helps you perform.</p>
       </div>
 
       {/* ── top grid: form + recent activity ── */}
-      <div className="daily-log-grid">
-        {/* ── form ── */}
-        <form className="daily-log-form" onSubmit={onSubmit} noValidate>
-          <h3>{isExistingEntry ? "Edit entry" : "Add today's log"}</h3>
+      <div className="grid gap-4 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] items-start max-[960px]:grid-cols-1">
 
-          <label className="dl-field">
-            <span>Date</span>
+        {/* ── form ── */}
+        <form className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-3" onSubmit={onSubmit} noValidate>
+          <h3 className="m-0 text-sm font-bold">{isExistingEntry ? "Edit entry" : "Add today's log"}</h3>
+
+          <div className={fieldClass}>
+            <span className={labelTextClass}>Date</span>
             <input
               type="date"
               name="log_date"
               value={form.log_date}
               max={todayIso()}
               onChange={onChange}
-              className="dl-input"
+              className={inputClass}
             />
-          </label>
+          </div>
 
           {/* Training */}
-          <fieldset className="dl-fieldset">
-            <legend>Training</legend>
-            <div className="dl-field">
-              <span className="dl-label">Training quality <span className="muted">(skip on rest days)</span></span>
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>Training</legend>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Training quality <span className="text-slate-400">(skip on rest days)</span></span>
               <RatingInput name="training_quality" value={form.training_quality} onChange={onRating} labels={QUALITY_LABELS} />
             </div>
-            <div className="dl-field">
-              <span className="dl-label">Workout notes</span>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Workout notes</span>
               <input
                 type="text"
                 name="workout_notes"
                 value={form.workout_notes}
                 onChange={onChange}
                 placeholder="e.g. 12km easy, avg HR 142"
-                className="dl-input"
+                className={inputClass}
               />
             </div>
           </fieldset>
 
           {/* Recovery */}
-          <fieldset className="dl-fieldset">
-            <legend>Recovery</legend>
-            <div className="dl-field">
-              <span className="dl-label">Sleep hours</span>
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>Recovery</legend>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Sleep hours</span>
               <input
                 type="number"
                 name="sleep_hours"
@@ -425,15 +412,15 @@ export default function DailyLogPage() {
                 onChange={onChange}
                 min="0" max="24" step="0.5"
                 placeholder="e.g. 7.5"
-                className="dl-input dl-input--short"
+                className={`${inputClass} max-w-[120px]`}
               />
             </div>
-            <div className="dl-field">
-              <span className="dl-label">Sleep quality</span>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Sleep quality</span>
               <RatingInput name="sleep_quality" value={form.sleep_quality} onChange={onRating} labels={SLEEP_LABELS} />
             </div>
-            <div className="dl-field">
-              <span className="dl-label">Resting HR <span className="muted">(bpm, optional)</span></span>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Resting HR <span className="text-slate-400">(bpm, optional)</span></span>
               <input
                 type="number"
                 name="resting_hr"
@@ -441,75 +428,80 @@ export default function DailyLogPage() {
                 onChange={onChange}
                 min="30" max="120"
                 placeholder="e.g. 52"
-                className="dl-input dl-input--short"
+                className={`${inputClass} max-w-[120px]`}
               />
             </div>
-            <div className="dl-field">
-              <span className="dl-label">Muscle fatigue / soreness</span>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Muscle fatigue / soreness</span>
               <RatingInput name="fatigue" value={form.fatigue} onChange={onRating} labels={FATIGUE_LABELS} />
             </div>
           </fieldset>
 
           {/* Lifestyle */}
-          <fieldset className="dl-fieldset">
-            <legend>Lifestyle</legend>
-            <div className="dl-field">
-              <span className="dl-label">Alcohol units</span>
-              <div className="stepper">
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>Lifestyle</legend>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Alcohol units</span>
+              <div className="inline-flex items-center border border-slate-300 rounded-lg overflow-hidden">
                 <button
                   type="button"
-                  className="stepper-btn"
+                  className="w-9 h-9 bg-slate-50 border-r border-slate-200 text-lg text-slate-600 cursor-pointer flex items-center justify-center hover:bg-slate-100"
                   onClick={() => setForm((p) => ({ ...p, alcohol_units: Math.max(0, (Number(p.alcohol_units) || 0) - 1) }))}
                 >−</button>
-                <span className="stepper-val">{form.alcohol_units}</span>
+                <span className="w-10 text-center font-semibold text-sm h-9 flex items-center justify-center">{form.alcohol_units}</span>
                 <button
                   type="button"
-                  className="stepper-btn"
+                  className="w-9 h-9 bg-slate-50 border-l border-slate-200 text-lg text-slate-600 cursor-pointer flex items-center justify-center hover:bg-slate-100"
                   onClick={() => setForm((p) => ({ ...p, alcohol_units: Math.min(30, (Number(p.alcohol_units) || 0) + 1) }))}
                 >+</button>
               </div>
             </div>
-            <div className="dl-field">
-              <span className="dl-label">Mood / energy</span>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Mood / energy</span>
               <RatingInput name="mood" value={form.mood} onChange={onRating} labels={MOOD_LABELS} />
             </div>
-            <div className="dl-field">
-              <span className="dl-label">Stress level</span>
+            <div className={fieldClass}>
+              <span className={labelTextClass}>Stress level</span>
               <RatingInput name="stress" value={form.stress} onChange={onRating} labels={STRESS_LABELS} />
             </div>
           </fieldset>
 
-          <div className="dl-field">
-            <span className="dl-label">Notes</span>
+          <div className={fieldClass}>
+            <span className={labelTextClass}>Notes</span>
             <textarea
               name="notes"
               value={form.notes}
               onChange={onChange}
               rows="3"
               placeholder="Anything else worth noting…"
-              className="dl-input"
+              className={inputClass}
             />
           </div>
 
-          <button type="submit" className="btn btn--primary" disabled={saving}>
+          <button type="submit" className="cta" disabled={saving}>
             {saving ? "Saving…" : isExistingEntry ? "Update log" : "Save log"}
           </button>
           {message && (
-            <p className="form-note" role="status">{message}</p>
+            <p className="text-sm text-slate-600 m-0" role="status">{message}</p>
           )}
           {dailyLogs.error && (
-            <p className="form-note form-note--error" role="alert">
+            <p className="text-sm text-red-600 m-0" role="alert">
               {dailyLogs.error.message}
             </p>
           )}
         </form>
 
         {/* ── recent history ── */}
-        <section className="daily-log-history" aria-label="Recent daily logs">
-          <h3>Recent entries</h3>
-          {dailyLogs.loading && <p className="muted">Loading…</p>}
-          {!dailyLogs.loading && dailyLogs.logs.length === 0 && <EmptyHistory />}
-          <div className="daily-log-list">
+        <section className="bg-white border border-slate-200 rounded-2xl p-4" aria-label="Recent daily logs">
+          <h3 className="m-0 mb-3 text-sm font-bold">Recent entries</h3>
+          {dailyLogs.loading && <p className="text-sm text-slate-500 m-0">Loading…</p>}
+          {!dailyLogs.loading && dailyLogs.logs.length === 0 && (
+            <div className="py-8 text-center">
+              <p className="font-semibold text-slate-700 m-0 mb-1">No entries yet</p>
+              <p className="text-sm text-slate-500 m-0">Start logging daily to unlock the correlation charts.</p>
+            </div>
+          )}
+          <div className="grid gap-2.5">
             {dailyLogs.logs.slice(0, 10).map((log) => (
               <LogCard key={log.id} log={log} />
             ))}
@@ -520,21 +512,21 @@ export default function DailyLogPage() {
       {/* ── charts ── */}
       {dailyLogs.logs.length >= 3 && (
         <>
-          <div className="chart-section-header">
-            <h3>Wellness trends</h3>
-            <p className="muted">Last 14 logged days — compare how your sleep, mood, fatigue, and training quality track together.</p>
+          <div className="mt-8 mb-3">
+            <h3 className="m-0 mb-1 text-base font-bold text-slate-900">Wellness trends</h3>
+            <p className="m-0 text-sm text-slate-500">Last 14 logged days — compare how your sleep, mood, fatigue, and training quality track together.</p>
           </div>
 
-          <div className="metric-card" style={{ marginBottom: "24px" }}>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
             <WellnessTimeline logs={dailyLogs.logs} />
           </div>
 
-          <div className="chart-section-header">
-            <h3>Correlations</h3>
-            <p className="muted">Average training quality grouped by lifestyle and recovery factors. More entries = more reliable signal.</p>
+          <div className="mt-2 mb-3">
+            <h3 className="m-0 mb-1 text-base font-bold text-slate-900">Correlations</h3>
+            <p className="m-0 text-sm text-slate-500">Average training quality grouped by lifestyle and recovery factors. More entries = more reliable signal.</p>
           </div>
 
-          <div className="correlation-charts">
+          <div className="grid grid-cols-2 gap-4 mb-6 max-[960px]:grid-cols-1">
             <CorrelationChart
               logs={dailyLogs.logs}
               metricKey="sleep_quality"

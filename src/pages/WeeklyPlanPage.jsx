@@ -35,15 +35,33 @@ function isToday(isoDate) {
   return isoDate === new Date().toISOString().split("T")[0];
 }
 
-// ── Workout type badge class ───────────────────────────────────────────────────
+// ── Workout type badge styles ─────────────────────────────────────────────────
 
-function typeBadgeClass(type) {
-  return `wpp-type-badge is-${type.replace(/\s+/g, "-")}`;
+const TYPE_BADGE_STYLES = {
+  "Easy":        "bg-green-100 text-green-800",
+  "Long Run":    "bg-blue-100 text-blue-700",
+  "Tempo":       "bg-violet-100 text-violet-800",
+  "Intervals":   "bg-pink-100 text-pink-800",
+  "Recovery":    "bg-green-50 text-green-700",
+  "Strength":    "bg-amber-100 text-amber-800",
+  "Cross-Train": "bg-sky-100 text-sky-800",
+  "Rest":        "bg-slate-100 text-slate-500",
+};
+
+function TypeBadge({ type }) {
+  const cls = TYPE_BADGE_STYLES[type] ?? "bg-slate-100 text-slate-500";
+  return (
+    <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase tracking-wide whitespace-nowrap ${cls}`}>
+      {type}
+    </span>
+  );
 }
 
 // ── Add/Edit form ─────────────────────────────────────────────────────────────
 
-function WorkoutForm({ date, initial, onSave, onCancel, loading }) {
+const inputClass = "w-full border border-slate-300 rounded-lg px-2 py-1.5 font-inherit text-xs bg-white focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_2px_rgba(37,99,235,0.12)]";
+
+function WorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
   const blank = { workout_type: "Easy", distance_km: "", duration_min: "", description: "" };
   const [form, setForm] = useState({ ...blank, ...initial });
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
@@ -60,58 +78,38 @@ function WorkoutForm({ date, initial, onSave, onCancel, loading }) {
   }
 
   return (
-    <form className="wpp-add-form" onSubmit={handleSubmit} noValidate>
-      <label>
+    <form className={`border-t border-slate-200 pt-2.5 grid gap-2${className ? ` ${className}` : ""}`} onSubmit={handleSubmit} noValidate>
+      <label className="grid gap-1 text-[11px] font-medium text-slate-500">
         Type
-        <select value={form.workout_type} onChange={(e) => set("workout_type", e.target.value)}>
+        <select className={inputClass} value={form.workout_type} onChange={(e) => set("workout_type", e.target.value)}>
           {WORKOUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </label>
 
       {form.workout_type !== "Rest" && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-            <label>
+          <div className="grid grid-cols-2 gap-1.5">
+            <label className="grid gap-1 text-[11px] font-medium text-slate-500">
               Distance (km)
-              <input
-                type="number"
-                min="0"
-                max="200"
-                step="0.1"
-                placeholder="—"
-                value={form.distance_km}
-                onChange={(e) => set("distance_km", e.target.value)}
-              />
+              <input type="number" min="0" max="200" step="0.1" className={inputClass} placeholder="—" value={form.distance_km} onChange={(e) => set("distance_km", e.target.value)} />
             </label>
-            <label>
+            <label className="grid gap-1 text-[11px] font-medium text-slate-500">
               Duration (min)
-              <input
-                type="number"
-                min="0"
-                max="600"
-                placeholder="—"
-                value={form.duration_min}
-                onChange={(e) => set("duration_min", e.target.value)}
-              />
+              <input type="number" min="0" max="600" className={inputClass} placeholder="—" value={form.duration_min} onChange={(e) => set("duration_min", e.target.value)} />
             </label>
           </div>
-          <label>
+          <label className="grid gap-1 text-[11px] font-medium text-slate-500">
             Description
-            <textarea
-              rows={2}
-              placeholder="e.g. 8×400m @ 5K pace, 90s recovery"
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-            />
+            <textarea rows={2} className={inputClass} placeholder="e.g. 8×400m @ 5K pace, 90s recovery" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </label>
         </>
       )}
 
-      <div className="wpp-add-form-actions">
-        <button type="submit" className="cta" disabled={loading} style={{ fontSize: "12px", padding: "7px 14px" }}>
+      <div className="flex gap-1.5">
+        <button type="submit" className="cta" disabled={loading} style={{ fontSize: "12px", padding: "6px 12px" }}>
           {loading ? "Saving…" : initial?.id ? "Update" : "Add"}
         </button>
-        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "12px", padding: "7px 12px" }}>
+        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "12px", padding: "6px 10px" }}>
           Cancel
         </button>
       </div>
@@ -123,31 +121,31 @@ function WorkoutForm({ date, initial, onSave, onCancel, loading }) {
 
 function WorkoutEntry({ entry, onEdit, onDelete, onToggle, loading }) {
   return (
-    <div className={`wpp-entry${entry.completed ? " is-completed" : ""}`}>
-      <div className="wpp-entry-header">
-        <span className={typeBadgeClass(entry.workout_type)}>{entry.workout_type}</span>
-        <div className="wpp-entry-actions">
+    <div className={`border border-slate-200 rounded-lg px-2.5 py-2 bg-slate-50 text-xs${entry.completed ? " opacity-55" : ""}`}>
+      <div className="flex justify-between items-center gap-1 mb-1">
+        <TypeBadge type={entry.workout_type} />
+        <div className="flex gap-0.5 items-center">
           <input
             type="checkbox"
             checked={entry.completed}
             onChange={() => onToggle(entry.id, entry.completed)}
             title="Mark completed"
             disabled={loading}
-            style={{ cursor: "pointer" }}
+            className="cursor-pointer"
           />
-          <button type="button" className="wpp-icon-btn" onClick={() => onEdit(entry)} title="Edit" disabled={loading}>✎</button>
-          <button type="button" className="wpp-icon-btn" onClick={() => onDelete(entry.id)} title="Delete" disabled={loading}>✕</button>
+          <button type="button" className="border-0 bg-transparent cursor-pointer px-1 py-0.5 text-slate-400 text-xs rounded hover:bg-slate-200 hover:text-slate-600 disabled:opacity-50" onClick={() => onEdit(entry)} title="Edit" disabled={loading}>✎</button>
+          <button type="button" className="border-0 bg-transparent cursor-pointer px-1 py-0.5 text-slate-400 text-xs rounded hover:bg-slate-200 hover:text-slate-600 disabled:opacity-50" onClick={() => onDelete(entry.id)} title="Delete" disabled={loading}>✕</button>
         </div>
       </div>
       {(entry.distance_km || entry.duration_min) && (
-        <p style={{ margin: "2px 0", fontSize: "12px" }}>
+        <p className="m-0 text-xs text-slate-600">
           {entry.distance_km ? `${entry.distance_km} km` : ""}
           {entry.distance_km && entry.duration_min ? " · " : ""}
           {entry.duration_min ? `${entry.duration_min} min` : ""}
         </p>
       )}
       {entry.description && (
-        <p className="wpp-entry-desc">{entry.description}</p>
+        <p className="m-0 text-[11px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{entry.description}</p>
       )}
     </div>
   );
@@ -163,13 +161,13 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
   const dayNum = new Date(`${date}T00:00:00Z`).getUTCDate();
 
   return (
-    <div className={`wpp-day${isToday(date) ? " is-today" : ""}`}>
-      <div className="wpp-day-header">
-        <span className="wpp-day-label">{dayName} {dayNum}</span>
+    <div className={`wpp-day bg-white border rounded-xl p-2.5 min-h-[130px] flex flex-col gap-2${isToday(date) ? " is-today border-blue-600 shadow-[0_0_0_1px_#2563eb]" : " border-slate-200"}`}>
+      <div className="flex justify-between items-center">
+        <span className="wpp-day-label text-xs font-bold text-slate-900">{dayName} {dayNum}</span>
         {!isAddingHere && (
           <button
             type="button"
-            className="wpp-day-add-btn"
+            className="w-6 h-6 rounded-full border border-slate-300 bg-slate-50 text-slate-500 text-base leading-none cursor-pointer flex items-center justify-center p-0 hover:bg-slate-200 disabled:opacity-50"
             onClick={() => onAdd(date)}
             title="Add workout"
             disabled={loading}
@@ -179,7 +177,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
         )}
       </div>
 
-      <div className="wpp-entry-list">
+      <div className="grid gap-1.5">
         {dayEntries.map((entry) =>
           editingHere && editingEntry.id === entry.id ? (
             <WorkoutForm
@@ -210,6 +208,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
           onSave={(data) => onSave(null, data)}
           onCancel={onCancelAdd}
           loading={loading}
+          className="wpp-add-form"
         />
       )}
     </div>
@@ -305,21 +304,21 @@ export default function WeeklyPlanPage() {
   );
 
   return (
-    <section className="page wpp-page">
-      <div className="page-header">
-        <h2>Weekly Plan</h2>
-        <p>Plan your workouts day by day. Check off sessions as you complete them.</p>
+    <section className="page">
+      <div className="mb-5">
+        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Weekly Plan</h2>
+        <p className="m-0 text-sm text-slate-500">Plan your workouts day by day. Check off sessions as you complete them.</p>
       </div>
 
       {/* Header: plan select + week nav */}
-      <div className="wpp-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <label style={{ fontSize: "13px", fontWeight: 600, margin: 0 }}>
+      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 flex items-center gap-4 flex-wrap mb-3.5 max-[960px]:flex-col max-[960px]:items-start">
+        <div className="flex items-center gap-2.5">
+          <label className="text-[13px] font-semibold m-0">
             Plan:{" "}
             <select
+              className="ml-1.5 border border-slate-300 rounded-lg px-2 py-1.5 font-inherit text-[13px] bg-white"
               value={selectedPlanId ?? ""}
               onChange={(e) => { setSelectedPlanId(e.target.value); setAddingTo(null); setEditingEntry(null); }}
-              style={{ marginLeft: "6px" }}
             >
               {plans.plans.length === 0 && <option value="">No plans — create one in Training Plan</option>}
               {plans.plans.map((p) => (
@@ -331,51 +330,30 @@ export default function WeeklyPlanPage() {
           </label>
         </div>
 
-        <div className="wpp-week-nav">
-          <button
-            type="button"
-            className="ghost"
-            style={{ padding: "6px 12px" }}
-            onClick={() => { setWeekStart((w) => isoDateOffset(w, -7)); setAddingTo(null); setEditingEntry(null); }}
-          >
-            ←
-          </button>
-          <span className="wpp-week-label">{formatWeekLabel(weekStart)}</span>
-          <button
-            type="button"
-            className="ghost"
-            style={{ padding: "6px 12px" }}
-            onClick={() => { setWeekStart((w) => isoDateOffset(w, 7)); setAddingTo(null); setEditingEntry(null); }}
-          >
-            →
-          </button>
-          <button
-            type="button"
-            className="ghost"
-            style={{ padding: "6px 12px", fontSize: "12px" }}
-            onClick={() => { setWeekStart(currentMondayIso()); setAddingTo(null); setEditingEntry(null); }}
-          >
-            Today
-          </button>
+        <div className="flex items-center gap-2 ml-auto max-[960px]:ml-0 max-[960px]:w-full max-[960px]:justify-between">
+          <button type="button" className="ghost" style={{ padding: "6px 12px" }} onClick={() => { setWeekStart((w) => isoDateOffset(w, -7)); setAddingTo(null); setEditingEntry(null); }}>←</button>
+          <span className="wpp-week-label font-semibold text-sm min-w-[220px] text-center max-[960px]:min-w-0 max-[960px]:text-left">{formatWeekLabel(weekStart)}</span>
+          <button type="button" className="ghost" style={{ padding: "6px 12px" }} onClick={() => { setWeekStart((w) => isoDateOffset(w, 7)); setAddingTo(null); setEditingEntry(null); }}>→</button>
+          <button type="button" className="ghost" style={{ padding: "6px 12px", fontSize: "12px" }} onClick={() => { setWeekStart(currentMondayIso()); setAddingTo(null); setEditingEntry(null); }}>Today</button>
         </div>
       </div>
 
       {/* Summary bar */}
       {selectedPlanId && (
-        <div className="wpp-summary">
-          <div className="wpp-summary-stat">Total: <strong>{summary.totalKm} km</strong></div>
-          <div className="wpp-summary-stat">Sessions: <strong>{summary.sessions}</strong></div>
-          <div className="wpp-summary-stat">Rest days: <strong>{summary.restDays}</strong></div>
-          <div className="wpp-summary-stat">Completed: <strong>{summary.completionPct}%</strong></div>
-          {pageError && <p className="feedback is-error" style={{ marginLeft: "auto" }}>{pageError}</p>}
+        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex gap-5 items-center flex-wrap mb-3.5">
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Total: <strong className="text-slate-900 font-bold">{summary.totalKm} km</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Sessions: <strong className="text-slate-900 font-bold">{summary.sessions}</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Rest days: <strong className="text-slate-900 font-bold">{summary.restDays}</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Completed: <strong className="text-slate-900 font-bold">{summary.completionPct}%</strong></div>
+          {pageError && <p className="text-sm text-red-600 m-0 ml-auto">{pageError}</p>}
         </div>
       )}
 
       {/* 7-day grid */}
       {!selectedPlanId ? (
-        <p className="empty-state">Select or create a training plan to start planning your week.</p>
+        <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start planning your week.</p>
       ) : (
-        <div className="wpp-day-grid">
+        <div className="wpp-day-grid grid grid-cols-7 gap-2.5 items-start max-[960px]:grid-cols-2 max-[480px]:grid-cols-1">
           {days.map((date, i) => (
             <DayColumn
               key={date}

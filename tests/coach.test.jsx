@@ -479,25 +479,38 @@ describe("Coach page — runner profile", () => {
     expect(screen.getByText(/About you/i)).toBeInTheDocument();
   });
 
-  it("renders background and goal textareas", () => {
+  it("renders a Running background textarea", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
     render(<CoachPage />);
 
     expect(screen.getByLabelText(/Running background/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Goal for this plan/i)).toBeInTheDocument();
   });
 
-  it("sends runnerProfile in the payload when profile fields are filled", async () => {
-    localStorage.setItem(
-      "runsmart-runner-profile",
-      JSON.stringify({ background: "Trail runner, 3 years", goal: "Sub-12h 100K" }),
-    );
+  it("shows a hint pointing to the Training Plan page for the plan goal", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
 
+    render(<CoachPage />);
+
+    expect(screen.getByText(/Training Plan/i, { selector: "strong" })).toBeInTheDocument();
+  });
+
+  it("sends runnerProfile in the payload when background is set", async () => {
     const mockClient = makeMockClient();
     getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppData());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        runnerProfile: {
+          background: "Trail runner, 3 years",
+          loading: false,
+          error: null,
+          loadProfile: vi.fn().mockResolvedValue(undefined),
+          saveProfile: vi.fn().mockResolvedValue(undefined),
+        },
+      }),
+    );
 
     const user = userEvent.setup();
     render(<CoachPage />);
@@ -518,10 +531,27 @@ describe("Coach page — runner profile", () => {
     });
   });
 
-  it("sends null runnerProfile when no profile is set", async () => {
+  it("sends null runnerProfile when no background and no plan goal are set", async () => {
     const mockClient = makeMockClient();
     getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppData());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        plans: {
+          plans: [{ ...SAMPLE_PLAN, goal: null }],
+          loading: false,
+          createPlan: vi.fn(),
+          updatePlan: vi.fn(),
+          deletePlan: vi.fn(),
+        },
+        runnerProfile: {
+          background: "",
+          loading: false,
+          error: null,
+          loadProfile: vi.fn().mockResolvedValue(undefined),
+          saveProfile: vi.fn().mockResolvedValue(undefined),
+        },
+      }),
+    );
 
     const user = userEvent.setup();
     render(<CoachPage />);

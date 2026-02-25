@@ -64,6 +64,7 @@ export const SAMPLE_PLAN = {
   current_mileage: 50,
   constraints: null,
   b2b_long_runs: false,
+  goal: "Finish under 3:30 and stay injury-free",
 };
 
 export const SAMPLE_BLOCKS = [
@@ -193,7 +194,15 @@ export function makeAppData(overrides = {}) {
       plans: [SAMPLE_PLAN],
       loading: false,
       createPlan: vi.fn().mockResolvedValue(SAMPLE_PLAN),
+      updatePlan: vi.fn().mockResolvedValue(SAMPLE_PLAN),
       deletePlan: vi.fn().mockResolvedValue(undefined),
+    },
+    runnerProfile: {
+      background: "",
+      loading: false,
+      error: null,
+      loadProfile: vi.fn().mockResolvedValue(undefined),
+      saveProfile: vi.fn().mockResolvedValue(undefined),
     },
     strava: {
       startConnect: vi.fn(),

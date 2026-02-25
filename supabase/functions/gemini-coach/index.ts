@@ -256,8 +256,7 @@ Deno.serve(async (req) => {
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1024,
-          responseMimeType: "application/json",
+          maxOutputTokens: 4096,
         },
       }),
     });
@@ -288,7 +287,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const rawText = candidates[0]?.content?.parts?.[0]?.text || "";
+    // Gemini 2.5-flash is a thinking model — parts may include thought parts.
+    // Find the first non-thought part that contains the actual output.
+    const parts: Array<{ text?: string; thought?: boolean }> = candidates[0]?.content?.parts || [];
+    const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
+    const rawText = outputPart?.text || "";
 
     // Parse the JSON array from Gemini's response
     let insights;

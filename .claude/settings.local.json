@@ -5,7 +5,14 @@
       "Bash(npm test:*)",
       "Bash(npx vitest run:*)",
       "Bash(git stash:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__get_project",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "Bash(curl -s \"https://runsmart-ten.vercel.app/\" | grep -oP 'VITE_SUPABASE_ANON_KEY[^\"]*' | head -5 2>&1; curl -s \"https://runsmart-ten.vercel.app/\" | grep -oP 'sb_publishable[^\\\\s\"]*' | head -5 2>&1)",
+      "Bash(curl:*)",
+      "Bash(cd /c/Users/evens/OneDrive/Dokumenter/PappaCode/RunSmart/runsmart && git push origin Workout-details 2>&1)"
     ]
   }
 }

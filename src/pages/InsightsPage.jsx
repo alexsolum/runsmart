@@ -6,19 +6,29 @@ function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// skeleton-block class preserved for test: container.querySelectorAll(".skeleton-block")
 function SkeletonBlock({ height = 240 }) {
-  return <div className="skeleton-block" style={{ height }} aria-hidden="true" />;
+  return (
+    <div
+      className="skeleton-block rounded-2xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse"
+      style={{ height }}
+      aria-hidden="true"
+    />
+  );
 }
+
+// kpi-card class preserved for test: document.querySelectorAll(".kpi-card")
+const DELTA_DIR_COLORS = { up: "text-green-600", down: "text-red-600", neutral: "text-slate-400" };
 
 function KpiCard({ label, value, delta, deltaDir, note }) {
   return (
-    <div className="kpi-card">
-      <p className="kpi-card__label">{label}</p>
-      <p className="kpi-card__value">{value}</p>
+    <div className="kpi-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+      <p className="m-0 text-xs text-slate-500 font-medium">{label}</p>
+      <p className="m-0 my-1 text-2xl font-bold text-slate-900">{value}</p>
       {delta != null && (
-        <p className={`kpi-card__delta kpi-card__delta--${deltaDir ?? "neutral"}`}>{delta}</p>
+        <p className={`m-0 text-sm font-semibold ${DELTA_DIR_COLORS[deltaDir ?? "neutral"]}`}>{delta}</p>
       )}
-      {note && <p className="kpi-card__note">{note}</p>}
+      {note && <p className="m-0 mt-1 text-xs text-slate-400">{note}</p>}
     </div>
   );
 }
@@ -42,11 +52,11 @@ function HRZoneWeeklyChart({ weeks }) {
   const chartBottom = margin.top + innerH;
 
   return (
-    <div className="d3-chart">
-      <div className="hr-zone-legend">
+    <div className="overflow-x-auto">
+      <div className="flex flex-wrap gap-4 mb-2">
         {ZONE_LABELS.map((label, i) => (
-          <div key={label} className="hr-zone-legend-item">
-            <div className="hr-zone-legend-dot" style={{ background: ZONE_COLORS[i] }} />
+          <div key={label} className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ background: ZONE_COLORS[i] }} />
             <span>{label}</span>
           </div>
         ))}
@@ -89,32 +99,32 @@ function HRZoneWeeklyChart({ weeks }) {
 
 function HRZoneActivityBreakdown({ activityZones }) {
   return (
-    <div className="hr-zone-activity-list">
+    <div className="grid gap-3">
       {activityZones.map((activity) => {
         const total = activity.total;
         return (
-          <div key={activity.id} className="hr-zone-activity-row">
-            <div className="hr-zone-activity-meta">
-              <span className="hr-zone-activity-name">{activity.name}</span>
-              <span className="muted">{fmtDate(activity.date)}</span>
+          <div key={activity.id} className="grid gap-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-900">{activity.name}</span>
+              <span className="text-xs text-slate-400">{fmtDate(activity.date)}</span>
             </div>
-            <div className="hr-zone-bar" role="img" aria-label={`Zone distribution for ${activity.name}`}>
+            <div className="flex rounded overflow-hidden h-4" role="img" aria-label={`Zone distribution for ${activity.name}`}>
               {ZONE_KEYS.map((key, zi) => {
                 const pct = total > 0 ? (activity[key] / total) * 100 : 0;
                 return pct > 0 ? (
                   <div
                     key={key}
-                    className="hr-zone-segment"
+                    className="h-full"
                     style={{ width: `${pct}%`, background: ZONE_COLORS[zi] }}
                     title={`${ZONE_LABELS[zi]}: ${Math.round(activity[key] / 60)}m (${Math.round(pct)}%)`}
                   />
                 ) : null;
               })}
             </div>
-            <div className="hr-zone-activity-legend">
+            <div className="flex flex-wrap gap-2">
               {ZONE_KEYS.map((key, zi) =>
                 activity[key] > 0 ? (
-                  <span key={key} className="zone-label-small" style={{ color: ZONE_COLORS[zi] }}>
+                  <span key={key} className="text-xs font-medium" style={{ color: ZONE_COLORS[zi] }}>
                     Z{zi + 1} {Math.round(activity[key] / 60)}m
                   </span>
                 ) : null,
@@ -151,7 +161,7 @@ function TrainingLoadChart({ series }) {
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => minY + (maxY - minY) * f);
 
   return (
-    <div className="d3-chart">
+    <div className="overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Acute and chronic training load timeline">
         {yTicks.map((val) => (
           <g key={val}>
@@ -161,34 +171,25 @@ function TrainingLoadChart({ series }) {
             </text>
           </g>
         ))}
-
         {tickDates.map((d) => (
           <text key={d.toISOString()} x={x(d.getTime())} y={height - 12} textAnchor="middle" fill="#64748b" fontSize="11">
             {fmtDate(d)}
           </text>
         ))}
-
         <path d={asPath("atl")} fill="none" stroke="#ef4444" strokeWidth="2.5" />
         <path d={asPath("ctl")} fill="none" stroke="#2563eb" strokeWidth="2.5" />
         <path d={asPath("tsb")} fill="none" stroke="#16a34a" strokeWidth="2" strokeDasharray="5 4" />
-
         <g transform={`translate(${margin.left},${margin.top})`}>
           <line x1="0" y1="0" x2="20" y2="0" stroke="#ef4444" strokeWidth="3" />
-          <text x="26" y="4" fill="#334155" fontSize="12">
-            Fatigue (ATL)
-          </text>
+          <text x="26" y="4" fill="#334155" fontSize="12">Fatigue (ATL)</text>
         </g>
         <g transform={`translate(${margin.left + 170},${margin.top})`}>
           <line x1="0" y1="0" x2="20" y2="0" stroke="#2563eb" strokeWidth="3" />
-          <text x="26" y="4" fill="#334155" fontSize="12">
-            Fitness (CTL)
-          </text>
+          <text x="26" y="4" fill="#334155" fontSize="12">Fitness (CTL)</text>
         </g>
         <g transform={`translate(${margin.left + 340},${margin.top})`}>
           <line x1="0" y1="0" x2="20" y2="0" stroke="#16a34a" strokeWidth="3" strokeDasharray="5 4" />
-          <text x="26" y="4" fill="#334155" fontSize="12">
-            Form (TSB)
-          </text>
+          <text x="26" y="4" fill="#334155" fontSize="12">Form (TSB)</text>
         </g>
       </svg>
     </div>
@@ -208,7 +209,7 @@ function WeeklyLoadChart({ points }) {
   const x = (i) => margin.left + i * band + (band - barW) / 2;
 
   return (
-    <div className="d3-chart">
+    <div className="overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Weekly training load">
         {[0, 0.25, 0.5, 0.75, 1].map((f) => {
           const val = maxLoad * f;
@@ -240,7 +241,6 @@ function LongRunChart({ points }) {
   const margin = { top: 24, right: 44, bottom: 40, left: 44 };
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
-
   const band = innerW / points.length;
   const barW = Math.min(28, band * 0.55);
   const maxDist = Math.max(...points.map((d) => d.distanceKm), 1) * 1.2;
@@ -248,13 +248,12 @@ function LongRunChart({ points }) {
   const x = (i) => margin.left + i * band + (band - barW) / 2;
   const yDist = (v) => margin.top + (1 - v / maxDist) * innerH;
   const yElev = (v) => margin.top + (1 - v / maxElev) * innerH;
-
   const linePath = points
     .map((point, i) => `${i ? "L" : "M"}${(x(i) + barW / 2).toFixed(2)} ${yElev(point.elevation).toFixed(2)}`)
     .join(" ");
 
   return (
-    <div className="d3-chart">
+    <div className="overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Long run distance and elevation progression">
         {points.map((point, i) => (
           <g key={point.label}>
@@ -264,7 +263,6 @@ function LongRunChart({ points }) {
             </text>
           </g>
         ))}
-
         <path d={linePath} fill="none" stroke="#f59e0b" strokeWidth="2.5" />
         {points.map((point, i) => (
           <circle key={`${point.label}-dot`} cx={x(i) + barW / 2} cy={yElev(point.elevation)} r="3.5" fill="#f59e0b" />
@@ -273,6 +271,9 @@ function LongRunChart({ points }) {
     </div>
   );
 }
+
+const cardClass = "bg-white border border-slate-200 rounded-2xl p-4 shadow-sm";
+const sectionHeaderClass = "mt-8 mb-3";
 
 export default function InsightsPage() {
   const { activities, checkins, plans, strava } = useAppData();
@@ -309,7 +310,6 @@ export default function InsightsPage() {
       const curr = weekly.get(key) || 0;
       weekly.set(key, curr + (Number(activity.moving_time) || 0) / 60);
     });
-
     return Array.from(weekly.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-8)
@@ -341,13 +341,11 @@ export default function InsightsPage() {
       const dist = Number(a.distance) || 0;
       if (d >= thisMonday) thisWeekDist += dist;
       else if (d >= lastMonday) lastWeekDist += dist;
-
       const mondayOfWeek = new Date(d);
       const diff = (d.getDay() === 0 ? -6 : 1) - d.getDay();
       mondayOfWeek.setDate(d.getDate() + diff);
       mondayOfWeek.setHours(0, 0, 0, 0);
-      const wk = mondayOfWeek.toISOString().split("T")[0];
-      weeksWithRuns.add(wk);
+      weeksWithRuns.add(mondayOfWeek.toISOString().split("T")[0]);
     });
 
     const thisWeekKm = (thisWeekDist / 1000).toFixed(1);
@@ -375,19 +373,7 @@ export default function InsightsPage() {
     const tsbStr = tsb == null ? null : `TSB ${tsb > 0 ? "+" : ""}${tsb.toFixed(1)}`;
     const readinessDir = tsb == null ? "neutral" : tsb > 5 ? "up" : tsb > -5 ? "neutral" : "down";
 
-    return {
-      thisWeekKm,
-      distDelta,
-      distDir,
-      ctlValue,
-      ctlDeltaStr,
-      ctlDir,
-      consistencyFrac,
-      weeksRun,
-      readiness,
-      tsbStr,
-      readinessDir,
-    };
+    return { thisWeekKm, distDelta, distDir, ctlValue, ctlDeltaStr, ctlDir, consistencyFrac, weeksRun, readiness, tsbStr, readinessDir };
   }, [activities.activities, trainingLoadSeries]);
 
   const latestLoad = trainingLoadSeries.at(-1);
@@ -397,9 +383,7 @@ export default function InsightsPage() {
 
   const targetLongRunKm = useMemo(() => {
     const currentMileage = Number(plans.plans[0]?.current_mileage) || 0;
-    if (currentMileage > 0) {
-      return Math.max(12, Math.round(currentMileage * 0.35));
-    }
+    if (currentMileage > 0) return Math.max(12, Math.round(currentMileage * 0.35));
     const longest = Math.max(...longRunPoints.map((point) => point.distanceKm), 0);
     return longest > 0 ? Math.round(longest * 1.15) : 20;
   }, [longRunPoints, plans.plans]);
@@ -428,13 +412,13 @@ export default function InsightsPage() {
 
   return (
     <section id="insights" className="page">
-      <div className="page-header">
-        <h2>Training analysis &amp; insights</h2>
-        <p>Understand readiness, spot risk early, and see the impact of your consistency.</p>
+      <div className="mb-5">
+        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Training analysis &amp; insights</h2>
+        <p className="m-0 text-sm text-slate-500">Understand readiness, spot risk early, and see the impact of your consistency.</p>
       </div>
 
-      {/* KPI strip */}
-      <div className="kpi-strip">
+      {/* KPI strip — kpi-strip class preserved for test */}
+      <div className="kpi-strip grid grid-cols-4 gap-3 mb-4 max-[960px]:grid-cols-2 max-[600px]:grid-cols-1">
         {isLoading ? (
           <>
             <SkeletonBlock height={88} />
@@ -444,141 +428,122 @@ export default function InsightsPage() {
           </>
         ) : hasData ? (
           <>
-            <KpiCard
-              label="This week"
-              value={`${kpiData.thisWeekKm} km`}
-              delta={kpiData.distDelta}
-              deltaDir={kpiData.distDir}
-            />
-            <KpiCard
-              label="Training load"
-              value={String(kpiData.ctlValue)}
-              delta={kpiData.ctlDeltaStr}
-              deltaDir={kpiData.ctlDir}
-              note="Chronic load (CTL)"
-            />
-            <KpiCard
-              label="Consistency"
-              value={kpiData.consistencyFrac}
-              note="Weeks with runs (last 8)"
-            />
-            <KpiCard
-              label="Readiness"
-              value={kpiData.readiness}
-              delta={kpiData.tsbStr}
-              deltaDir={kpiData.readinessDir}
-            />
+            <KpiCard label="This week" value={`${kpiData.thisWeekKm} km`} delta={kpiData.distDelta} deltaDir={kpiData.distDir} />
+            <KpiCard label="Training load" value={String(kpiData.ctlValue)} delta={kpiData.ctlDeltaStr} deltaDir={kpiData.ctlDir} note="Chronic load (CTL)" />
+            <KpiCard label="Consistency" value={kpiData.consistencyFrac} note="Weeks with runs (last 8)" />
+            <KpiCard label="Readiness" value={kpiData.readiness} delta={kpiData.tsbStr} deltaDir={kpiData.readinessDir} />
           </>
         ) : null}
       </div>
 
       {/* Empty state */}
       {!isLoading && !hasData && (
-        <div className="empty-state">
-          <p className="empty-state__title">No training data yet</p>
-          <p className="empty-state__body">
+        <div className="text-center py-12">
+          <p className="font-semibold text-slate-700 m-0 mb-1 text-base">No training data yet</p>
+          <p className="text-sm text-slate-500 m-0 mb-4">
             Connect Strava and sync your activities to unlock training load charts, zone analysis, and readiness tracking.
           </p>
           {strava.startConnect && (
-            <button type="button" className="btn btn--primary" onClick={strava.startConnect} style={{ marginTop: "16px" }}>
+            <button type="button" className="cta" onClick={strava.startConnect} style={{ marginTop: "16px" }}>
               Connect Strava
             </button>
           )}
         </div>
       )}
 
-      {/* Chart sections — skeleton while loading, hidden when empty */}
+      {/* Chart sections */}
       {isLoading ? (
-        <>
+        <div className="grid gap-4">
           <SkeletonBlock height={290} />
           <SkeletonBlock height={270} />
           <SkeletonBlock height={280} />
-        </>
+        </div>
       ) : hasData ? (
-        <>
+        <div className="grid gap-4">
           {trainingLoadSeries.length >= 7 && (
-            <div id="training-load-section">
-              <h4>Training load trend</h4>
+            <div className={cardClass} id="training-load-section">
+              <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Training load trend</h4>
               <TrainingLoadChart series={trainingLoadSeries} />
             </div>
           )}
 
           {weeklyLoadPoints.length >= 3 && (
-            <div id="weekly-load-section">
-              <h4>Weekly load</h4>
-              <p className="muted">Rolling 8-week view of accumulated training minutes.</p>
+            <div className={cardClass} id="weekly-load-section">
+              <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Weekly load</h4>
+              <p className="m-0 mb-3 text-xs text-slate-500">Rolling 8-week view of accumulated training minutes.</p>
               <WeeklyLoadChart points={weeklyLoadPoints} />
             </div>
           )}
 
           {(weeklyZones.length >= 1 || activityZones.length >= 1) && (
-            <div id="hr-zones-section">
-              <h4>Heart rate zone distribution</h4>
-              <p className="muted">Time spent in each training zone — use this to balance aerobic base (Z1–Z2) against intensity (Z3–Z5) week by week.</p>
+            <div className={cardClass} id="hr-zones-section">
+              <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Heart rate zone distribution</h4>
+              <p className="m-0 mb-3 text-xs text-slate-500">Time spent in each training zone — use this to balance aerobic base (Z1–Z2) against intensity (Z3–Z5) week by week.</p>
               {weeklyZones.length >= 2 && <HRZoneWeeklyChart weeks={weeklyZones} />}
               {activityZones.length >= 1 && (
                 <>
-                  <h4 style={{ marginTop: "24px" }}>Zone breakdown per workout</h4>
-                  <p className="muted">Last {activityZones.length} activities with heart rate data.</p>
-                  <div className="metric-card" style={{ marginTop: "12px" }}>
-                    <HRZoneActivityBreakdown activityZones={activityZones} />
-                  </div>
+                  <h4 className="m-0 mt-6 mb-1 text-sm font-bold text-slate-900">Zone breakdown per workout</h4>
+                  <p className="m-0 mb-3 text-xs text-slate-500">Last {activityZones.length} activities with heart rate data.</p>
+                  <HRZoneActivityBreakdown activityZones={activityZones} />
                 </>
               )}
             </div>
           )}
 
-          <div id="fitness-level-section" className="metric-card">
-            <h4>Fitness level</h4>
-            <p className="muted">Calculated from current chronic load (CTL).</p>
-            <div className="fitness-meter" role="img" aria-label={`Fitness level ${fitnessScore} out of 100`}>
-              <div className="fitness-meter__fill" style={{ width: `${fitnessScore}%` }} />
+          {/* fitness-meter and fitness-meter__fill classes preserved for tests */}
+          <div className={`${cardClass}`} id="fitness-level-section">
+            <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Fitness level</h4>
+            <p className="m-0 mb-3 text-xs text-slate-500">Calculated from current chronic load (CTL).</p>
+            <div
+              className="fitness-meter w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-2"
+              role="img"
+              aria-label={`Fitness level ${fitnessScore} out of 100`}
+            >
+              <div className="fitness-meter__fill h-full bg-blue-600 rounded-full transition-all" style={{ width: `${fitnessScore}%` }} />
             </div>
-            <div className="metric-row">
-              <span>Level: {fitnessLevel}</span>
-              <strong>{fitnessScore}/100</strong>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-600">Level: {fitnessLevel}</span>
+              <strong className="font-bold text-slate-900">{fitnessScore}/100</strong>
             </div>
           </div>
 
           {longRunPoints.length >= 2 && (
-            <div id="long-run-section">
-              <h4>Long run progression</h4>
-              <div className="metric-row">
-                <span>
+            <div className={cardClass} id="long-run-section">
+              <h4 className="m-0 mb-2 text-sm font-bold text-slate-900">Long run progression</h4>
+              <div className="flex justify-between items-center text-sm mb-2">
+                <span className="text-slate-600">
                   Long run progress: <strong>{latestLongRunKm.toFixed(1)} km</strong> / {targetLongRunKm} km target
                 </span>
-                <strong>{longRunCompletion}%</strong>
+                <strong className="font-bold text-slate-900">{longRunCompletion}%</strong>
               </div>
-              <div className="fitness-meter" role="img" aria-label={`Long run progress ${longRunCompletion} percent`}>
-                <div className="fitness-meter__fill fitness-meter__fill--longrun" style={{ width: `${longRunCompletion}%` }} />
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-3" role="img" aria-label={`Long run progress ${longRunCompletion} percent`}>
+                <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${longRunCompletion}%` }} />
               </div>
               <LongRunChart points={longRunPoints} />
             </div>
           )}
 
-          <div className="insight-summary" id="insight-summary">
+          <div className={`${cardClass} grid gap-4 grid-cols-2 max-[600px]:grid-cols-1`} id="insight-summary">
             <div>
-              <h4>Latest check-in</h4>
-              <p className="muted" id="latest-checkin-text">
-                {latestText}
-              </p>
+              <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Latest check-in</h4>
+              <p className="m-0 text-xs text-slate-500" id="latest-checkin-text">{latestText}</p>
             </div>
-            <div className="stats" id="insight-stats">
+            <div className="grid grid-cols-3 gap-3" id="insight-stats">
               <div>
-                <span className="label">Form trend</span>
-                <strong id="stat-form">{formStat == null ? "—" : `${formStat > 0 ? "+" : ""}${formStat.toFixed(1)}`}</strong>
+                <span className="block text-[11px] text-slate-500 mb-0.5">Form trend</span>
+                <strong id="stat-form" className="text-sm font-bold text-slate-900">{formStat == null ? "—" : `${formStat > 0 ? "+" : ""}${formStat.toFixed(1)}`}</strong>
               </div>
               <div>
-                <span className="label">Readiness</span>
-                <strong id="stat-readiness">{readiness}</strong>
+                <span className="block text-[11px] text-slate-500 mb-0.5">Readiness</span>
+                <strong id="stat-readiness" className="text-sm font-bold text-slate-900">{readiness}</strong>
               </div>
               <div>
-                <span className="label">Risk score</span>
-                <strong id="stat-risk">{risk}</strong>
+                <span className="block text-[11px] text-slate-500 mb-0.5">Risk score</span>
+                <strong id="stat-risk" className="text-sm font-bold text-slate-900">{risk}</strong>
               </div>
             </div>
           </div>
-        </>
+        </div>
       ) : null}
     </section>
   );

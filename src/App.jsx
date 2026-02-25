@@ -162,12 +162,20 @@ function Shell() {
           </div>
         </header>
 
-        <main className="app-content">
+        <main className="p-6 max-[960px]:p-4">
           <ActiveComponent />
         </main>
       </div>
 
-      {menuOpen && <button className="app-overlay" type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}
+      {/* Mobile overlay */}
+      {menuOpen && (
+        <button
+          className="fixed inset-0 border-0 bg-slate-900/35 z-20 max-[960px]:block hidden"
+          type="button"
+          onClick={() => setMenuOpen(false)}
+          aria-label="Close menu"
+        />
+      )}
     </div>
   );
 }
@@ -177,8 +185,8 @@ function AuthGate() {
 
   if (auth.loading) {
     return (
-      <div className="auth-page">
-        <p style={{ color: "#64748b" }}>Loading…</p>
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50">
+        <p className="text-slate-500">Loading…</p>
       </div>
     );
   }

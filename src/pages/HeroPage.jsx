@@ -61,24 +61,29 @@ function deltaMeta(current, previous, suffix = "vs last period") {
   return { text: `● ${Math.abs(change).toFixed(0)}%`, tone: "warning", suffix };
 }
 
-function DashboardSkeleton() {
-  return (
-    <div className="dashboard-shell is-loading" aria-hidden="true">
-      <section className="dashboard-main">
-        <div className="skeleton skeleton--header" />
-        <div className="dashboard-kpis">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="dashboard-kpi skeleton skeleton--card" />
-          ))}
-        </div>
-        <div className="skeleton skeleton--chart" />
-      </section>
-      <aside className="dashboard-rail">
-        <div className="skeleton skeleton--card" />
-        <div className="skeleton skeleton--card" />
-      </aside>
-    </div>
-  );
+function formatTimeOfDay(dateStr) {
+  if (!dateStr) return null;
+  return new Date(dateStr).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return null;
+  const mins = Math.round(seconds / 60);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+function effortMeta(zones) {
+  if (!zones) return null;
+  const total = (zones.z1 || 0) + (zones.z2 || 0) + (zones.z3 || 0) + (zones.z4 || 0) + (zones.z5 || 0);
+  if (!total) return null;
+  const hardPct = ((zones.z4 || 0) + (zones.z5 || 0)) / total;
+  const modPct = (zones.z3 || 0) / total;
+  if (hardPct > 0.35) return { icon: "🔴", label: "Hard" };
+  if (modPct > 0.25 || hardPct > 0.15) return { icon: "🟡", label: "Moderate" };
+  return { icon: "🟢", label: "Easy" };
 }
 
 const KPI_COLORS = ["#2563eb", "#8b5cf6", "#16a34a", "#f59e0b"];
@@ -89,6 +94,20 @@ const DELTA_COLOR = {
   warning: "text-amber-600",
   info: "text-blue-600",
 };
+
+function DashboardSkeleton() {
+  return (
+    <div className="is-loading grid gap-4" aria-hidden="true">
+      <div className="h-[120px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
+      <div className="grid grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div key={idx} className="min-h-[120px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
+        ))}
+      </div>
+      <div className="min-h-[280px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
+    </div>
+  );
+}
 
 export default function HeroPage() {
   const { auth, activities } = useAppData();
@@ -266,10 +285,10 @@ export default function HeroPage() {
 
   if (activities.error) {
     return (
-      <section className="dashboard-card">
-        <h2>Dashboard temporarily unavailable</h2>
-        <p className="empty-state">We could not load activity data. Please retry from the Data tab or refresh the page.</p>
-      </section>
+      <div className="bg-white border border-slate-200 rounded-2xl p-5">
+        <h2 className="m-0 mb-2 text-xl font-bold text-slate-900">Dashboard temporarily unavailable</h2>
+        <p className="m-0 text-sm text-slate-500">We could not load activity data. Please retry from the Data tab or refresh the page.</p>
+      </div>
     );
   }
 
@@ -314,9 +333,7 @@ export default function HeroPage() {
               className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
             >
               {TYPE_FILTERS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
+                <option key={item} value={item}>{item}</option>
               ))}
             </select>
           </div>
@@ -450,10 +467,10 @@ export default function HeroPage() {
                 key={item}
                 type="button"
                 aria-pressed={timelineFilter === item}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
                   timelineFilter === item
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                    : "text-slate-500 hover:text-slate-700 border border-transparent"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : "text-slate-500 hover:text-slate-700 border-transparent"
                 }`}
                 onClick={() => setTimelineFilter(item)}
               >
@@ -471,26 +488,37 @@ export default function HeroPage() {
           />
           <div className="space-y-1">
             {activityFeed.length ? (
-              activityFeed.map((item) => (
-                <button
-                  type="button"
-                  className="w-full grid grid-cols-[28px_1fr_auto] gap-2 items-center text-left border-t border-slate-100 py-2.5 hover:bg-slate-50 rounded-lg transition-colors"
-                  key={item.id}
-                >
-                  <span className="text-base" aria-hidden="true">{activityIcon(item.type)}</span>
-                  <span>
-                    <strong className="block text-sm text-slate-900">{item.name || item.type || "Workout"}</strong>
-                    <small className="block text-xs text-slate-500">{item.type || "Session"} · {formatDistance(Number(item.distance) || 0)}</small>
-                  </span>
-                  <span className="text-xs text-slate-400">{formatAgo(item.started_at)}</span>
-                </button>
-              ))
+              activityFeed.map((item) => {
+                const duration = formatDuration(item.moving_time);
+                const timeOfDay = formatTimeOfDay(item.started_at);
+                const effort = effortMeta(item.heart_rate_zones);
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className="w-full grid grid-cols-[28px_1fr_auto] gap-2 items-start text-left border-t border-slate-100 py-2.5 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    <span className="text-base mt-0.5" aria-hidden="true">{activityIcon(item.type)}</span>
+                    <span>
+                      <strong className="block text-sm text-slate-900">{item.name || item.type || "Workout"}</strong>
+                      <small className="block text-xs text-slate-500">
+                        {item.type || "Session"} · {formatDistance(Number(item.distance) || 0)}{duration ? ` · ${duration}` : ""}
+                      </small>
+                      {(timeOfDay || effort) && (
+                        <small className="block text-xs text-slate-400 mt-0.5">
+                          {timeOfDay}{effort ? ` · ${effort.icon} ${effort.label}` : ""}
+                        </small>
+                      )}
+                    </span>
+                    <span className="text-xs text-slate-400 mt-1">{formatAgo(item.started_at)}</span>
+                  </button>
+                );
+              })
             ) : (
               <p className="text-slate-400 text-sm py-4 text-center">No activity matches this filter.</p>
             )}
           </div>
         </article>
-
       </aside>
     </div>
   );

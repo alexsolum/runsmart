@@ -91,7 +91,7 @@ runsmart/
 | External APIs | Strava v3, Google Gemini 2.5-flash | Both routed via Edge Functions |
 | Hosting | Vercel | Primary deployment |
 | Testing | Vitest + React Testing Library | Unit + component tests |
-| Styling | Vanilla CSS | No Tailwind, no CSS-in-JS |
+| Styling | Tailwind and shadcn/ui |
 | Language | JavaScript / JSX | No TypeScript yet |
 
 ## Development

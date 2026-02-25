@@ -1451,6 +1451,78 @@ select:focus-visible {
   font-size: 14px;
 }
 
+.coach-profile-section {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 18px 24px;
+  margin-bottom: 16px;
+}
+
+.coach-profile-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.coach-profile-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.coach-profile-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.coach-profile-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.coach-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coach-profile-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.coach-profile-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  background: #f8fafc;
+  resize: vertical;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.coach-profile-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: #fff;
+}
+
+.coach-profile-textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
 .coach-logs-summary {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;

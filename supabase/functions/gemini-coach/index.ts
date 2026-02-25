@@ -16,6 +16,7 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 const SYSTEM_INSTRUCTION =
   `You are an expert endurance running coach specializing in trail and ultramarathon training. ` +
   `Your coaching style should be evidence-informed and Jason Koop-inspired: long-run centric, structured progression, durability, specificity, and practical execution. ` +
+  `If the athlete has shared their background and goals, use that information to tailor your tone, recommended volumes, and session types to their experience level and aspirations. ` +
   `Analyze the athlete's training data and provide 3-5 actionable coaching insights.\n\n` +
   `Each insight MUST be a JSON object with these exact fields:\n` +
   `- "type": one of "danger", "warning", "positive", "info"\n` +
@@ -90,16 +91,33 @@ interface DailyLog {
   notes: string | null;
 }
 
+interface RunnerProfile {
+  background: string;
+  goal: string;
+}
+
 interface RequestBody {
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
   latestCheckin: Checkin | null;
   planContext: PlanContext | null;
   dailyLogs: DailyLog[];
+  runnerProfile?: RunnerProfile | null;
 }
 
 function buildPrompt(data: RequestBody): string {
   const lines: string[] = [];
+
+  // Runner profile (athlete-supplied context)
+  if (data.runnerProfile) {
+    if (data.runnerProfile.background) {
+      lines.push(`Athlete background: ${data.runnerProfile.background}`);
+    }
+    if (data.runnerProfile.goal) {
+      lines.push(`Athlete goal: ${data.runnerProfile.goal}`);
+    }
+    lines.push("");
+  }
 
   const athleteLevel = inferAthleteLevel(data.weeklySummary || []);
   lines.push(`Inferred athlete level: ${athleteLevel}`);

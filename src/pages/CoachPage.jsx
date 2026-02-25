@@ -221,14 +221,13 @@ export default function CoachPage() {
     setError(null);
 
     try {
-      // Load fresh daily logs and fetch session concurrently
+      // Load fresh daily logs and check session concurrently
       const [freshLogs, sessionResult] = await Promise.all([
         dailyLogs.loadLogs().catch(() => dailyLogs.logs),
         client.auth.getSession(),
       ]);
 
-      const session = sessionResult?.data?.session;
-      if (!session?.access_token) {
+      if (!sessionResult?.data?.session) {
         throw new Error("Not authenticated. Please sign in again.");
       }
 
@@ -240,9 +239,9 @@ export default function CoachPage() {
         dailyLogs: getRecentDailyLogs(freshLogs ?? []),
       };
 
+      // Let the Supabase client handle Authorization automatically from session
       const { data, error: invokeError } = await client.functions.invoke("gemini-coach", {
         body: payload,
-        headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
       if (invokeError) throw new Error(`Coach request failed: ${invokeError.message}`);

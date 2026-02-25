@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import MiniBarChart from "../components/MiniBarChart";
+import TrainingVolumeChart from "../components/TrainingVolumeChart";
 
 const STORAGE_KEY = "runsmart.dashboard.filters";
 const DATE_FILTERS = [
@@ -51,6 +53,14 @@ function activityIcon(type) {
   return "🗓️";
 }
 
+function deltaMeta(current, previous, suffix = "vs last period") {
+  if (!previous) return { text: "No baseline", tone: "info", suffix };
+  const change = ((current - previous) / previous) * 100;
+  if (change >= 5) return { text: `▲ ${change.toFixed(0)}%`, tone: "success", suffix };
+  if (change <= -5) return { text: `▼ ${Math.abs(change).toFixed(0)}%`, tone: "critical", suffix };
+  return { text: `● ${Math.abs(change).toFixed(0)}%`, tone: "warning", suffix };
+}
+
 function formatTimeOfDay(dateStr) {
   if (!dateStr) return null;
   return new Date(dateStr).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -76,19 +86,13 @@ function effortMeta(zones) {
   return { icon: "🟢", label: "Easy" };
 }
 
-function deltaMeta(current, previous, suffix = "vs last period") {
-  if (!previous) return { text: "No baseline", tone: "info", suffix };
-  const change = ((current - previous) / previous) * 100;
-  if (change >= 5) return { text: `▲ ${change.toFixed(0)}%`, tone: "success", suffix };
-  if (change <= -5) return { text: `▼ ${Math.abs(change).toFixed(0)}%`, tone: "critical", suffix };
-  return { text: `● ${Math.abs(change).toFixed(0)}%`, tone: "warning", suffix };
-}
+const KPI_COLORS = ["#2563eb", "#8b5cf6", "#16a34a", "#f59e0b"];
 
-const DELTA_COLORS = {
-  success:  "text-green-600",
-  warning:  "text-amber-600",
+const DELTA_COLOR = {
+  success: "text-green-600",
   critical: "text-red-600",
-  info:     "text-blue-600",
+  warning: "text-amber-600",
+  info: "text-blue-600",
 };
 
 function DashboardSkeleton() {
@@ -102,24 +106,6 @@ function DashboardSkeleton() {
       </div>
       <div className="min-h-[280px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
     </div>
-  );
-}
-
-// Pill-style chip button for filter groups
-function Chip({ label, active, onClick }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      className={`min-h-[34px] rounded-full border px-3 py-1 text-sm font-inherit cursor-pointer transition-colors ${
-        active
-          ? "bg-indigo-100 border-indigo-200 text-indigo-800"
-          : "bg-white border-transparent text-slate-700 hover:bg-slate-100"
-      }`}
-      onClick={onClick}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -233,10 +219,11 @@ export default function HeroPage() {
     return Object.entries(grouped)
       .map(([date, values]) => ({
         date,
-        distance: values.distance / 1000,
-        load: values.load,
+        label: new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        distance: +(values.distance / 1000).toFixed(1),
+        load: +values.load.toFixed(0),
         pace: values.pace.length
-          ? values.pace.reduce((acc, value) => acc + value, 0) / values.pace.length / 60
+          ? +(values.pace.reduce((acc, value) => acc + value, 0) / values.pace.length / 60).toFixed(2)
           : null,
       }))
       .slice(-8);
@@ -280,6 +267,18 @@ export default function HeroPage() {
     return "Light training week. Consider adding an aerobic support run.";
   }, [filtered]);
 
+  const dailyDistances = useMemo(() => {
+    const result = Array(7).fill(0);
+    const now = new Date();
+    filtered.forEach((item) => {
+      const dayDiff = Math.floor((now - new Date(item.started_at)) / (1000 * 60 * 60 * 24));
+      if (dayDiff >= 0 && dayDiff < 7) {
+        result[6 - dayDiff] += (Number(item.distance) || 0) / 1000;
+      }
+    });
+    return result;
+  }, [filtered]);
+
   if (activities.loading) {
     return <DashboardSkeleton />;
   }
@@ -293,156 +292,190 @@ export default function HeroPage() {
     );
   }
 
-  const cardClass = "bg-white border border-slate-200 rounded-2xl p-4 shadow-sm";
-
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-6 items-start max-[960px]:grid-cols-1">
-
-      {/* ── Main column ── */}
-      <div className="grid gap-4 content-start min-w-0">
-
-        {/* Header */}
-        <header className={`${cardClass} flex justify-between gap-4 max-[960px]:flex-col max-[960px]:sticky max-[960px]:top-0 max-[960px]:z-[5]`}>
+    <div className="dashboard-shell">
+      <section className="dashboard-main">
+        {/* Header: greeting + filters */}
+        <header className="bg-white rounded-2xl p-5 shadow-sm flex flex-col lg:flex-row justify-between gap-4">
           <div>
-            <p className="m-0 text-sm text-slate-500">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
-            <h2 className="my-1 text-xl font-bold text-slate-900">Welcome back, {auth.user?.email?.split("@")[0] || "Athlete"}</h2>
-            <p className="m-0 text-sm text-slate-500">Current phase: Build · focus on aerobic durability and controlled intensity.</p>
+            <p className="text-sm text-slate-500 mb-1">
+              {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+            </p>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">
+              Welcome back, {auth.user?.email?.split("@")[0] || "Athlete"}
+            </h2>
+            <p className="text-sm text-slate-500">
+              Current phase: Build · focus on aerobic durability and controlled intensity.
+            </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Dashboard filters">
-            <div className="inline-flex gap-1 p-0.5 bg-slate-100 rounded-full">
+            <div className="inline-flex gap-1 p-1 bg-slate-100 rounded-full">
               {DATE_FILTERS.map((item) => (
-                <Chip
+                <button
                   key={item.key}
-                  label={item.label}
-                  active={dateFilter === item.key}
+                  type="button"
+                  aria-pressed={dateFilter === item.key}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    dateFilter === item.key
+                      ? "bg-white shadow-sm text-slate-900"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
                   onClick={() => setDateFilter(item.key)}
-                />
+                >
+                  {item.label}
+                </button>
               ))}
             </div>
             <select
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value)}
               aria-label="Workout type filter"
-              className="min-h-[38px] rounded-lg border border-slate-200 bg-white text-slate-700 font-inherit px-3 py-1 text-sm"
+              className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
             >
               {TYPE_FILTERS.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
-            <button
-              type="button"
-              className="min-h-[38px] rounded-lg border border-slate-200 bg-white text-slate-700 font-inherit px-3 py-1 text-sm"
-            >
-              Notifications
-            </button>
           </div>
         </header>
 
-        {/* KPI strip */}
-        <section
-          className="grid gap-3 grid-cols-4 overflow-x-auto max-[960px]:flex max-[960px]:pb-1"
-          aria-label="Weekly metrics"
-        >
-          {metrics.map((metric) => (
-            <article className={`dashboard-kpi ${cardClass} min-w-[200px] max-[960px]:min-w-[210px]`} key={metric.label}>
-              <p className="m-0 text-sm text-slate-500">{metric.label}</p>
-              <strong className="block my-1 text-[1.4rem] font-bold text-slate-900">{metric.value}</strong>
-              <span className={`font-semibold text-sm ${DELTA_COLORS[metric.delta.tone] ?? "text-slate-500"}`}>{metric.delta.text}</span>
-              <small className="block text-xs text-slate-400">{metric.delta.suffix}</small>
-              <small className="block mt-1 text-xs text-slate-400">{metric.helper}</small>
+        {/* KPI Cards */}
+        <section className="dashboard-kpis" aria-label="Weekly metrics">
+          {metrics.map((metric, idx) => (
+            <article key={metric.label} className="dashboard-kpi bg-white rounded-2xl p-5 shadow-sm flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-500 mb-1">{metric.label}</p>
+                <strong className="text-2xl font-bold text-slate-900 block">{metric.value}</strong>
+                <span className={`text-xs font-semibold mt-1 inline-block ${DELTA_COLOR[metric.delta.tone] || "text-blue-600"}`}>
+                  {metric.delta.text}
+                </span>
+                <small className="block text-xs text-slate-400 mt-0.5">{metric.delta.suffix}</small>
+                <small className="kpi-helper block text-xs text-slate-400 mt-1">{metric.helper}</small>
+              </div>
+              <MiniBarChart data={dailyDistances} color={KPI_COLORS[idx]} />
             </article>
           ))}
         </section>
 
-        {/* Training trend */}
-        <article className={cardClass}>
-          <div className="flex justify-between gap-3 items-baseline mb-3">
+        {/* Training Trend Chart */}
+        <article className="bg-white rounded-2xl p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h3 className="m-0 text-sm font-bold text-slate-900">Training Trend</h3>
-              <p className="m-0 text-xs text-slate-500">Distance, load, and pace overlays</p>
+              <h3 className="text-base font-semibold text-slate-900">Training Trend</h3>
+              <p className="text-sm text-slate-500">Distance, load, and pace overlays</p>
             </div>
-            <div className="inline-flex gap-1 p-0.5 bg-slate-100 rounded-full" role="group" aria-label="Trend overlay selector">
+            <div className="inline-flex gap-1 p-1 bg-slate-100 rounded-full" role="group" aria-label="Trend overlay selector">
               {OVERLAY_FILTERS.map((item) => (
-                <Chip
+                <button
                   key={item.key}
-                  label={item.label}
-                  active={overlayFilter === item.key}
+                  type="button"
+                  aria-pressed={overlayFilter === item.key}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    overlayFilter === item.key
+                      ? "bg-white shadow-sm text-slate-900"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
                   onClick={() => setOverlayFilter(item.key)}
-                />
+                >
+                  {item.label}
+                </button>
               ))}
             </div>
           </div>
-          <div className="grid gap-2" role="img" aria-label={`Trend chart for ${overlayFilter} over recent sessions`}>
-            {weeklySeries.length ? (
-              weeklySeries.map((point) => (
-                <div key={point.date} className="grid grid-cols-[85px_1fr] gap-2 items-center pt-2 border-t border-slate-100 max-[960px]:grid-cols-1">
-                  <span className="text-xs text-slate-500">{new Date(point.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-                  {overlayFilter === "distance" && (
-                    <div>
-                      <label className="block text-xs text-slate-600 mb-1">Distance {point.distance.toFixed(1)} km</label>
-                      <progress max="30" value={point.distance} className="w-full h-2" />
-                    </div>
-                  )}
-                  {overlayFilter === "load" && (
-                    <div>
-                      <label className="block text-xs text-slate-600 mb-1">Load {Math.round(point.load)} min</label>
-                      <progress max="180" value={point.load} className="w-full h-2" />
-                    </div>
-                  )}
-                  {overlayFilter === "pace" && (
-                    <div>
-                      <label className="block text-xs text-slate-600 mb-1">Pace {point.pace ? `${point.pace.toFixed(2)} min/km` : "—"}</label>
-                      <progress max="8" value={point.pace ? Math.max(0, 8 - point.pace) : 0} className="w-full h-2" />
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-400 text-center py-4 m-0">No trend data for this period. Connect Strava or log your next workout to populate the chart.</p>
-            )}
-          </div>
-          <p className="m-0 mt-3 text-xs text-slate-400">Summary: recent load is {metrics[1].value}, with readiness currently at {metrics[3].value}.</p>
+          {weeklySeries.length ? (
+            <TrainingVolumeChart data={weeklySeries} overlayFilter={overlayFilter} />
+          ) : (
+            <p className="text-slate-400 text-sm py-12 text-center">
+              No trend data for this period. Connect Strava or log your next workout to populate the chart.
+            </p>
+          )}
+          <p className="text-xs text-slate-400 mt-3">
+            Summary: recent load is {metrics[1].value}, with readiness currently at {metrics[3].value}.
+          </p>
         </article>
 
-        {/* Insights row */}
-        <div className="grid gap-3 grid-cols-2 max-[960px]:grid-cols-1">
-          <article className={cardClass}>
-            <h3 className="m-0 mb-2 text-sm font-bold text-slate-900">Workout Mix</h3>
+        {/* Workout Mix + Fatigue & Form */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <article className="bg-white rounded-2xl p-5 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900 mb-3">Workout Mix</h3>
             {workoutMix.length ? (
-              <ul className="m-0 p-0 list-none grid gap-2">
+              <div className="space-y-2">
                 {workoutMix.map(([type, count]) => (
-                  <li key={type} className="flex justify-between pb-2 border-b border-slate-100 last:border-0 last:pb-0">
-                    <span className="text-sm text-slate-700">{type}</span>
-                    <strong className="text-sm font-bold text-slate-900">{count}</strong>
-                  </li>
+                  <div key={type} className="flex items-center justify-between text-sm border-b border-slate-100 pb-2">
+                    <span className="text-slate-600">{type}</span>
+                    <strong className="text-slate-900">{count}</strong>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : (
-              <p className="text-sm text-slate-400 m-0">No completed sessions yet.</p>
+              <p className="text-slate-400 text-sm">No completed sessions yet.</p>
             )}
           </article>
-          <article className={cardClass}>
-            <h3 className="m-0 mb-2 text-sm font-bold text-slate-900">Fatigue &amp; Form</h3>
-            <p className="m-0 mb-3 text-sm text-slate-600">{fatigueSummary}</p>
-            <button type="button" className="ghost" style={{ fontSize: "12px", padding: "6px 10px" }}>View details</button>
+          <article className="bg-white rounded-2xl p-5 shadow-sm">
+            <h3 className="text-base font-semibold text-slate-900 mb-3">Fatigue &amp; Form</h3>
+            <p className="text-sm text-slate-600">{fatigueSummary}</p>
+            <button type="button" className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
+              View details
+            </button>
           </article>
-        </div>
-      </div>
+        </section>
+      </section>
 
-      {/* ── Rail / sidebar ── */}
-      <aside className="grid gap-4 content-start" aria-label="Recent activity stream">
-        <article className={cardClass}>
-          <div className="flex justify-between items-baseline gap-3 mb-2">
-            <h3 className="m-0 text-sm font-bold text-slate-900">Recent Activity</h3>
-          </div>
-          <div className="flex gap-1 mb-2">
-            {TIMELINE_FILTERS.map((item) => (
-              <Chip
-                key={item}
-                label={item}
-                active={timelineFilter === item}
-                onClick={() => setTimelineFilter(item)}
+      {/* Right Rail */}
+      <aside className="dashboard-rail" aria-label="Recent activity stream">
+        {/* Statistics Panel */}
+        <article className="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Statistics</h3>
+
+          <div className="mb-4">
+            <div className="flex justify-between text-sm mb-1.5">
+              <span className="text-slate-600">Weekly Regularity</span>
+              <span className="font-semibold text-slate-900">{metrics[2].value}</span>
+            </div>
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (parseInt(metrics[2].value) / 7) * 100)}%` }}
               />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="flex justify-between text-sm mb-1.5">
+              <span className="text-slate-600">Form Score</span>
+              <span className="font-semibold text-slate-900">{metrics[3].value}</span>
+            </div>
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 rounded-full transition-all"
+                style={{ width: metrics[3].value }}
+              />
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl">
+            <p className="text-sm text-slate-600">{fatigueSummary}</p>
+          </div>
+        </article>
+
+        {/* Recent Activity */}
+        <article className="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-slate-900 mb-3">Recent Activity</h3>
+          <div className="flex gap-1 mb-3">
+            {TIMELINE_FILTERS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={timelineFilter === item}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
+                  timelineFilter === item
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : "text-slate-500 hover:text-slate-700 border-transparent"
+                }`}
+                onClick={() => setTimelineFilter(item)}
+              >
+                {item}
+              </button>
             ))}
           </div>
           <input
@@ -451,19 +484,23 @@ export default function HeroPage() {
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search workouts"
             aria-label="Search recent activity"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 font-inherit text-sm bg-white mb-1"
+            className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 mb-3"
           />
-          <div className="mt-3 grid gap-2">
+          <div className="space-y-1">
             {activityFeed.length ? (
               activityFeed.map((item) => {
                 const duration = formatDuration(item.moving_time);
                 const timeOfDay = formatTimeOfDay(item.started_at);
                 const effort = effortMeta(item.heart_rate_zones);
                 return (
-                  <button type="button" key={item.id} className="grid grid-cols-[28px_1fr_auto] gap-2 items-start text-left border-0 border-t border-slate-100 bg-transparent text-inherit font-inherit py-2 cursor-pointer w-full">
-                    <span className="text-lg mt-0.5" aria-hidden="true">{activityIcon(item.type)}</span>
+                  <button
+                    type="button"
+                    key={item.id}
+                    className="w-full grid grid-cols-[28px_1fr_auto] gap-2 items-start text-left border-t border-slate-100 py-2.5 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    <span className="text-base mt-0.5" aria-hidden="true">{activityIcon(item.type)}</span>
                     <span>
-                      <strong className="block text-sm font-semibold text-slate-900">{item.name || item.type || "Workout"}</strong>
+                      <strong className="block text-sm text-slate-900">{item.name || item.type || "Workout"}</strong>
                       <small className="block text-xs text-slate-500">
                         {item.type || "Session"} · {formatDistance(Number(item.distance) || 0)}{duration ? ` · ${duration}` : ""}
                       </small>
@@ -473,12 +510,12 @@ export default function HeroPage() {
                         </small>
                       )}
                     </span>
-                    <span className="text-xs text-slate-400 whitespace-nowrap mt-1">{formatAgo(item.started_at)}</span>
+                    <span className="text-xs text-slate-400 mt-1">{formatAgo(item.started_at)}</span>
                   </button>
                 );
               })
             ) : (
-              <p className="text-sm text-slate-400 m-0 py-2">No activity matches this filter.</p>
+              <p className="text-slate-400 text-sm py-4 text-center">No activity matches this filter.</p>
             )}
           </div>
         </article>

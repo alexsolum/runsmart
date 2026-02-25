@@ -37,6 +37,23 @@ const BLANK_PLAN = {
   b2b_long_runs: false,
 };
 
+// Phase colors map
+const PHASE_COLORS = {
+  Base:     "bg-sky-500",
+  Build:    "bg-blue-600",
+  Peak:     "bg-violet-700",
+  Taper:    "bg-amber-600",
+  Recovery: "bg-green-600",
+};
+
+const PHASE_BADGE_COLORS = {
+  Base:     "bg-sky-500 text-white",
+  Build:    "bg-blue-600 text-white",
+  Peak:     "bg-violet-700 text-white",
+  Taper:    "bg-amber-600 text-white",
+  Recovery: "bg-green-600 text-white",
+};
+
 function PhaseSummaryBar({ blocks }) {
   if (!blocks.length) return null;
   const earliest = new Date(blocks[0].start_date);
@@ -44,15 +61,16 @@ function PhaseSummaryBar({ blocks }) {
   const totalDays = (latest - earliest) / (1000 * 60 * 60 * 24) || 1;
 
   return (
-    <div className="ltp-phase-bar" aria-label="Training phase timeline">
+    <div className="ltp-phase-bar flex rounded-xl overflow-hidden min-h-[38px] mb-4 gap-0.5 bg-slate-100" aria-label="Training phase timeline">
       {blocks.map((block) => {
         const spanDays =
           (new Date(block.end_date) - new Date(block.start_date)) / (1000 * 60 * 60 * 24) || 1;
         const flex = spanDays / totalDays;
+        const colorClass = PHASE_COLORS[block.phase] ?? "bg-slate-400";
         return (
           <div
             key={block.id}
-            className={`ltp-phase-seg is-${block.phase}`}
+            className={`flex items-center px-2.5 py-1.5 text-[11px] font-bold text-white min-w-0 overflow-hidden whitespace-nowrap ${colorClass}`}
             style={{ flex }}
             title={`${block.label || block.phase}: ${formatDateRange(block.start_date, block.end_date)}`}
           >
@@ -63,6 +81,8 @@ function PhaseSummaryBar({ blocks }) {
     </div>
   );
 }
+
+const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-2 font-inherit text-[13px] bg-white focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]";
 
 function BlockForm({ initial, planId, onSave, onCancel, loading }) {
   const [form, setForm] = useState({ ...BLANK_BLOCK, ...initial });
@@ -82,76 +102,53 @@ function BlockForm({ initial, planId, onSave, onCancel, loading }) {
   }
 
   return (
-    <form className="ltp-block-form" onSubmit={handleSubmit} noValidate>
-      <h4 style={{ margin: "0 0 12px" }}>{initial?.id ? "Edit block" : "Add training block"}</h4>
+    <form className="ltp-block-form border-t border-slate-200 pt-3.5" onSubmit={handleSubmit} noValidate>
+      <h4 className="m-0 mb-3 text-sm font-bold">{initial?.id ? "Edit block" : "Add training block"}</h4>
 
-      <label>
-        <span>Phase</span>
-        <select value={form.phase} onChange={(e) => set("phase", e.target.value)} required>
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Phase</span>
+        <select className={inputClass} value={form.phase} onChange={(e) => set("phase", e.target.value)} required>
           {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </label>
 
-      <label>
-        <span>Label (optional, e.g. "Base 1")</span>
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Label (optional, e.g. "Base 1")</span>
         <input
           type="text"
+          className={inputClass}
           placeholder="Leave blank to use phase name"
           value={form.label}
           onChange={(e) => set("label", e.target.value)}
         />
       </label>
 
-      <div className="ltp-form-row">
-        <label>
-          <span>Start date</span>
-          <input
-            type="date"
-            value={form.start_date}
-            onChange={(e) => set("start_date", e.target.value)}
-            required
-          />
+      <div className="grid grid-cols-2 gap-2 mb-2.5">
+        <label className="block">
+          <span className="block text-xs text-slate-500 font-medium mb-1">Start date</span>
+          <input type="date" className={inputClass} value={form.start_date} onChange={(e) => set("start_date", e.target.value)} required />
         </label>
-        <label>
-          <span>End date</span>
-          <input
-            type="date"
-            value={form.end_date}
-            onChange={(e) => set("end_date", e.target.value)}
-            min={form.start_date}
-            required
-          />
+        <label className="block">
+          <span className="block text-xs text-slate-500 font-medium mb-1">End date</span>
+          <input type="date" className={inputClass} value={form.end_date} onChange={(e) => set("end_date", e.target.value)} min={form.start_date} required />
         </label>
       </div>
 
-      <label>
-        <span>Weekly target (km, optional)</span>
-        <input
-          type="number"
-          min="0"
-          max="500"
-          step="0.5"
-          placeholder="e.g. 60"
-          value={form.target_km}
-          onChange={(e) => set("target_km", e.target.value)}
-        />
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Weekly target (km, optional)</span>
+        <input type="number" min="0" max="500" step="0.5" className={inputClass} placeholder="e.g. 60" value={form.target_km} onChange={(e) => set("target_km", e.target.value)} />
       </label>
 
-      <label>
-        <span>Notes (optional)</span>
-        <textarea
-          rows={2}
-          placeholder="e.g. Focus on aerobic base, keep HR in zone 2"
-          value={form.notes}
-          onChange={(e) => set("notes", e.target.value)}
-        />
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Notes (optional)</span>
+        <textarea rows={2} className={inputClass} placeholder="e.g. Focus on aerobic base, keep HR in zone 2" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
       </label>
 
-      <div className="ltp-panel-actions">
-        <button type="submit" className="cta" disabled={loading || !form.start_date || !form.end_date}>
+      <div className="flex gap-2 flex-wrap">
+        <button type="submit" className="cta" disabled={loading || !form.start_date || !form.end_date} style={{ fontSize: "13px", padding: "8px 14px" }}>
           {loading ? "Saving…" : initial?.id ? "Update block" : "Add block"}
         </button>
-        <button type="button" className="ghost" onClick={onCancel} disabled={loading}>
+        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "13px", padding: "8px 14px" }}>
           Cancel
         </button>
       </div>
@@ -176,75 +173,47 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
   }
 
   return (
-    <form className="ltp-block-form" onSubmit={handleSubmit} noValidate>
-      <h4 style={{ margin: "0 0 12px" }}>New training plan</h4>
+    <form className="border-t border-slate-200 pt-3.5" onSubmit={handleSubmit} noValidate>
+      <h4 className="m-0 mb-3 text-sm font-bold">New training plan</h4>
 
-      <label>
-        <span>Goal race</span>
-        <input
-          type="text"
-          placeholder="e.g. Stockholm Marathon"
-          value={form.race}
-          onChange={(e) => set("race", e.target.value)}
-          required
-        />
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Goal race</span>
+        <input type="text" className={inputClass} placeholder="e.g. Stockholm Marathon" value={form.race} onChange={(e) => set("race", e.target.value)} required />
       </label>
 
-      <label>
-        <span>Race date</span>
-        <input
-          type="date"
-          value={form.race_date}
-          onChange={(e) => set("race_date", e.target.value)}
-          min={todayIso()}
-          required
-        />
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Race date</span>
+        <input type="date" className={inputClass} value={form.race_date} onChange={(e) => set("race_date", e.target.value)} min={todayIso()} required />
       </label>
 
-      <div className="ltp-form-row">
-        <label>
-          <span>Days/week available</span>
-          <select value={form.availability} onChange={(e) => set("availability", e.target.value)}>
+      <div className="grid grid-cols-2 gap-2 mb-2.5">
+        <label className="block">
+          <span className="block text-xs text-slate-500 font-medium mb-1">Days/week available</span>
+          <select className={inputClass} value={form.availability} onChange={(e) => set("availability", e.target.value)}>
             {[3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
-        <label>
-          <span>Current weekly km</span>
-          <input
-            type="number"
-            min="0"
-            max="300"
-            placeholder="e.g. 50"
-            value={form.current_mileage}
-            onChange={(e) => set("current_mileage", e.target.value)}
-          />
+        <label className="block">
+          <span className="block text-xs text-slate-500 font-medium mb-1">Current weekly km</span>
+          <input type="number" min="0" max="300" className={inputClass} placeholder="e.g. 50" value={form.current_mileage} onChange={(e) => set("current_mileage", e.target.value)} />
         </label>
       </div>
 
-      <label>
-        <span>Constraints / injuries (optional)</span>
-        <textarea
-          rows={2}
-          placeholder="e.g. Knee niggle, avoid hills for now"
-          value={form.constraints}
-          onChange={(e) => set("constraints", e.target.value)}
-        />
+      <label className="block mb-2.5">
+        <span className="block text-xs text-slate-500 font-medium mb-1">Constraints / injuries (optional)</span>
+        <textarea rows={2} className={inputClass} placeholder="e.g. Knee niggle, avoid hills for now" value={form.constraints} onChange={(e) => set("constraints", e.target.value)} />
       </label>
 
-      <label className="ltp-checkbox-label">
-        <input
-          type="checkbox"
-          checked={form.b2b_long_runs}
-          onChange={(e) => set("b2b_long_runs", e.target.checked)}
-        />
-        <span>Back-to-back long runs</span>
+      <label className="flex items-center gap-2 mb-2.5 cursor-pointer">
+        <input type="checkbox" checked={form.b2b_long_runs} onChange={(e) => set("b2b_long_runs", e.target.checked)} />
+        <span className="text-sm">Back-to-back long runs</span>
       </label>
 
-      <div className="ltp-panel-actions">
-        <button type="submit" className="cta" disabled={loading || !form.race || !form.race_date}>
+      <div className="flex gap-2 flex-wrap">
+        <button type="submit" className="cta" disabled={loading || !form.race || !form.race_date} style={{ fontSize: "13px", padding: "8px 14px" }}>
           {loading ? "Creating…" : "Create plan"}
         </button>
-        <button type="button" className="ghost" onClick={onCancel} disabled={loading}>
+        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "13px", padding: "8px 14px" }}>
           Cancel
         </button>
       </div>
@@ -259,6 +228,7 @@ export default function LongTermPlanPage() {
   const [editingBlock, setEditingBlock] = useState(null);   // null | {} (new) | block obj (edit)
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [goalDraft, setGoalDraft] = useState("");
 
   // Auto-select first plan
   useEffect(() => {
@@ -273,6 +243,12 @@ export default function LongTermPlanPage() {
       trainingBlocks.loadBlocks(selectedPlanId).catch(() => {});
     }
   }, [selectedPlanId, trainingBlocks.loadBlocks]);
+
+  // Sync goal draft when selected plan changes
+  useEffect(() => {
+    const plan = plans.plans.find((p) => p.id === selectedPlanId);
+    setGoalDraft(plan?.goal ?? "");
+  }, [selectedPlanId, plans.plans]);
 
   const selectedPlan = plans.plans.find((p) => p.id === selectedPlanId) ?? null;
 
@@ -320,28 +296,37 @@ export default function LongTermPlanPage() {
     [trainingBlocks],
   );
 
+  const handleSaveGoal = useCallback(async () => {
+    if (!selectedPlanId) return;
+    try {
+      await plans.updatePlan(selectedPlanId, { goal: goalDraft || null });
+    } catch (err) {
+      setFormError(err.message);
+    }
+  }, [selectedPlanId, goalDraft, plans]);
+
   const daysToRace = selectedPlan
     ? Math.max(0, Math.round((new Date(selectedPlan.race_date) - new Date()) / (1000 * 60 * 60 * 24)))
     : null;
 
   return (
-    <section className="page ltp-page">
-      <div className="page-header">
-        <h2>Training Plan</h2>
-        <p>Build your macro plan — phases and training blocks towards your goal race.</p>
+    <section className="page">
+      <div className="mb-5">
+        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Training Plan</h2>
+        <p className="m-0 text-sm text-slate-500">Build your macro plan — phases and training blocks towards your goal race.</p>
       </div>
 
-      <div className="ltp-grid">
+      <div className="grid gap-4 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] max-[960px]:grid-cols-1 items-start">
         {/* ── Left panel ── */}
-        <div className="ltp-panel">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-4">
           {/* Plan selector */}
           <div>
-            <h3>Your plan</h3>
+            <h3 className="m-0 mb-1 text-sm font-bold">Your plan</h3>
             {plans.plans.length > 0 ? (
               <select
+                className="w-full border border-slate-300 rounded-lg px-2.5 py-2 font-inherit text-[13px] bg-white mb-2.5"
                 value={selectedPlanId ?? ""}
                 onChange={(e) => { setSelectedPlanId(e.target.value); setEditingBlock(null); }}
-                style={{ width: "100%", marginBottom: "10px" }}
               >
                 {plans.plans.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -350,7 +335,7 @@ export default function LongTermPlanPage() {
                 ))}
               </select>
             ) : (
-              <p className="muted" style={{ fontSize: "13px" }}>No plans yet.</p>
+              <p className="text-[13px] text-slate-500 m-0 mb-2.5">No plans yet.</p>
             )}
             <button
               type="button"
@@ -364,15 +349,32 @@ export default function LongTermPlanPage() {
 
           {/* Plan details */}
           {selectedPlan && !showCreatePlan && (
-            <div className="ltp-plan-meta">
-              <p><strong>{selectedPlan.race}</strong></p>
-              <p className="muted" style={{ fontSize: "13px" }}>
+            <div>
+              <p className="my-0.5 font-bold text-sm">{selectedPlan.race}</p>
+              <p className="my-0.5 text-[13px] text-slate-500">
                 {new Date(selectedPlan.race_date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                 {daysToRace !== null && ` · ${daysToRace} days away`}
               </p>
               {selectedPlan.current_mileage && (
-                <p style={{ fontSize: "13px" }}>Base volume: {selectedPlan.current_mileage} km/week</p>
+                <p className="my-0.5 text-[13px]">Base volume: {selectedPlan.current_mileage} km/week</p>
               )}
+              <div className="mt-3">
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Goal for this plan
+                </label>
+                <textarea
+                  rows={2}
+                  className="w-full text-[13px] border border-slate-300 rounded-lg px-2.5 py-2 font-inherit bg-white box-border focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)] disabled:opacity-60"
+                  placeholder="e.g. Finish my first 100K under 12 hours, stay healthy, enjoy the process"
+                  value={goalDraft}
+                  onChange={(e) => setGoalDraft(e.target.value)}
+                  onBlur={handleSaveGoal}
+                  disabled={plans.loading}
+                />
+                <p className="text-[11px] text-slate-400 mt-0.5 mb-0">
+                  Sent to the AI coach. Saved automatically on blur.
+                </p>
+              </div>
             </div>
           )}
 
@@ -409,24 +411,24 @@ export default function LongTermPlanPage() {
           )}
 
           {formError && (
-            <p className="feedback is-error">{formError}</p>
+            <p className="text-sm text-red-600 m-0">{formError}</p>
           )}
         </div>
 
         {/* ── Right panel — timeline ── */}
-        <div className="ltp-timeline">
-          <h3>Training phases</h3>
+        <div className="ltp-timeline bg-white border border-slate-200 rounded-2xl p-4">
+          <h3 className="m-0 mb-3.5 text-sm font-bold">Training phases</h3>
 
           {!selectedPlanId && (
-            <p className="empty-state">Select or create a training plan to start building phases.</p>
+            <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start building phases.</p>
           )}
 
           {selectedPlanId && trainingBlocks.loading && (
-            <p className="muted" style={{ fontSize: "13px" }}>Loading blocks…</p>
+            <p className="text-[13px] text-slate-500">Loading blocks…</p>
           )}
 
           {selectedPlanId && !trainingBlocks.loading && trainingBlocks.blocks.length === 0 && (
-            <p className="empty-state">
+            <p className="text-sm text-slate-400 text-center py-8">
               No training phases yet. Add your first block using the panel on the left.
             </p>
           )}
@@ -434,15 +436,17 @@ export default function LongTermPlanPage() {
           {trainingBlocks.blocks.length > 0 && (
             <>
               <PhaseSummaryBar blocks={trainingBlocks.blocks} />
-              <div className="ltp-block-list">
+              <div className="grid gap-2.5">
                 {trainingBlocks.blocks.map((block) => (
-                  <div key={block.id} className="ltp-block-card">
-                    <div className="ltp-block-card-header">
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span className={`ltp-phase-badge is-${block.phase}`}>{block.phase}</span>
-                        {block.label && <strong style={{ fontSize: "14px" }}>{block.label}</strong>}
+                  <div key={block.id} className="border border-slate-200 rounded-xl px-3.5 py-3 bg-slate-50">
+                    <div className="flex justify-between items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[11px] font-bold rounded-full px-2.5 py-0.5 uppercase tracking-wide ${PHASE_BADGE_COLORS[block.phase] ?? "bg-slate-400 text-white"}`}>
+                          {block.phase}
+                        </span>
+                        {block.label && <strong className="text-sm">{block.label}</strong>}
                       </div>
-                      <div className="ltp-block-card-actions">
+                      <div className="flex gap-1.5">
                         <button
                           type="button"
                           className="ghost"
@@ -454,19 +458,19 @@ export default function LongTermPlanPage() {
                         <button
                           type="button"
                           className="ghost"
-                          style={{ fontSize: "12px", padding: "4px 10px", color: "var(--color-danger)" }}
+                          style={{ fontSize: "12px", padding: "4px 10px", color: "#dc2626" }}
                           onClick={() => handleDeleteBlock(block)}
                         >
                           Delete
                         </button>
                       </div>
                     </div>
-                    <p>{formatDateRange(block.start_date, block.end_date)}</p>
+                    <p className="my-0.5 text-[13px] text-slate-500">{formatDateRange(block.start_date, block.end_date)}</p>
                     {block.target_km && (
-                      <p>Target: {block.target_km} km/week</p>
+                      <p className="my-0.5 text-[13px] text-slate-500">Target: {block.target_km} km/week</p>
                     )}
                     {block.notes && (
-                      <p style={{ fontStyle: "italic", color: "var(--color-text-muted)" }}>{block.notes}</p>
+                      <p className="my-0.5 text-[13px] text-slate-500 italic">{block.notes}</p>
                     )}
                   </div>
                 ))}

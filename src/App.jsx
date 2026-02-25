@@ -50,14 +50,23 @@ function Shell() {
   );
 
   return (
-    <div className="app-shell">
-      <aside className={`app-sidebar ${menuOpen ? "is-open" : ""}`}>
-        <div className="app-sidebar__brand">RunSmart</div>
-        <nav className="app-sidebar__nav" aria-label="Main navigation">
+    <div className="flex min-h-screen w-full bg-gradient-to-b from-slate-50 to-indigo-50">
+      {/* Sidebar */}
+      <aside
+        className={`w-64 bg-slate-900 text-slate-300 flex flex-col gap-5 px-3.5 py-6 shrink-0
+          max-[960px]:fixed max-[960px]:inset-y-0 max-[960px]:left-0 max-[960px]:z-30
+          max-[960px]:transition-transform max-[960px]:duration-200
+          ${menuOpen ? "max-[960px]:translate-x-0" : "max-[960px]:-translate-x-full"}`}
+      >
+        <div className="text-white font-bold text-xl px-3">RunSmart</div>
+        <nav className="flex flex-col gap-1.5" aria-label="Main navigation">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.key}
-              className={`app-sidebar__link ${item.key === activePage ? "is-active" : ""}`}
+              className={`text-left border-0 rounded-xl px-3 py-2.5 bg-transparent text-inherit font-inherit cursor-pointer transition-colors
+                ${item.key === activePage
+                  ? "bg-slate-300/20 text-white"
+                  : "hover:bg-slate-300/20 hover:text-white"}`}
               type="button"
               onClick={() => {
                 setActivePage(item.key);
@@ -68,28 +77,46 @@ function Shell() {
             </button>
           ))}
         </nav>
-        <div className="app-sidebar__meta">
-          <p className="app-sidebar__email">{auth.user.email}</p>
-          <button type="button" className="app-sidebar__signout" onClick={auth.signOut}>
+        <div className="mt-auto border-t border-slate-300/30 pt-3 px-3 text-[13px]">
+          <p className="text-xs text-slate-400 mb-2 truncate">{auth.user.email}</p>
+          <button
+            type="button"
+            className="w-full text-left border border-slate-300/40 bg-transparent text-slate-400 rounded-lg px-3 py-1.5 text-xs font-inherit cursor-pointer hover:bg-slate-300/15 hover:text-slate-200 transition-colors"
+            onClick={auth.signOut}
+          >
             Sign out
           </button>
         </div>
       </aside>
 
-      <div className="app-content-wrap">
-        <header className="app-topbar">
-          <button className="app-menu-btn" type="button" onClick={() => setMenuOpen((prev) => !prev)}>
+      {/* Main content wrapper */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile topbar */}
+        <header className="hidden max-[960px]:flex items-center gap-3 px-4 py-3.5 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
+          <button
+            className="border border-slate-300 bg-white rounded-lg px-2.5 py-1 cursor-pointer"
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+          >
             ☰
           </button>
-          <h1>RunSmart</h1>
+          <h1 className="m-0 text-lg font-bold">RunSmart</h1>
         </header>
 
-        <main className="app-content">
+        <main className="p-6 max-[960px]:p-4">
           <ActiveComponent />
         </main>
       </div>
 
-      {menuOpen && <button className="app-overlay" type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}
+      {/* Mobile overlay */}
+      {menuOpen && (
+        <button
+          className="fixed inset-0 border-0 bg-slate-900/35 z-20 max-[960px]:block hidden"
+          type="button"
+          onClick={() => setMenuOpen(false)}
+          aria-label="Close menu"
+        />
+      )}
     </div>
   );
 }
@@ -99,8 +126,8 @@ function AuthGate() {
 
   if (auth.loading) {
     return (
-      <div className="auth-page">
-        <p style={{ color: "#64748b" }}>Loading…</p>
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50">
+        <p className="text-slate-500">Loading…</p>
       </div>
     );
   }

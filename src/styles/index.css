@@ -1,5 +1,6 @@
-@import '../../styles.css';
 @import './tokens.css';
+@import '../../styles.css';
+@import "tailwindcss";
 
 #root {
   width: 100%;

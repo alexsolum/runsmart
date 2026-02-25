@@ -16,6 +16,13 @@ function reducer(state, action) {
       return { ...state, plans: action.payload, loading: false, success: true };
     case "created":
       return { ...state, plans: [action.payload, ...state.plans], loading: false, success: true };
+    case "updated":
+      return {
+        ...state,
+        plans: state.plans.map((p) => (p.id === action.payload.id ? action.payload : p)),
+        loading: false,
+        success: true,
+      };
     case "deleted":
       return {
         ...state,
@@ -64,6 +71,26 @@ export function usePlans(userId) {
     [client, userId],
   );
 
+  const updatePlan = useCallback(
+    async (id, patch) => {
+      if (!client) throw new Error("Supabase is not configured");
+      dispatch({ type: "pending" });
+      const { data, error } = await client
+        .from("training_plans")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) {
+        dispatch({ type: "error", payload: error });
+        throw error;
+      }
+      dispatch({ type: "updated", payload: data });
+      return data;
+    },
+    [client],
+  );
+
   const deletePlan = useCallback(
     async (id) => {
       if (!client) throw new Error("Supabase is not configured");
@@ -85,6 +112,7 @@ export function usePlans(userId) {
     success: state.success,
     loadPlans,
     createPlan,
+    updatePlan,
     deletePlan,
   };
 }

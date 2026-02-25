@@ -144,6 +144,43 @@ describe("Dashboard — empty state (no Strava data)", () => {
   });
 });
 
+describe("Dashboard — activity feed detail", () => {
+  beforeEach(() => {
+    useAppData.mockReturnValue(makeAppData());
+  });
+
+  it("shows duration in activity cards", () => {
+    render(<HeroPage />);
+    // Morning Run: moving_time 3120s → 52 min
+    expect(screen.getByText(/52 min/)).toBeInTheDocument();
+    // Tempo Tuesday: moving_time 2160s → 36 min
+    expect(screen.getByText(/36 min/)).toBeInTheDocument();
+  });
+
+  it("shows time of day in activity cards", () => {
+    render(<HeroPage />);
+    // Activities are timestamped with today's ISO date — some AM/PM time should be present
+    const rail = screen.getByRole("complementary", { name: /recent activity stream/i });
+    // Locale time string contains either AM/PM or a colon (HH:MM), both indicate a time value
+    expect(rail.textContent).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("shows effort icon for activities with heart rate zone data", () => {
+    render(<HeroPage />);
+    // Tempo Tuesday: z4+z5 dominate → 🔴 Hard
+    expect(screen.getByText(/Hard/)).toBeInTheDocument();
+    // Morning Run: moderate HR zone mix → 🟡 Moderate
+    const moderateItems = screen.getAllByText(/Moderate/);
+    expect(moderateItems.length).toBeGreaterThan(0);
+  });
+
+  it("shows 2h 0m for long run with 7200s moving time", () => {
+    render(<HeroPage />);
+    // Long Run Sunday: moving_time 7200s → 2h
+    expect(screen.getByText(/2h/)).toBeInTheDocument();
+  });
+});
+
 describe("Dashboard — filter controls", () => {
   beforeEach(() => {
     useAppData.mockReturnValue(makeAppData());

@@ -67,10 +67,10 @@
 }
 
 .app-topbar {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 14px 24px;
   border-bottom: 1px solid #e2e8f0;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(6px);
@@ -361,10 +361,6 @@ select:focus-visible {
 
   .app-sidebar.is-open {
     transform: translateX(0);
-  }
-
-  .app-topbar {
-    display: flex;
   }
 
   .app-content {

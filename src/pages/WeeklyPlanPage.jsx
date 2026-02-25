@@ -8,15 +8,15 @@ const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function currentMondayIso() {
   const d = new Date();
-  const day = d.getDay() || 7;
-  d.setDate(d.getDate() - day + 1);
-  d.setHours(0, 0, 0, 0);
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - day + 1);
+  d.setUTCHours(0, 0, 0, 0);
   return d.toISOString().split("T")[0];
 }
 
 function isoDateOffset(isoDate, days) {
-  const d = new Date(`${isoDate}T00:00:00`);
-  d.setDate(d.getDate() + days);
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().split("T")[0];
 }
 
@@ -25,10 +25,10 @@ function weekDays(weekStartIso) {
 }
 
 function formatWeekLabel(weekStartIso) {
-  const start = new Date(`${weekStartIso}T00:00:00`);
-  const end = new Date(`${isoDateOffset(weekStartIso, 6)}T00:00:00`);
+  const start = new Date(`${weekStartIso}T00:00:00Z`);
+  const end = new Date(`${isoDateOffset(weekStartIso, 6)}T00:00:00Z`);
   const opts = { day: "numeric", month: "short" };
-  return `${start.toLocaleDateString(undefined, opts)} — ${end.toLocaleDateString(undefined, opts)} ${end.getFullYear()}`;
+  return `${start.toLocaleDateString(undefined, opts)} — ${end.toLocaleDateString(undefined, opts)} ${end.getUTCFullYear()}`;
 }
 
 function isToday(isoDate) {
@@ -160,7 +160,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
   const isAddingHere = addingTo === date;
   const editingHere = editingEntry && dayEntries.find((e) => e.id === editingEntry.id);
 
-  const dayNum = new Date(`${date}T00:00:00`).getDate();
+  const dayNum = new Date(`${date}T00:00:00Z`).getUTCDate();
 
   return (
     <div className={`wpp-day${isToday(date) ? " is-today" : ""}`}>

@@ -1,6 +1,6 @@
 window.RUNTIME_CONFIG = window.RUNTIME_CONFIG || {
   SUPABASE_URL: "https://rhbnzzxzltjtposwpfin.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_f5uvKNZx0fjm9nDWnhspQw_6mAa4nin",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoYm56enh6bHRqdHBvc3dwZmluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwNjg0NzgsImV4cCI6MjA4NjY0NDQ3OH0.ZEs8YFPpafr6VWKRdngE0HaXMxcJkc9_k7EPYyZicmA",
   AUTH_REDIRECT_URL: "",
   STRAVA_CLIENT_ID: "46597",
 };

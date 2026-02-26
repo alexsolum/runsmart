@@ -45,7 +45,7 @@ export default function DataPage() {
         <p className="m-0 text-sm text-slate-500">Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4 items-start">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-6 items-start">
         <div className="bg-white border border-slate-200 rounded-2xl p-5">
           <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Connected sources</h4>
           <ul className="m-0 pl-5 text-sm text-slate-700 flex flex-col gap-1">

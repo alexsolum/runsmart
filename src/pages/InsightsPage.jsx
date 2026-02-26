@@ -418,7 +418,7 @@ export default function InsightsPage() {
       </div>
 
       {/* KPI strip — kpi-strip class preserved for test */}
-      <div className="kpi-strip grid grid-cols-4 gap-3 mb-4 max-[960px]:grid-cols-2 max-[600px]:grid-cols-1">
+      <div className="kpi-strip grid grid-cols-4 gap-4 mb-6 max-[960px]:grid-cols-2 max-[600px]:grid-cols-1">
         {isLoading ? (
           <>
             <SkeletonBlock height={88} />
@@ -453,13 +453,13 @@ export default function InsightsPage() {
 
       {/* Chart sections */}
       {isLoading ? (
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           <SkeletonBlock height={290} />
           <SkeletonBlock height={270} />
           <SkeletonBlock height={280} />
         </div>
       ) : hasData ? (
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           {trainingLoadSeries.length >= 7 && (
             <div className={cardClass} id="training-load-section">
               <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Training load trend</h4>

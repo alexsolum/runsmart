@@ -138,6 +138,47 @@ export const SAMPLE_DAILY_LOGS = [
   },
 ];
 
+export const SAMPLE_CONVERSATIONS = [
+  {
+    id: "conv-1",
+    user_id: "user-1",
+    title: "Good training consistency",
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "conv-2",
+    user_id: "user-1",
+    title: "Pre-race tapering advice",
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+export const SAMPLE_MESSAGES = [
+  {
+    id: "msg-1",
+    conversation_id: "conv-1",
+    role: "user",
+    content: { type: "initial_request" },
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "msg-2",
+    conversation_id: "conv-1",
+    role: "assistant",
+    content: [
+      {
+        type: "positive",
+        icon: "trending",
+        title: "Good training consistency",
+        body: "Your running has been consistent this week. Keep building aerobic base.",
+      },
+    ],
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 export const SAMPLE_WORKOUT_ENTRIES = [
   {
     id: "we-1",
@@ -225,6 +266,28 @@ export function makeAppData(overrides = {}) {
       updateEntry: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES[0]),
       deleteEntry: vi.fn().mockResolvedValue(undefined),
       toggleCompleted: vi.fn().mockResolvedValue(undefined),
+    },
+    coachConversations: {
+      conversations: [],
+      activeConversation: null,
+      messages: [],
+      loading: false,
+      error: null,
+      loadConversations: vi.fn().mockResolvedValue([]),
+      loadMessages: vi.fn().mockResolvedValue([]),
+      createConversation: vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]),
+      addMessage: vi.fn().mockImplementation((convId, role, content) =>
+        Promise.resolve({
+          id: `msg-${Date.now()}`,
+          conversation_id: convId,
+          role,
+          content,
+          created_at: new Date().toISOString(),
+        })
+      ),
+      updateConversationTitle: vi.fn().mockResolvedValue(undefined),
+      deleteConversation: vi.fn().mockResolvedValue(undefined),
+      setActiveConversation: vi.fn().mockResolvedValue(undefined),
     },
     ...overrides,
   };

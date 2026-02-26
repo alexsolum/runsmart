@@ -10,6 +10,8 @@ import RoadmapPage from "./pages/RoadmapPage";
 import DataPage from "./pages/DataPage";
 import InsightsPage from "./pages/InsightsPage";
 import DailyLogPage from "./pages/DailyLogPage";
+import MobilePage from "./pages/MobilePage";
+import MobileNavBar from "./components/MobileNavBar";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import {
   LayoutDashboard,
@@ -23,6 +25,7 @@ import {
   Menu,
   Search,
   Bell,
+  Smartphone,
 } from "lucide-react";
 
 // Static nav structure — labels are i18n keys, translated at render time
@@ -43,6 +46,7 @@ const NAV_GROUPS = [
       { key: "daily-log", labelKey: "nav.dailyLog", icon: ClipboardList, component: DailyLogPage },
       { key: "data", labelKey: "sidebar.data", icon: Database, component: DataPage },
       { key: "roadmap", labelKey: "sidebar.roadmap", icon: Map, component: RoadmapPage },
+      { key: "mobile", labelKey: "nav.mobile", icon: Smartphone, component: MobilePage },
     ],
   },
 ];
@@ -54,6 +58,7 @@ function Shell() {
   const { t } = useI18n();
   const [activePage, setActivePage] = useState(ALL_NAV_ITEMS[0].key);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState("analytics");
 
   useEffect(() => {
     if (!auth.user?.id) return;
@@ -73,10 +78,11 @@ function Shell() {
     loadAll();
   }, [auth.user?.id, plans.loadPlans, activities.loadActivities, checkins.loadCheckins]);
 
-  const ActiveComponent = useMemo(
-    () => ALL_NAV_ITEMS.find((item) => item.key === activePage)?.component ?? HeroPage,
+  const activeNavItem = useMemo(
+    () => ALL_NAV_ITEMS.find((item) => item.key === activePage) ?? ALL_NAV_ITEMS[0],
     [activePage],
   );
+  const ActiveComponent = activeNavItem.component;
 
   return (
     <div className="app-shell">
@@ -153,7 +159,7 @@ function Shell() {
             <span className="text-slate-400">{t("nav.pages")}</span>
             <span className="text-slate-300">/</span>
             <span className="font-semibold text-slate-800">
-              {t(ALL_NAV_ITEMS.find((i) => i.key === activePage)?.labelKey ?? "sidebar.dashboard")}
+              {t(activeNavItem.labelKey ?? "sidebar.dashboard")}
             </span>
           </div>
 
@@ -170,9 +176,19 @@ function Shell() {
         </header>
 
         <main className="flex-1 min-h-0 overflow-y-auto">
-          <ActiveComponent />
+          <ActiveComponent defaultTab={activePage === "mobile" ? mobileTab : undefined} />
         </main>
       </div>
+
+      <MobileNavBar
+        activePage={activePage}
+        activeMobileTab={mobileTab}
+        onNavigate={(pageKey, tab) => {
+          setActivePage(pageKey);
+          if (tab) setMobileTab(tab);
+          setMenuOpen(false);
+        }}
+      />
 
       {/* Mobile overlay */}
       {menuOpen && (

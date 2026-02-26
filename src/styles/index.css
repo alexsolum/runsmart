@@ -110,7 +110,7 @@
 
 .dashboard-main {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-6);
   align-content: start;
 }
 

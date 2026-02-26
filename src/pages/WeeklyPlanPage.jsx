@@ -311,7 +311,7 @@ export default function WeeklyPlanPage() {
       </div>
 
       {/* Header: plan select + week nav */}
-      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 flex items-center gap-4 flex-wrap mb-3.5 max-[960px]:flex-col max-[960px]:items-start">
+      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 flex items-center gap-4 flex-wrap mb-5 max-[960px]:flex-col max-[960px]:items-start">
         <div className="flex items-center gap-2.5">
           <label className="text-[13px] font-semibold m-0">
             Plan:{" "}

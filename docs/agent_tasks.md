@@ -41,7 +41,7 @@ Update documentation
 (Only pause for destructive or risky actions.)
 
 🔥 Priority Tasks (Current Sprint)
-[ ] TASK-003 – AI Coach chat history & conversational follow-ups ("Marius AI Bakken")
+[x] TASK-003 – AI Coach chat history & conversational follow-ups ("Marius AI Bakken")
 Goal
 
 Transform the Coach page from a one-shot insight generator into a persistent conversational coaching experience with:
@@ -304,7 +304,7 @@ src/pages/CoachPage.jsx
 supabase/functions/gemini-coach/index.ts
 src/context/AppDataContext.jsx
 tests/mockAppData.js
-[ ] TASK-004 – Norwegian translation & language switcher
+[x] TASK-004 – Norwegian translation & language switcher
 Goal
 
 Full Norwegian translation coverage with language switching.
@@ -463,7 +463,7 @@ Effort indicator from HR zones.
 Tests updated.
 
 🐞 Bugs / Technical Debt
-[ ] BUG-002 – Insufficient margins across pages
+[x] BUG-002 – Insufficient margins across pages
 Problem
 
 UI feels cramped due to inconsistent spacing.
@@ -492,7 +492,7 @@ No cramped components
 
 Tests still pass.
 
-[ ] BUG-003 – Training plan goal not saving
+[x] BUG-003 – Training plan goal not saving
 Root Cause
 
 Supabase schema cache missing goal column.
@@ -565,4 +565,32 @@ All related tests passing.
   - Activity feed cards now show: Type · Distance · Duration on line 2, Time of day · 🔴/🟡/🟢 Effort on line 3
   - Effort derived from heart_rate_zones: z4+z5 > 35% = Hard, z3 > 25% or z4+z5 > 15% = Moderate, else Easy
   - 4 new tests in dashboard.test.jsx; all 170 tests pass
+- BUG-003 → DONE:
+  - Created supabase/migrations/20260226_fix_schema_cache.sql
+  - Adds goal column IF NOT EXISTS + NOTIFY pgrst reload
+- BUG-002 → DONE:
+  - Made `<main>` in App.jsx use flex-1 + overflow-y-auto so pages scroll within the content area
+  - Increased section gaps: InsightsPage gap-4→gap-6 (KPI strip and chart sections), DailyLogPage gap-4→gap-6 (top grid), LongTermPlanPage gap-4→gap-6, DataPage gap-4→gap-6
+  - WeeklyPlanPage: mb-3.5→mb-5 for the header bar
+  - dashboard-main CSS gap: var(--space-4)→var(--space-6) (16px→24px) for more breathing room
+  - All 205 tests pass
+- TASK-004 → DONE:
+  - Made useI18n() reactive with useSyncExternalStore (re-renders components on language switch)
+  - Added 50+ new translation keys (nav groups, coach UI strings) to both EN and NO in translations.js
+  - Removed applyTranslations() call from setLanguage() (React rendering only; DOM approach removed from auto-trigger)
+  - Created src/components/LanguageSwitcher.jsx (EN/NO toggle, aria-pressed state, localStorage persistence)
+  - Updated App.jsx: uses t() for all nav labels, sign-out, search, breadcrumb; LanguageSwitcher in sidebar footer
+  - Updated CoachPage.jsx: all UI strings use t() (buttons, labels, placeholders, empty states)
+  - Created tests/i18n.test.jsx: 21 tests covering t(), setLanguage(), useI18n() reactivity, LanguageSwitcher
+  - All 205 tests pass
+- TASK-003 → DONE:
+  - Created supabase/migrations/20260226_coach_conversations.sql (coach_conversations + coach_messages tables, RLS, auto-update trigger)
+  - Created src/hooks/useCoachConversations.js (full CRUD: load/create/addMessage/updateTitle/delete/setActive)
+  - Created src/components/CoachAvatar.jsx (SVG runner with Norwegian flag accent, role=img)
+  - Updated AppDataContext.jsx: added useCoachConversations(userId) → coachConversations slice
+  - Updated tests/mockAppData.js: SAMPLE_CONVERSATIONS, SAMPLE_MESSAGES, coachConversations mock in makeAppData
+  - Redesigned src/pages/CoachPage.jsx: "Marius AI Bakken" branding, two-column layout (sidebar + chat), conversation list with inline delete confirmation, optimistic message rendering, Refresh button for initial coaching, text input for follow-ups
+  - Updated supabase/functions/gemini-coach/index.ts: FOLLOWUP_SYSTEM_INSTRUCTION, mode=initial/followup routing, conversation history support, returns {text} for followup mode
+  - Removed sessionStorage caching (all persistence in Supabase)
+  - Updated tests/coach.test.jsx: 184 tests total, all passing (branding, sidebar CRUD, initial coaching, follow-ups, error states, wellness, runner profile)
 

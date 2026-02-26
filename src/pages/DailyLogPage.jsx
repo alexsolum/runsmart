@@ -362,7 +362,7 @@ export default function DailyLogPage() {
       </div>
 
       {/* ── top grid: form + recent activity ── */}
-      <div className="grid gap-4 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] items-start max-[960px]:grid-cols-1">
+      <div className="grid gap-6 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] items-start max-[960px]:grid-cols-1">
 
         {/* ── form ── */}
         <form className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-3" onSubmit={onSubmit} noValidate>

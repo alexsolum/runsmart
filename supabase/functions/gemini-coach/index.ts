@@ -14,8 +14,8 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const SYSTEM_INSTRUCTION =
-  `You are an expert endurance running coach specializing in trail and ultramarathon training. ` +
-  `Your coaching style should be evidence-informed and Jason Koop-inspired: long-run centric, structured progression, durability, specificity, and practical execution. ` +
+  `You are Marius AI Bakken, an expert endurance running coach specializing in trail and ultramarathon training. ` +
+  `Your coaching style is evidence-informed and Jason Koop-inspired: long-run centric, structured progression, durability, specificity, and practical execution. ` +
   `If the athlete has shared their background and goals, use that information to tailor your tone, recommended volumes, and session types to their experience level and aspirations. ` +
   `Analyze the athlete's training data and provide 3-5 actionable coaching insights.\n\n` +
   `Each insight MUST be a JSON object with these exact fields:\n` +
@@ -30,6 +30,13 @@ const SYSTEM_INSTRUCTION =
   `4) Include one weekly planning recommendation (how to structure the coming week).\n` +
   `5) Use metric units (km/min).\n\n` +
   `Respond ONLY with a valid JSON array of insight objects. No markdown fences, no explanation outside the array.`;
+
+const FOLLOWUP_SYSTEM_INSTRUCTION =
+  `You are Marius AI Bakken, a personal AI running coach with deep expertise in endurance and ultramarathon training. ` +
+  `Your style is conversational, direct, and practical — like a trusted coach who knows the athlete well. ` +
+  `The athlete is asking a follow-up question based on your previous coaching insights. ` +
+  `Answer concisely in 2-5 sentences. Be specific and reference their actual training data where relevant. ` +
+  `Use metric units (km/min). Respond in plain text only — no JSON, no bullet lists, no markdown.`;
 
 function formatDelta(current: number, previous: number): string {
   if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return "n/a";
@@ -96,7 +103,14 @@ interface RunnerProfile {
   goal: string;
 }
 
+interface ConversationTurn {
+  role: "user" | "model";
+  text: string;
+}
+
 interface RequestBody {
+  mode?: "initial" | "followup";
+  conversationHistory?: ConversationTurn[];
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
   latestCheckin: Checkin | null;
@@ -246,6 +260,70 @@ Deno.serve(async (req) => {
 
     // Parse the training data summary
     const body: RequestBody = await req.json();
+    const isFollowup = body.mode === "followup";
+
+    if (isFollowup) {
+      // ── Follow-up conversational mode ─────────────────────────────────────
+      const history = body.conversationHistory ?? [];
+      if (history.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No conversation history provided for follow-up" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // Build training context prefix (injected before conversation history)
+      const contextPrefix = buildPrompt(body);
+
+      // Build Gemini contents array from conversation history.
+      // Prepend training context to the first user turn.
+      const contents = history.map((turn, idx) => {
+        let text = turn.text;
+        if (idx === 0 && turn.role === "user" && contextPrefix.trim()) {
+          text = `Context about this athlete's training:\n${contextPrefix}\n\n---\n\n${text}`;
+        }
+        return { role: turn.role, parts: [{ text }] };
+      });
+
+      const geminiRes = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: FOLLOWUP_SYSTEM_INSTRUCTION }] },
+          contents,
+          generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
+        }),
+      });
+
+      if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        console.error("Gemini API error (followup):", geminiRes.status, errText);
+        return new Response(
+          JSON.stringify({ error: "Gemini API request failed" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const geminiData = await geminiRes.json();
+      const candidates = geminiData.candidates;
+      if (!candidates?.length) {
+        return new Response(
+          JSON.stringify({ error: "No response from Gemini" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const parts: Array<{ text?: string; thought?: boolean }> = candidates[0]?.content?.parts || [];
+      const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
+      const text = (outputPart?.text || "").trim();
+
+      return new Response(
+        JSON.stringify({ text }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Initial coaching mode (default) ───────────────────────────────────────
     const userMessage = buildPrompt(body);
 
     if (!userMessage.trim()) {

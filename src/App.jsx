@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppDataProvider, useAppData } from "./context/AppDataContext";
+import { useI18n } from "./i18n/translations";
 import AuthPage from "./pages/AuthPage";
 import HeroPage from "./pages/HeroPage";
 import LongTermPlanPage from "./pages/LongTermPlanPage";
@@ -9,6 +10,7 @@ import RoadmapPage from "./pages/RoadmapPage";
 import DataPage from "./pages/DataPage";
 import InsightsPage from "./pages/InsightsPage";
 import DailyLogPage from "./pages/DailyLogPage";
+import LanguageSwitcher from "./components/LanguageSwitcher";
 import {
   LayoutDashboard,
   Calendar,
@@ -23,23 +25,24 @@ import {
   Bell,
 } from "lucide-react";
 
+// Static nav structure — labels are i18n keys, translated at render time
 const NAV_GROUPS = [
   {
-    label: "General",
+    labelKey: "nav.general",
     items: [
-      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, component: HeroPage },
-      { key: "training-plan", label: "Training Plan", icon: Calendar, component: LongTermPlanPage },
-      { key: "weekly-plan", label: "Weekly Plan", icon: CalendarDays, component: WeeklyPlanPage },
-      { key: "coach", label: "Coach", icon: MessageSquare, component: CoachPage },
-      { key: "insights", label: "Insights", icon: BarChart3, component: InsightsPage },
+      { key: "dashboard", labelKey: "sidebar.dashboard", icon: LayoutDashboard, component: HeroPage },
+      { key: "training-plan", labelKey: "nav.trainingPlan", icon: Calendar, component: LongTermPlanPage },
+      { key: "weekly-plan", labelKey: "nav.weeklyPlan", icon: CalendarDays, component: WeeklyPlanPage },
+      { key: "coach", labelKey: "sidebar.coach", icon: MessageSquare, component: CoachPage },
+      { key: "insights", labelKey: "sidebar.insights", icon: BarChart3, component: InsightsPage },
     ],
   },
   {
-    label: "Other",
+    labelKey: "nav.other",
     items: [
-      { key: "daily-log", label: "Daily Log", icon: ClipboardList, component: DailyLogPage },
-      { key: "data", label: "Data", icon: Database, component: DataPage },
-      { key: "roadmap", label: "Roadmap", icon: Map, component: RoadmapPage },
+      { key: "daily-log", labelKey: "nav.dailyLog", icon: ClipboardList, component: DailyLogPage },
+      { key: "data", labelKey: "sidebar.data", icon: Database, component: DataPage },
+      { key: "roadmap", labelKey: "sidebar.roadmap", icon: Map, component: RoadmapPage },
     ],
   },
 ];
@@ -48,6 +51,7 @@ const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 function Shell() {
   const { auth, plans, activities, checkins } = useAppData();
+  const { t } = useI18n();
   const [activePage, setActivePage] = useState(ALL_NAV_ITEMS[0].key);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -86,9 +90,9 @@ function Shell() {
         {/* Grouped navigation */}
         <nav className="flex flex-col gap-6 flex-1" aria-label="Main navigation">
           {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
+            <div key={group.labelKey}>
               <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                {group.label}
+                {t(group.labelKey)}
               </p>
               <div className="flex flex-col gap-1">
                 {group.items.map((item) => {
@@ -109,7 +113,7 @@ function Shell() {
                       }}
                     >
                       <Icon size={18} strokeWidth={1.8} />
-                      {item.label}
+                      {t(item.labelKey)}
                     </button>
                   );
                 })}
@@ -126,8 +130,11 @@ function Shell() {
             className="w-full text-left text-xs text-slate-400 hover:text-slate-200 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
             onClick={auth.signOut}
           >
-            Sign out
+            {t("nav.signout")}
           </button>
+          <div className="px-3 pt-3">
+            <LanguageSwitcher />
+          </div>
         </div>
       </aside>
 
@@ -143,10 +150,10 @@ function Shell() {
 
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-slate-400">Pages</span>
+            <span className="text-slate-400">{t("nav.pages")}</span>
             <span className="text-slate-300">/</span>
             <span className="font-semibold text-slate-800">
-              {ALL_NAV_ITEMS.find((i) => i.key === activePage)?.label ?? "Dashboard"}
+              {t(ALL_NAV_ITEMS.find((i) => i.key === activePage)?.labelKey ?? "sidebar.dashboard")}
             </span>
           </div>
 
@@ -154,7 +161,7 @@ function Shell() {
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-500">
               <Search size={14} />
-              <span>Search</span>
+              <span>{t("nav.search")}</span>
             </div>
             <button type="button" className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors">
               <Bell size={18} className="text-slate-500" />
@@ -162,7 +169,7 @@ function Shell() {
           </div>
         </header>
 
-        <main>
+        <main className="flex-1 min-h-0 overflow-y-auto">
           <ActiveComponent />
         </main>
       </div>

@@ -1,4 +1,5 @@
 // ---- Internationalization ----
+import { useSyncExternalStore } from "react";
 
 export const TRANSLATIONS = {
   en: {
@@ -302,6 +303,48 @@ export const TRANSLATIONS = {
     // Language
     "lang.en": "English",
     "lang.no": "Norsk",
+
+    // App shell navigation groups
+    "nav.general": "General",
+    "nav.other": "Other",
+    "nav.trainingPlan": "Training Plan",
+    "nav.weeklyPlan": "Weekly Plan",
+    "nav.dailyLog": "Daily Log",
+    "nav.pages": "Pages",
+    "nav.search": "Search",
+
+    // Coach page — new conversational UI
+    "coach.aiCoachSubtitle": "Your AI running coach",
+    "coach.showConversations": "Conversations",
+    "coach.hide": "Hide",
+    "coach.newConversation": "+ New conversation",
+    "coach.noConversations": "No conversations yet.",
+    "coach.deleteConv": "Delete this conversation?",
+    "coach.delete": "Delete",
+    "coach.cancel": "Cancel",
+    "coach.emptyState": "Select a conversation or click + New conversation to get started.",
+    "coach.clickRefresh": "Click Refresh coaching to get AI-powered insights based on your training data.",
+    "coach.refreshCoaching": "Refresh coaching",
+    "coach.analyzingBtn": "Analyzing\u2026",
+    "coach.analyzingMsg": "Analyzing your training data with Gemini AI\u2026",
+    "coach.followupPlaceholder": "Ask a follow-up question\u2026",
+    "coach.send": "Send",
+    "coach.dismiss": "Dismiss",
+    "coach.trainingDataAnalyzed": "Training data analyzed",
+    "coach.noPlan": "No training plan found.",
+    "coach.createPlanFirst": "Create a training plan first for personalized coaching.",
+    "coach.goalRace": "Goal Race",
+    "coach.currentPhase": "Current Phase",
+    "coach.week": "Week",
+    "coach.targetVolume": "Target Volume",
+    "coach.daysToRace": "days to race",
+    "coach.last7Days": "Last 7 days",
+    "coach.mood": "Mood",
+    "coach.aboutYou": "About you",
+    "coach.profileDescPre": "Sent to the AI coach. Your goal is set on the",
+    "coach.profileDescPost": "page.",
+    "coach.runningBackground": "Running background",
+    "coach.bgPlaceholder": "e.g. Running for 3 years, mostly trails",
   },
 
   no: {
@@ -605,6 +648,48 @@ export const TRANSLATIONS = {
     // Language
     "lang.en": "English",
     "lang.no": "Norsk",
+
+    // App shell navigation groups
+    "nav.general": "Generelt",
+    "nav.other": "Annet",
+    "nav.trainingPlan": "Treningsplan",
+    "nav.weeklyPlan": "Ukeplan",
+    "nav.dailyLog": "Dagslogg",
+    "nav.pages": "Sider",
+    "nav.search": "S\u00f8k",
+
+    // Coach page — new conversational UI
+    "coach.aiCoachSubtitle": "Din AI-l\u00f8petrener",
+    "coach.showConversations": "Samtaler",
+    "coach.hide": "Skjul",
+    "coach.newConversation": "+ Ny samtale",
+    "coach.noConversations": "Ingen samtaler enn\u00e5.",
+    "coach.deleteConv": "Slette denne samtalen?",
+    "coach.delete": "Slett",
+    "coach.cancel": "Avbryt",
+    "coach.emptyState": "Velg en samtale eller klikk + Ny samtale for \u00e5 begynne.",
+    "coach.clickRefresh": "Klikk Oppdater coaching for \u00e5 f\u00e5 AI-drevne innsikter basert p\u00e5 dine treningsdata.",
+    "coach.refreshCoaching": "Oppdater coaching",
+    "coach.analyzingBtn": "Analyserer\u2026",
+    "coach.analyzingMsg": "Analyserer treningsdataene dine med Gemini AI\u2026",
+    "coach.followupPlaceholder": "Still et oppf\u00f8lgingssp\u00f8rsm\u00e5l\u2026",
+    "coach.send": "Send",
+    "coach.dismiss": "Lukk",
+    "coach.trainingDataAnalyzed": "Treningsdata analysert",
+    "coach.noPlan": "Ingen treningsplan funnet.",
+    "coach.createPlanFirst": "Opprett en treningsplan f\u00f8rst for personlig coaching.",
+    "coach.goalRace": "M\u00e5ll\u00f8p",
+    "coach.currentPhase": "N\u00e5v\u00e6rende fase",
+    "coach.week": "Uke",
+    "coach.targetVolume": "M\u00e5lvolum",
+    "coach.daysToRace": "dager til l\u00f8p",
+    "coach.last7Days": "Siste 7 dager",
+    "coach.mood": "Hum\u00f8r",
+    "coach.aboutYou": "Om deg",
+    "coach.profileDescPre": "Sendt til AI-treneren. M\u00e5let ditt er satt p\u00e5",
+    "coach.profileDescPost": "siden.",
+    "coach.runningBackground": "L\u00f8pebakgrunn",
+    "coach.bgPlaceholder": "f.eks. L\u00f8pt i 3 \u00e5r, mest stier",
   },
 };
 
@@ -638,7 +723,16 @@ function createI18nProvider() {
 const i18nProvider = createI18nProvider();
 
 export function useI18n() {
-  return i18nProvider;
+  // Subscribe to module-level language changes; triggers React re-render on switch
+  useSyncExternalStore(
+    (callback) => {
+      i18nSubscribers.add(callback);
+      return () => i18nSubscribers.delete(callback);
+    },
+    () => currentLang,
+    () => "en",
+  );
+  return { t, lang: currentLang, setLanguage };
 }
 
 export function getCurrentLanguage() {
@@ -655,7 +749,6 @@ export function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem("runsmart-lang", lang);
   document.documentElement.lang = lang;
-  applyTranslations();
   notifyI18nSubscribers();
 }
 

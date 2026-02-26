@@ -316,7 +316,7 @@ export default function LongTermPlanPage() {
         <p className="m-0 text-sm text-slate-500">Build your macro plan — phases and training blocks towards your goal race.</p>
       </div>
 
-      <div className="grid gap-4 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] max-[960px]:grid-cols-1 items-start">
+      <div className="grid gap-6 grid-cols-[minmax(280px,380px)_minmax(0,1fr)] max-[960px]:grid-cols-1 items-start">
         {/* ── Left panel ── */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-4">
           {/* Plan selector */}

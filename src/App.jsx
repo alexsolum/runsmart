@@ -162,7 +162,7 @@ function Shell() {
           </div>
         </header>
 
-        <main className="p-6 max-[960px]:p-4">
+        <main>
           <ActiveComponent />
         </main>
       </div>

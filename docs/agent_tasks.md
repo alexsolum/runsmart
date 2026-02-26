@@ -160,6 +160,125 @@ Files to modify:
 
 ---
 
+### [ ] TASK-004 – Norwegian translation & language switcher
+
+Goal: Complete the Norwegian translation coverage across the entire app and add an easy, always-accessible language switcher so users can toggle between English and Norwegian.
+
+Context:
+A partial i18n system already exists in `src/i18n/translations.js`. It contains both English (`en`) and Norwegian (`no`) translation dictionaries with ~150 keys each, a `t(key)` lookup function, `setLanguage(lang)` for switching, and a subscriber pattern for notifying components. However, **none of the React components actually use it** — all pages have hardcoded English strings. The `useI18n()` hook is exported but never imported by any component. The language switcher UI (`.lang-option` buttons) is referenced in `applyTranslations()` but doesn't exist in any rendered component.
+
+Requirements:
+
+**1. Integrate `t()` into all React page components**
+- Replace all hardcoded English strings in every page component with `t("key")` calls.
+- Pages to update (all files in `src/pages/`):
+  - `HeroPage.jsx` — dashboard headings, KPI labels, activity feed labels, trend chart labels
+  - `LongTermPlanPage.jsx` — form labels, plan card text, training block labels, goal placeholder
+  - `WeeklyPlanPage.jsx` — day names, workout type labels, edit modal labels, save/reset buttons
+  - `CoachPage.jsx` — coach title/subtitle, insight section headers, loading/error text, profile section labels
+  - `InsightsPage.jsx` — section headings, check-in form labels, chart labels, trend descriptions
+  - `DailyLogPage.jsx` — form field labels, save/submit buttons, log entry labels
+  - `DataPage.jsx` — Strava section, manual log form, activity table headers
+  - `RoadmapPage.jsx` — timeline labels, phase descriptions
+  - `AuthPage.jsx` — sign-in/sign-up form labels, OAuth button text
+- Also update shared components:
+  - `Sidebar.jsx` — navigation item labels
+  - `Topbar.jsx` — any header text, sign-out label
+
+**2. Add missing translation keys**
+- Audit every page for strings that don't have a corresponding key in `TRANSLATIONS`.
+- Add new keys to both `en` and `no` dictionaries in `translations.js`.
+- Likely missing areas:
+  - Dashboard page: KPI card labels, "Recent activity" heading, "Weekly volume" chart title, empty states
+  - Daily Log page: all form labels (sleep hours, mood, stress, etc.), submit button, log history section
+  - Coach page: "About you" label, "Refresh coaching" button, plan banner labels, daily log summary labels
+  - Weekly plan: day-of-week names (Mon–Sun), "Add workout" button, week navigation
+  - Training plan: "Goal for this plan" label, "Create plan" button, constraint labels
+  - Any new strings added by TASK-003 (coach chat history) — conversation list labels, follow-up input placeholder, delete confirmation, etc.
+
+**3. Make `useI18n` reactive in React**
+- The current `useI18n()` returns a plain object — it won't trigger React re-renders when the language changes.
+- Convert it to a proper React hook that uses `useState` + `useEffect` (or `useSyncExternalStore`) to subscribe to language changes:
+  ```javascript
+  export function useI18n() {
+    const [lang, setLang] = useState(getCurrentLanguage());
+    useEffect(() => {
+      const unsub = i18nProvider.subscribe((newLang) => setLang(newLang));
+      return unsub;
+    }, []);
+    return { t, lang, setLanguage: i18nProvider.setLanguage };
+  }
+  ```
+- This ensures all components re-render with the new language when the user switches.
+
+**4. Language switcher component**
+- Create `src/components/LanguageSwitcher.jsx`:
+  - Two small flag/label buttons: "EN" / "NO" (or "English" / "Norsk").
+  - Highlight the currently active language.
+  - Calls `setLanguage("en")` or `setLanguage("no")` on click.
+  - Compact design — suitable for placement in the sidebar or topbar.
+- Place the switcher in one of these locations (preference order):
+  1. **Sidebar footer** — below the nav links, above the sign-out button. Always visible.
+  2. **Topbar** — right side, next to the user avatar/sign-out.
+- The selected language persists in `localStorage` (already implemented via `runsmart-lang` key).
+
+**5. Norwegian translation quality**
+- Review and improve existing Norwegian translations for natural phrasing. Current translations are mostly correct but some could be more idiomatic:
+  - "Beredskap" → consider "Treningsform" or "Klar for trening" for "Readiness"
+  - "Kilometerstand" → consider "Distanse" for weekly mileage context
+  - Ensure consistency in running terminology (use standard Norwegian running community terms)
+- All new keys must have Norwegian translations — do not leave any `no` keys as English fallbacks.
+
+**6. Remove `applyTranslations()` DOM-based approach**
+- The existing `applyTranslations()` function uses `document.querySelectorAll("[data-i18n]")` — this is a vanilla JS pattern that conflicts with React's declarative rendering.
+- Since all strings will now go through `t()` in JSX, this function becomes unnecessary.
+- Remove `applyTranslations()` and all `data-i18n` / `data-i18n-attr` attributes from any HTML (if they exist outside React).
+- Keep the `subscribe` pattern for the React hook, but remove the DOM-walking logic.
+
+**7. Tests**
+- New test file: `tests/i18n.test.jsx` covering:
+  - `t()` returns English strings by default.
+  - `t()` returns Norwegian strings after `setLanguage("no")`.
+  - `t()` falls back to English for missing Norwegian keys.
+  - `useI18n()` hook triggers re-render on language change.
+  - Language switcher component renders and toggles language on click.
+- Update existing component tests: ensure `t()` is mocked or the i18n module is set to a known language before each test so hardcoded string assertions still pass.
+
+Acceptance criteria:
+- Every user-visible string in the app is rendered via `t("key")` — no hardcoded English text in JSX.
+- Both English and Norwegian dictionaries are complete and cover all keys.
+- A visible language switcher exists in the sidebar or topbar.
+- Switching language instantly updates all visible text without a page reload.
+- Language preference persists across sessions (localStorage).
+- Norwegian translations read naturally to a Norwegian speaker.
+- All new and existing tests pass.
+
+Files to create:
+- `src/components/LanguageSwitcher.jsx`
+- `tests/i18n.test.jsx`
+
+Files to modify:
+- `src/i18n/translations.js` (add missing keys, make useI18n reactive, remove applyTranslations)
+- `src/pages/HeroPage.jsx`
+- `src/pages/LongTermPlanPage.jsx`
+- `src/pages/WeeklyPlanPage.jsx`
+- `src/pages/CoachPage.jsx`
+- `src/pages/InsightsPage.jsx`
+- `src/pages/DailyLogPage.jsx`
+- `src/pages/DataPage.jsx`
+- `src/pages/RoadmapPage.jsx`
+- `src/pages/AuthPage.jsx`
+- `src/components/Sidebar.jsx`
+- `src/components/Topbar.jsx`
+- `tests/mockAppData.js` (if i18n is added to context)
+
+Notes:
+- The existing `TRANSLATIONS` object and `t()` / `setLanguage()` functions are a solid foundation — build on them rather than replacing with a library like `react-i18next`.
+- If TASK-003 (coach chat history) is implemented first, include Norwegian translations for all new coach chat UI strings.
+- Day-of-week and month names should also be translated (used in WeeklyPlanPage and activity dates).
+
+---
+
 ### [x] TASK-001 – Save runner context in the Supabase database - connect to the user that is logged in
 Goal: I want the runner context (runner background and goal of plan) to be saved so that it is available across plattforms/devices.
 

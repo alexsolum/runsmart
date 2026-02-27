@@ -3,6 +3,7 @@ import { useAppData } from "../context/AppDataContext";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import CoachAvatar from "../components/CoachAvatar";
 import { useI18n } from "../i18n/translations";
+import { Button } from "@/components/ui/button";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -507,14 +508,16 @@ export default function CoachPage() {
           <p className="m-0 text-sm text-slate-500">{t("coach.aiCoachSubtitle")}</p>
         </div>
         {/* Mobile sidebar toggle */}
-        <button
+        <Button
           type="button"
-          className="ghost md:hidden"
+          variant="ghost"
+          size="sm"
+          className="md:hidden"
           onClick={() => setShowSidebar((s) => !s)}
           aria-label="Toggle conversations"
         >
           {showSidebar ? t("coach.hide") : t("coach.showConversations")}
-        </button>
+        </Button>
       </header>
 
       {/* ── Main layout ── */}
@@ -529,13 +532,13 @@ export default function CoachPage() {
         >
           {/* New conversation button */}
           <div className="p-3 border-b border-slate-100">
-            <button
+            <Button
               type="button"
-              className="w-full cta text-sm py-2"
+              className="w-full text-sm"
               onClick={handleNewConversation}
             >
               {t("coach.newConversation")}
-            </button>
+            </Button>
           </div>
 
           {/* Conversation list */}
@@ -552,20 +555,24 @@ export default function CoachPage() {
                       <div className="px-3 py-2.5 bg-red-50">
                         <p className="text-xs text-red-700 mb-1.5">{t("coach.deleteConv")}</p>
                         <div className="flex gap-2">
-                          <button
+                          <Button
                             type="button"
-                            className="text-xs px-2.5 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            variant="destructive"
+                            size="sm"
+                            className="h-auto text-xs px-2.5 py-1"
                             onClick={() => handleDeleteConversation(conv.id)}
                           >
                             {t("coach.delete")}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
-                            className="text-xs px-2.5 py-1 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                            variant="outline"
+                            size="sm"
+                            className="h-auto text-xs px-2.5 py-1"
                             onClick={() => setDeletingId(null)}
                           >
                             {t("coach.cancel")}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ) : (
@@ -581,15 +588,17 @@ export default function CoachPage() {
                           <p className="m-0 text-xs font-semibold text-slate-800 truncate">{conv.title}</p>
                           <p className="m-0 text-[11px] text-slate-400 mt-0.5">{relativeTime(conv.updated_at)}</p>
                         </div>
-                        <button
+                        <Button
                           type="button"
-                          className="opacity-0 group-hover:opacity-100 shrink-0 text-slate-400 hover:text-red-500 transition-opacity p-0.5 text-sm"
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 shrink-0 h-6 w-6 text-slate-400 hover:text-red-500 transition-opacity"
                           onClick={(e) => { e.stopPropagation(); setDeletingId(conv.id); }}
                           aria-label={`Delete conversation: ${conv.title}`}
                           title="Delete"
                         >
                           ×
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </li>
@@ -664,23 +673,22 @@ export default function CoachPage() {
           {error && (
             <div className="mx-4 mb-2 bg-red-50 border border-red-200 rounded-xl p-3 text-red-800 text-sm flex gap-3 items-start" role="alert">
               <p className="m-0 flex-1">{error}</p>
-              <button type="button" className="ghost self-start text-xs shrink-0" onClick={() => setError(null)}>
+              <Button type="button" variant="ghost" size="sm" className="self-start text-xs shrink-0 h-auto py-0.5 px-2" onClick={() => setError(null)}>
                 {t("coach.dismiss")}
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Input area */}
           <div className="px-4 pb-4 pt-2 border-t border-slate-100 shrink-0">
             {!activeConv ? null : !hasAssistantMessage ? (
-              <button
+              <Button
                 type="button"
-                className="cta"
                 onClick={fetchInitialInsights}
                 disabled={sending}
               >
                 {sending ? t("coach.analyzingBtn") : t("coach.refreshCoaching")}
-              </button>
+              </Button>
             ) : (
               <div className="flex gap-2">
                 <textarea
@@ -692,14 +700,14 @@ export default function CoachPage() {
                   onKeyDown={handleKeyDown}
                   disabled={sending}
                 />
-                <button
+                <Button
                   type="button"
-                  className="cta self-end"
+                  className="self-end"
                   onClick={handleSendFollowup}
                   disabled={sending || !inputText.trim()}
                 >
                   {sending ? "…" : t("coach.send")}
-                </button>
+                </Button>
               </div>
             )}
           </div>

@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -43,7 +46,6 @@ function RatingInput({ name, value, onChange, labels }) {
   );
 }
 
-const inputClass = "w-full border border-slate-300 rounded-lg px-3 py-2 font-inherit text-sm bg-white box-border focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.15)]";
 
 function MetricChip({ icon, label, value }) {
   if (value == null) return null;
@@ -370,13 +372,12 @@ export default function DailyLogPage() {
 
           <div className={fieldClass}>
             <span className={labelTextClass}>Date</span>
-            <input
+            <Input
               type="date"
               name="log_date"
               value={form.log_date}
               max={todayIso()}
               onChange={onChange}
-              className={inputClass}
             />
           </div>
 
@@ -389,13 +390,12 @@ export default function DailyLogPage() {
             </div>
             <div className={fieldClass}>
               <span className={labelTextClass}>Workout notes</span>
-              <input
+              <Input
                 type="text"
                 name="workout_notes"
                 value={form.workout_notes}
                 onChange={onChange}
                 placeholder="e.g. 12km easy, avg HR 142"
-                className={inputClass}
               />
             </div>
           </fieldset>
@@ -405,14 +405,14 @@ export default function DailyLogPage() {
             <legend className={legendClass}>Recovery</legend>
             <div className={fieldClass}>
               <span className={labelTextClass}>Sleep hours</span>
-              <input
+              <Input
                 type="number"
                 name="sleep_hours"
                 value={form.sleep_hours}
                 onChange={onChange}
                 min="0" max="24" step="0.5"
                 placeholder="e.g. 7.5"
-                className={`${inputClass} max-w-[120px]`}
+                className="max-w-[120px]"
               />
             </div>
             <div className={fieldClass}>
@@ -421,14 +421,14 @@ export default function DailyLogPage() {
             </div>
             <div className={fieldClass}>
               <span className={labelTextClass}>Resting HR <span className="text-slate-400">(bpm, optional)</span></span>
-              <input
+              <Input
                 type="number"
                 name="resting_hr"
                 value={form.resting_hr}
                 onChange={onChange}
                 min="30" max="120"
                 placeholder="e.g. 52"
-                className={`${inputClass} max-w-[120px]`}
+                className="max-w-[120px]"
               />
             </div>
             <div className={fieldClass}>
@@ -442,18 +442,22 @@ export default function DailyLogPage() {
             <legend className={legendClass}>Lifestyle</legend>
             <div className={fieldClass}>
               <span className={labelTextClass}>Alcohol units</span>
-              <div className="inline-flex items-center border border-slate-300 rounded-lg overflow-hidden">
-                <button
+              <div className="inline-flex items-center border border-border rounded-lg overflow-hidden">
+                <Button
                   type="button"
-                  className="w-9 h-9 bg-slate-50 border-r border-slate-200 text-lg text-slate-600 cursor-pointer flex items-center justify-center hover:bg-slate-100"
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-none border-r border-border h-9 w-9 text-lg"
                   onClick={() => setForm((p) => ({ ...p, alcohol_units: Math.max(0, (Number(p.alcohol_units) || 0) - 1) }))}
-                >−</button>
+                >−</Button>
                 <span className="w-10 text-center font-semibold text-sm h-9 flex items-center justify-center">{form.alcohol_units}</span>
-                <button
+                <Button
                   type="button"
-                  className="w-9 h-9 bg-slate-50 border-l border-slate-200 text-lg text-slate-600 cursor-pointer flex items-center justify-center hover:bg-slate-100"
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-none border-l border-border h-9 w-9 text-lg"
                   onClick={() => setForm((p) => ({ ...p, alcohol_units: Math.min(30, (Number(p.alcohol_units) || 0) + 1) }))}
-                >+</button>
+                >+</Button>
               </div>
             </div>
             <div className={fieldClass}>
@@ -468,19 +472,18 @@ export default function DailyLogPage() {
 
           <div className={fieldClass}>
             <span className={labelTextClass}>Notes</span>
-            <textarea
+            <Textarea
               name="notes"
               value={form.notes}
               onChange={onChange}
               rows="3"
               placeholder="Anything else worth noting…"
-              className={inputClass}
             />
           </div>
 
-          <button type="submit" className="cta" disabled={saving}>
+          <Button type="submit" disabled={saving}>
             {saving ? "Saving…" : isExistingEntry ? "Update log" : "Save log"}
-          </button>
+          </Button>
           {message && (
             <p className="text-sm text-slate-600 m-0" role="status">{message}</p>
           )}

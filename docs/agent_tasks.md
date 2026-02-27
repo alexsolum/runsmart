@@ -9,7 +9,7 @@ Only stop if blocked or if an action may cause data loss or security issues.
 
 Tech stack
 
-Frontend: Tailwind CSS
+Frontend: Tailwind CSS + shadcn/ui
 
 Backend: Supabase
 
@@ -510,9 +510,91 @@ NOTIFY pgrst, 'reload schema';
 Verify persistence.
 
 ⚙️ Improvements
-[ ] IMP-001 – TBD
+[ ] IMP-001 – shadcn/ui Component Library Integration
+Goal
 
-Placeholder for future improvements.
+Replace legacy HTML string-generator UI primitives in src/components/ui/ with proper
+shadcn/ui React components. Migrate interactive elements (buttons, inputs, selects,
+dialogs, cards, badges) across all pages from ad-hoc Tailwind + custom CSS to the
+shadcn component model. Reduce the 2,366-line index.css over time as shadcn handles
+component-level styling.
+
+Phase 0 – Infrastructure
+- Install: clsx, tailwind-merge, class-variance-authority
+- Create components.json (shadcn config, tsx: false for JavaScript project)
+- Create src/lib/utils.js with cn() utility
+- Add shadcn CSS variable block to src/styles/index.css mapped to existing palette
+- Fix --border alias collision in styles.css before running shadcn init
+
+Phase 1 – Core UI Components
+Add via npx shadcn@latest add <component>:
+- button (replaces .cta / .ghost CSS and Button.js stub)
+- card (replaces .dashboard-card, .kpi-card, .coach-insight-card; Card.js stub)
+- input (replaces Input.js stub and custom input CSS)
+- textarea (replaces Textarea.js stub)
+- select (replaces Select.js stub; NOTE: use for non-test-critical selects only)
+- badge (replaces Badge.js stub)
+- dialog (replaces Modal.js stub)
+Delete all 8 stub files; no pages import them so no breakage.
+
+Phase 2 – Page Migration (priority order)
+1. AuthPage.jsx – lowest risk (no tests); Input, Button, Card
+2. DailyLogPage.jsx – high form density; Input, Textarea, Button (preserve .rating-group)
+3. LongTermPlanPage.jsx – Input, Select, Button (preserve .ltp-phase-bar, .ltp-timeline, .ltp-block-form)
+4. WeeklyPlanPage.jsx – Button, Input (preserve all .wpp-* classes for tests)
+5. CoachPage.jsx – Card, Badge (preserve .coach-insight-card.is-* classes for tests)
+6. HeroPage.jsx – Card, Badge (preserve .dashboard-kpi for tests)
+7. InsightsPage.jsx – Card (preserve .kpi-card, .skeleton-block, .fitness-meter* for tests)
+8. MobilePage.jsx – full refactor (no test coverage)
+
+Phase 3 – Shell Components
+- App.jsx sidebar nav: Button variant="ghost" for nav items
+- Topbar search Input
+- Consider shadcn Sheet for mobile sidebar drawer
+
+CSS Cleanup (ongoing)
+- Delete .cta / .ghost CSS blocks from index.css after Phase 2
+- Delete component-specific CSS blocks as pages are migrated
+- Keep .wpp-*, .dashboard-kpi, .coach-insight-card, .ltp-* until tests are updated
+- Target: reduce index.css from 2,366 lines to ~800 lines
+
+Test compatibility notes
+- Preserve all BEM class names that tests query
+- shadcn Input/Textarea forward name/type/placeholder → attribute selectors still work
+- shadcn Select uses Radix portal; keep native <select> for test-critical fields
+
+Acceptance Criteria
+
+All 8 stub files replaced with shadcn React components
+No regression in existing test suite (currently 205 tests)
+Interactive elements use shadcn Button/Input/Select/Textarea/Dialog across all pages
+index.css reduced by at least 40%
+npm run build passes
+
+Files to Create
+components.json
+src/lib/utils.js
+src/components/ui/button.jsx (replaces Button.js)
+src/components/ui/card.jsx (replaces Card.js)
+src/components/ui/input.jsx (replaces Input.js)
+src/components/ui/textarea.jsx (replaces Textarea.js)
+src/components/ui/select.jsx (replaces Select.js)
+src/components/ui/badge.jsx (replaces Badge.js)
+src/components/ui/dialog.jsx (replaces Modal.js)
+
+Files to Modify
+package.json
+src/styles/index.css
+src/styles/styles.css (rename --border alias)
+src/pages/AuthPage.jsx
+src/pages/DailyLogPage.jsx
+src/pages/LongTermPlanPage.jsx
+src/pages/WeeklyPlanPage.jsx
+src/pages/CoachPage.jsx
+src/pages/HeroPage.jsx
+src/pages/InsightsPage.jsx
+src/pages/MobilePage.jsx
+src/App.jsx
 
 📚 Known Constraints
 

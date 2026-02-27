@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { computeLongRuns, computeTrainingLoad, computeWeeklyHRZones, computeRecentActivityZones } from "../domain/compute";
+import { Button } from "@/components/ui/button";
 
 function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -444,9 +445,9 @@ export default function InsightsPage() {
             Connect Strava and sync your activities to unlock training load charts, zone analysis, and readiness tracking.
           </p>
           {strava.startConnect && (
-            <button type="button" className="cta" onClick={strava.startConnect} style={{ marginTop: "16px" }}>
+            <Button type="button" className="mt-4" onClick={strava.startConnect}>
               Connect Strava
-            </button>
+            </Button>
           )}
         </div>
       )}

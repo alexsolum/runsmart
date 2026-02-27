@@ -138,7 +138,7 @@ function WorkoutEntry({ entry, onEdit, onDelete, onToggle, loading }) {
         </div>
       </div>
       {(entry.distance_km || entry.duration_min) && (
-        <p className="m-0 text-xs text-slate-600">
+        <p className="font-mono m-0 text-xs text-slate-600">
           {entry.distance_km ? `${entry.distance_km} km` : ""}
           {entry.distance_km && entry.duration_min ? " · " : ""}
           {entry.duration_min ? `${entry.duration_min} min` : ""}
@@ -341,10 +341,10 @@ export default function WeeklyPlanPage() {
       {/* Summary bar */}
       {selectedPlanId && (
         <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex gap-5 items-center flex-wrap mb-3.5">
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Total: <strong className="text-slate-900 font-bold">{summary.totalKm} km</strong></div>
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Sessions: <strong className="text-slate-900 font-bold">{summary.sessions}</strong></div>
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Rest days: <strong className="text-slate-900 font-bold">{summary.restDays}</strong></div>
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Completed: <strong className="text-slate-900 font-bold">{summary.completionPct}%</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Total: <strong className="font-mono text-slate-900 font-bold">{summary.totalKm} km</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Sessions: <strong className="font-mono text-slate-900 font-bold">{summary.sessions}</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Rest days: <strong className="font-mono text-slate-900 font-bold">{summary.restDays}</strong></div>
+          <div className="wpp-summary-stat text-[13px] text-slate-500">Completed: <strong className="font-mono text-slate-900 font-bold">{summary.completionPct}%</strong></div>
           {pageError && <p className="text-sm text-red-600 m-0 ml-auto">{pageError}</p>}
         </div>
       )}

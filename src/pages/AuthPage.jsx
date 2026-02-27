@@ -45,7 +45,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 p-6">
       <div className="bg-white border border-slate-200 rounded-2xl shadow-lg p-10 w-full max-w-sm">
-        <div className="text-xl font-bold text-blue-600 mb-6">RunSmart</div>
+        <div className="font-serif text-xl font-bold text-blue-600 mb-6">RunSmart</div>
         <h1 className="text-2xl font-bold text-slate-900 m-0 mb-5">
           {mode === "signin" ? "Sign in" : "Create account"}
         </h1>

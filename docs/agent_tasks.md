@@ -509,92 +509,214 @@ NOTIFY pgrst, 'reload schema';
 
 Verify persistence.
 
-⚙️ Improvements
-[ ] IMP-001 – shadcn/ui Component Library Integration
-Goal
+⚙️ Improvements — "Fjell & Fart" Frontend Design Overhaul
 
-Replace legacy HTML string-generator UI primitives in src/components/ui/ with proper
-shadcn/ui React components. Migrate interactive elements (buttons, inputs, selects,
-dialogs, cards, badges) across all pages from ad-hoc Tailwind + custom CSS to the
-shadcn component model. Reduce the 2,366-line index.css over time as shadcn handles
-component-level styling.
+Design direction: Premium, Scandinavian-inspired training cockpit. Dark-dominant with warm accent tones (amber/terracotta from trail dirt, cool blue from Nordic sky). Refined industrial — clean lines, generous negative space, confident typography. The AI coach "Marius AI Bakken" should feel like a real presence. The overall feel should be distinctly Norwegian without being kitsch.
 
-Phase 0 – Infrastructure
-- Install: clsx, tailwind-merge, class-variance-authority
-- Create components.json (shadcn config, tsx: false for JavaScript project)
-- Create src/lib/utils.js with cn() utility
-- Add shadcn CSS variable block to src/styles/index.css mapped to existing palette
-- Fix --border alias collision in styles.css before running shadcn init
+[x] IMP-001 — P1: Typography & Identity
+Status: Completed
 
-Phase 1 – Core UI Components
-Add via npx shadcn@latest add <component>:
-- button (replaces .cta / .ghost CSS and Button.js stub)
-- card (replaces .dashboard-card, .kpi-card, .coach-insight-card; Card.js stub)
-- input (replaces Input.js stub and custom input CSS)
-- textarea (replaces Textarea.js stub)
-- select (replaces Select.js stub; NOTE: use for non-test-critical selects only)
-- badge (replaces Badge.js stub)
-- dialog (replaces Modal.js stub)
-Delete all 8 stub files; no pages import them so no breakage.
+Replaced Inter with a three-font system:
+- Display/headings (h1–h3, brand marks): Instrument Serif
+- Body/UI (global, labels, nav, forms): DM Sans
+- Numeric data (KPI values, distances, paces, durations, stats): JetBrains Mono
 
-Phase 2 – Page Migration (priority order)
-1. AuthPage.jsx – lowest risk (no tests); Input, Button, Card
-2. DailyLogPage.jsx – high form density; Input, Textarea, Button (preserve .rating-group)
-3. LongTermPlanPage.jsx – Input, Select, Button (preserve .ltp-phase-bar, .ltp-timeline, .ltp-block-form)
-4. WeeklyPlanPage.jsx – Button, Input (preserve all .wpp-* classes for tests)
-5. CoachPage.jsx – Card, Badge (preserve .coach-insight-card.is-* classes for tests)
-6. HeroPage.jsx – Card, Badge (preserve .dashboard-kpi for tests)
-7. InsightsPage.jsx – Card (preserve .kpi-card, .skeleton-block, .fitness-meter* for tests)
-8. MobilePage.jsx – full refactor (no test coverage)
+Changes:
+- index.html: single Google Fonts link for all 3 families
+- src/styles/tokens.css: added --font-family-serif and --font-family-mono tokens
+- src/styles/index.css: Tailwind @theme override + global h1–h3 serif rule + brand/KPI CSS selectors
+- src/styles.css: body updated to DM Sans
+- JSX: font-mono applied to KPI values, distances, durations, pace, wellness stats across HeroPage, InsightsPage, CoachPage, WeeklyPlanPage, DailyLogPage; font-serif to brand marks in App and AuthPage
+- All 244 tests pass
 
-Phase 3 – Shell Components
-- App.jsx sidebar nav: Button variant="ghost" for nav items
-- Topbar search Input
-- Consider shadcn Sheet for mobile sidebar drawer
+[ ] IMP-002 — P2: Color System & Dark Mode
+Priority: High
+Phase: 1 (next up)
 
-CSS Cleanup (ongoing)
-- Delete .cta / .ghost CSS blocks from index.css after Phase 2
-- Delete component-specific CSS blocks as pages are migrated
-- Keep .wpp-*, .dashboard-kpi, .coach-insight-card, .ltp-* until tests are updated
-- Target: reduce index.css from 2,366 lines to ~800 lines
+Goal: Define a cohesive dark-first palette. Athletes check their phone at 5am, in bed after long runs — dark mode should be default.
 
-Test compatibility notes
-- Preserve all BEM class names that tests query
-- shadcn Input/Textarea forward name/type/placeholder → attribute selectors still work
-- shadcn Select uses Radix portal; keep native <select> for test-critical fields
+Palette:
+  --bg-primary:        #0D0F12   (near-black, not pure #000)
+  --bg-surface:        #161920   (cards, panels)
+  --bg-elevated:       #1E222B   (hover states, active nav)
+  --border-subtle:     #2A2F3A   (dividers, card edges)
+  --text-primary:      #E8E6E3   (warm white, not blue-white)
+  --text-secondary:    #8A8F9C   (subdued labels)
+  --accent-amber:      #E6A549   (primary accent — trail/warmth)
+  --accent-terracotta: #C76B4A   (danger/effort zones)
+  --accent-sky:        #5BA4CF   (info/recovery/cool-down)
+  --accent-pine:       #4A9B6E   (positive/green zones)
+  --gradient-effort:   linear-gradient(135deg, #C76B4A, #E6A549)
 
-Acceptance Criteria
+Tasks:
+- Add dark palette tokens to tokens.css
+- Implement dark mode as default theme via CSS custom properties
+- Update sidebar, topbar, cards, and page backgrounds
+- Offer light mode as secondary option (warm off-white #FAFAF7 backgrounds with muted accent versions)
+- Add theme toggle mechanism (localStorage persistent)
+- Update all hardcoded Tailwind color classes (text-slate-900, bg-white, etc.) to use theme-aware tokens
 
-All 8 stub files replaced with shadcn React components
-No regression in existing test suite (currently 205 tests)
-Interactive elements use shadcn Button/Input/Select/Textarea/Dialog across all pages
-index.css reduced by at least 40%
-npm run build passes
+Acceptance Criteria:
+- Dark mode is default, visually cohesive
+- Light mode available as toggle
+- All components render correctly in both modes
+- Tests pass
 
-Files to Create
-components.json
-src/lib/utils.js
-src/components/ui/button.jsx (replaces Button.js)
-src/components/ui/card.jsx (replaces Card.js)
-src/components/ui/input.jsx (replaces Input.js)
-src/components/ui/textarea.jsx (replaces Textarea.js)
-src/components/ui/select.jsx (replaces Select.js)
-src/components/ui/badge.jsx (replaces Badge.js)
-src/components/ui/dialog.jsx (replaces Modal.js)
+[ ] IMP-003 — P3: Dashboard Layout Redesign ("Training Cockpit")
+Priority: Medium
+Phase: 2
 
-Files to Modify
-package.json
-src/styles/index.css
-src/styles/styles.css (rename --border alias)
-src/pages/AuthPage.jsx
-src/pages/DailyLogPage.jsx
-src/pages/LongTermPlanPage.jsx
-src/pages/WeeklyPlanPage.jsx
-src/pages/CoachPage.jsx
-src/pages/HeroPage.jsx
-src/pages/InsightsPage.jsx
-src/pages/MobilePage.jsx
-src/App.jsx
+Goal: Redesign HeroPage from standard grid to a purpose-built training cockpit.
+
+Tasks:
+- Hero stat strip at top — today's date, days to race, current training phase, weekly km progress bar (one glanceable row)
+- Volume chart — full width, area chart (not bar) with gradient fill under line, animate on load
+- Activity feed — timeline with vertical line connector, effort-colored dots (red/amber/green from HR zones), hover lift, staggered fade-in
+- AI Coach preview card — prominent card showing latest insight with coach avatar, single-click to coach page
+- Weekly plan mini-view — 7-column micro-calendar showing planned vs completed workouts with check marks
+- CSS Grid with grid-template-areas for named zones; single column on mobile with smart stacking (stat strip → coach → weekly plan → volume → feed)
+
+Acceptance Criteria:
+- Dashboard feels like a training command center
+- All data still accessible
+- Responsive on mobile
+- Tests pass
+
+[ ] IMP-004 — P4: Motion & Micro-interactions
+Priority: Medium
+Phase: 2
+
+Goal: Add purposeful animation to reinforce progress and movement metaphors.
+
+Tasks:
+- Page load: staggered fade-up for dashboard cards (CSS @keyframes slideUp, delays 0/80/160/240ms)
+- Chart animations: ensure Recharts isAnimationActive on all charts
+- Number counters: animate KPI stats counting up from 0 on page load (requestAnimationFrame)
+- Route transitions: subtle fade between pages (React Suspense + CSS transitions)
+- Hover states: cards lift (translateY -2px + shadow increase), nav items get left-border accent slide-in
+- Coach insights: stagger in with slight bounce
+
+Acceptance Criteria:
+- Animations are smooth, purposeful, not distracting
+- No layout shift from animations
+- Works on mobile
+- Tests pass
+
+[ ] IMP-005 — P5: AI Coach Page Visual Identity
+Priority: Medium
+Phase: 3
+
+Goal: Make the coach feature feel like a real presence, not a chatbot bolted on.
+
+Tasks:
+- Larger CoachAvatar, always visible in sidebar/header of coach page
+- Insight cards with distinctive left-border color + icon per type:
+  - Danger: terracotta left border, pulsing dot
+  - Warning: amber left border
+  - Positive: pine green left border
+  - Info: sky blue left border
+- Conversation history sidebar — dark panel, conversation list with date + first insight title, active highlighted with amber
+- Empty state — atmospheric illustration/pattern with "Start your first coaching session" CTA
+- Typing indicator — 3-dot breathing animation with "Marius is analyzing your data…"
+
+Acceptance Criteria:
+- Coach page feels distinctive and branded
+- Insight types are visually distinguishable
+- Loading state is polished
+- Tests pass
+
+[ ] IMP-006 — P6: Background Atmosphere & Texture
+Priority: Low
+Phase: 4
+
+Goal: Add subtle depth to flat solid-color backgrounds.
+
+Tasks:
+- Subtle noise/grain texture overlay on background (repeating SVG/PNG at ~3% opacity)
+- Topographic contour line pattern for hero/header area (CSS background SVG, very low opacity, fits trail/mountain theme)
+- Gradient mesh behind dashboard hero (subtle amber → transparent, positioned top-right)
+
+Acceptance Criteria:
+- Textures add depth without distraction
+- Performance not impacted
+- Works in both dark and light modes
+
+[ ] IMP-007 — P7: Data Visualization Polish
+Priority: Medium
+Phase: 3
+
+Goal: Transform default Recharts styling to match the Fjell & Fart palette.
+
+Tasks:
+- Custom tooltip — dark surface background, rounded corners, amber accent border-top
+- Chart colors — use accent palette consistently (amber primary, sky secondary, pine positive)
+- Grid lines — nearly invisible (#1E222B on dark bg), remove Y-axis labels when tooltip exists
+- Training volume chart — gradient fill (accent-amber 10% opacity → transparent at x-axis)
+- HR zone chart — stacked horizontal bar (Z1: sky, Z2: pine, Z3: amber, Z4: terracotta, Z5: danger-red)
+
+Acceptance Criteria:
+- Charts feel cohesive with the overall design
+- All chart types styled consistently
+- Tests pass
+
+[ ] IMP-008 — P8: Navigation Refinement
+Priority: Low
+Phase: 4
+
+Goal: Refine sidebar from template-like to purposeful, space-efficient navigation.
+
+Tasks:
+- Collapsed-first sidebar — icon-only by default, labels on hover/expand
+- Active state — amber left-border indicator + brighter icon (no background highlight)
+- Group labels — small, uppercase, letter-spaced section labels in text-secondary
+- Bottom-pinned items — settings and language switcher at sidebar bottom
+- Mobile — bottom tab bar with 4–5 key icons (no hamburger menu)
+
+Acceptance Criteria:
+- Sidebar saves horizontal space in collapsed state
+- Active state is clear
+- Mobile nav is thumb-friendly
+- Tests pass
+
+[ ] IMP-009 — P9: Training Plan Page Visual Upgrade
+Priority: Low
+Phase: 4
+
+Goal: Elevate the weekly plan view from spreadsheet-like to visually engaging.
+
+Tasks:
+- Block timeline — horizontal strip (Base → Build → Peak → Taper) with current position highlighted
+- Day cards — workout type icon, planned distance, completion status (checkmark with green glow)
+- Today indicator — current day card with amber border + elevated shadow
+- Drag affordance — subtle grip dots on card edge if workouts can be rearranged
+
+Acceptance Criteria:
+- Training phases visually clear
+- Today is immediately identifiable
+- Tests pass
+
+[ ] IMP-010 — P10: Daily Log / Wellness UI
+Priority: Low
+Phase: 4
+
+Goal: Make daily logging engaging enough to use every day in <30 seconds.
+
+Tasks:
+- Emoji-based scales — replace 1–5 number sliders with 5 face icons, satisfying click/tap animation
+- Quick-log card — single card fillable in <30s, shown prominently on dashboard if today not logged
+- Trend sparklines — 7-day sparkline next to each metric (sleep, fatigue, mood)
+
+Acceptance Criteria:
+- Daily log is faster and more engaging to fill out
+- Sparklines show meaningful trends
+- Dashboard prompts logging when not done
+- Tests pass
+
+Implementation Phases:
+  Phase 1: IMP-001 (done) + IMP-002 (Colors/Dark mode)
+  Phase 2: IMP-003 (Dashboard layout) + IMP-004 (Motion)
+  Phase 3: IMP-005 (Coach UI) + IMP-007 (Chart polish)
+  Phase 4: IMP-006 (Texture) + IMP-008 (Nav) + IMP-009 + IMP-010
 
 📚 Known Constraints
 
@@ -675,4 +797,10 @@ All related tests passing.
   - Updated supabase/functions/gemini-coach/index.ts: FOLLOWUP_SYSTEM_INSTRUCTION, mode=initial/followup routing, conversation history support, returns {text} for followup mode
   - Removed sessionStorage caching (all persistence in Supabase)
   - Updated tests/coach.test.jsx: 184 tests total, all passing (branding, sidebar CRUD, initial coaching, follow-ups, error states, wellness, runner profile)
+- IMP-001 → DONE:
+  - Replaced Inter with three-font system: Instrument Serif (headings), DM Sans (body), JetBrains Mono (data)
+  - Updated index.html, tokens.css, index.css (@theme + global rules), styles.css
+  - Applied font-mono to KPI values, distances, paces, durations, wellness stats across 6 page components
+  - Applied font-serif to brand marks in App.jsx and AuthPage.jsx
+  - All 244 tests pass
 

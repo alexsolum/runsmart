@@ -345,7 +345,7 @@ export default function HeroPage() {
             <article key={metric.label} className="dashboard-kpi bg-white rounded-2xl p-5 shadow-sm flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm text-slate-500 mb-1">{metric.label}</p>
-                <strong className="text-2xl font-bold text-slate-900 block">{metric.value}</strong>
+                <strong className="font-mono text-2xl font-bold text-slate-900 block">{metric.value}</strong>
                 <span className={`text-xs font-semibold mt-1 inline-block ${DELTA_COLOR[metric.delta.tone] || "text-blue-600"}`}>
                   {metric.delta.text}
                 </span>
@@ -502,7 +502,7 @@ export default function HeroPage() {
                     <span>
                       <strong className="block text-sm text-slate-900">{item.name || item.type || "Workout"}</strong>
                       <small className="block text-xs text-slate-500">
-                        {item.type || "Session"} · {formatDistance(Number(item.distance) || 0)}{duration ? ` · ${duration}` : ""}
+                        {item.type || "Session"} · <span className="font-mono">{formatDistance(Number(item.distance) || 0)}{duration ? ` · ${duration}` : ""}</span>
                       </small>
                       {(timeOfDay || effort) && (
                         <small className="block text-xs text-slate-400 mt-0.5">

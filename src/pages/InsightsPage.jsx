@@ -24,7 +24,7 @@ function KpiCard({ label, value, delta, deltaDir, note }) {
   return (
     <div className="kpi-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
       <p className="m-0 text-xs text-slate-500 font-medium">{label}</p>
-      <p className="m-0 my-1 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="font-mono m-0 my-1 text-2xl font-bold text-slate-900">{value}</p>
       {delta != null && (
         <p className={`m-0 text-sm font-semibold ${DELTA_DIR_COLORS[deltaDir ?? "neutral"]}`}>{delta}</p>
       )}
@@ -503,7 +503,7 @@ export default function InsightsPage() {
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-slate-600">Level: {fitnessLevel}</span>
-              <strong className="font-bold text-slate-900">{fitnessScore}/100</strong>
+              <strong className="font-mono font-bold text-slate-900">{fitnessScore}/100</strong>
             </div>
           </div>
 
@@ -512,9 +512,9 @@ export default function InsightsPage() {
               <h4 className="m-0 mb-2 text-sm font-bold text-slate-900">Long run progression</h4>
               <div className="flex justify-between items-center text-sm mb-2">
                 <span className="text-slate-600">
-                  Long run progress: <strong>{latestLongRunKm.toFixed(1)} km</strong> / {targetLongRunKm} km target
+                  Long run progress: <strong className="font-mono">{latestLongRunKm.toFixed(1)} km</strong> / {targetLongRunKm} km target
                 </span>
-                <strong className="font-bold text-slate-900">{longRunCompletion}%</strong>
+                <strong className="font-mono font-bold text-slate-900">{longRunCompletion}%</strong>
               </div>
               <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-3" role="img" aria-label={`Long run progress ${longRunCompletion} percent`}>
                 <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${longRunCompletion}%` }} />
@@ -531,15 +531,15 @@ export default function InsightsPage() {
             <div className="grid grid-cols-3 gap-3" id="insight-stats">
               <div>
                 <span className="block text-[11px] text-slate-500 mb-0.5">Form trend</span>
-                <strong id="stat-form" className="text-sm font-bold text-slate-900">{formStat == null ? "—" : `${formStat > 0 ? "+" : ""}${formStat.toFixed(1)}`}</strong>
+                <strong id="stat-form" className="font-mono text-sm font-bold text-slate-900">{formStat == null ? "—" : `${formStat > 0 ? "+" : ""}${formStat.toFixed(1)}`}</strong>
               </div>
               <div>
                 <span className="block text-[11px] text-slate-500 mb-0.5">Readiness</span>
-                <strong id="stat-readiness" className="text-sm font-bold text-slate-900">{readiness}</strong>
+                <strong id="stat-readiness" className="font-mono text-sm font-bold text-slate-900">{readiness}</strong>
               </div>
               <div>
                 <span className="block text-[11px] text-slate-500 mb-0.5">Risk score</span>
-                <strong id="stat-risk" className="text-sm font-bold text-slate-900">{risk}</strong>
+                <strong id="stat-risk" className="font-mono text-sm font-bold text-slate-900">{risk}</strong>
               </div>
             </div>
           </div>

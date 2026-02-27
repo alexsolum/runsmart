@@ -50,7 +50,7 @@ function MetricChip({ icon, label, value }) {
   return (
     <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
       {icon && <span aria-hidden="true">{icon}</span>}
-      <span>{label}: <strong>{value}</strong></span>
+      <span>{label}: <strong className="font-mono">{value}</strong></span>
     </span>
   );
 }

@@ -36,7 +36,9 @@
   --shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.2);
 
   /* Type */
-  --font-family-sans: "Inter", sans-serif;
+  --font-family-sans: "DM Sans", sans-serif;
+  --font-family-serif: "Instrument Serif", Georgia, serif;
+  --font-family-mono: "JetBrains Mono", monospace;
   --font-size-sm: 12px;
   --font-size-md: 14px;
   --font-size-lg: 16px;

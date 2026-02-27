@@ -180,17 +180,17 @@ function DailyLogSummary({ logs }) {
       <div className="flex flex-wrap gap-2.5">
         {avgFatigue != null && (
           <span className="text-[13px] text-green-700 flex items-center gap-1">
-            {t("insights.fatigue")} <strong className="text-green-900">{avgFatigue.toFixed(1)}/5</strong>
+            {t("insights.fatigue")} <strong className="font-mono text-green-900">{avgFatigue.toFixed(1)}/5</strong>
           </span>
         )}
         {avgSleep != null && (
           <span className="text-[13px] text-green-700 flex items-center gap-1">
-            {t("insights.sleepQuality")} <strong className="text-green-900">{avgSleep.toFixed(1)}/5</strong>
+            {t("insights.sleepQuality")} <strong className="font-mono text-green-900">{avgSleep.toFixed(1)}/5</strong>
           </span>
         )}
         {avgMood != null && (
           <span className="text-[13px] text-green-700 flex items-center gap-1">
-            {t("coach.mood")} <strong className="text-green-900">{avgMood.toFixed(1)}/5</strong>
+            {t("coach.mood")} <strong className="font-mono text-green-900">{avgMood.toFixed(1)}/5</strong>
           </span>
         )}
         <span className="text-[13px] text-green-700 flex items-center gap-1">

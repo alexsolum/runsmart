@@ -9,7 +9,7 @@ Only stop if blocked or if an action may cause data loss or security issues.
 
 Tech stack
 
-Frontend: Tailwind CSS
+Frontend: Tailwind CSS + shadcn/ui
 
 Backend: Supabase
 

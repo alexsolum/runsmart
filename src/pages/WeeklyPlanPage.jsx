@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -59,7 +62,7 @@ function TypeBadge({ type }) {
 
 // ── Add/Edit form ─────────────────────────────────────────────────────────────
 
-const inputClass = "w-full border border-slate-300 rounded-lg px-2 py-1.5 font-inherit text-xs bg-white focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_2px_rgba(37,99,235,0.12)]";
+const selectClass = "w-full border border-input rounded-md px-2 py-1.5 font-inherit text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring";
 
 function WorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
   const blank = { workout_type: "Easy", distance_km: "", duration_min: "", description: "" };
@@ -81,7 +84,7 @@ function WorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
     <form className={`border-t border-slate-200 pt-2.5 grid gap-2${className ? ` ${className}` : ""}`} onSubmit={handleSubmit} noValidate>
       <label className="grid gap-1 text-[11px] font-medium text-slate-500">
         Type
-        <select className={inputClass} value={form.workout_type} onChange={(e) => set("workout_type", e.target.value)}>
+        <select className={selectClass} value={form.workout_type} onChange={(e) => set("workout_type", e.target.value)}>
           {WORKOUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </label>
@@ -91,27 +94,27 @@ function WorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
           <div className="grid grid-cols-2 gap-1.5">
             <label className="grid gap-1 text-[11px] font-medium text-slate-500">
               Distance (km)
-              <input type="number" min="0" max="200" step="0.1" className={inputClass} placeholder="—" value={form.distance_km} onChange={(e) => set("distance_km", e.target.value)} />
+              <Input type="number" min="0" max="200" step="0.1" className="text-xs h-8 px-2 py-1.5" placeholder="—" value={form.distance_km} onChange={(e) => set("distance_km", e.target.value)} />
             </label>
             <label className="grid gap-1 text-[11px] font-medium text-slate-500">
               Duration (min)
-              <input type="number" min="0" max="600" className={inputClass} placeholder="—" value={form.duration_min} onChange={(e) => set("duration_min", e.target.value)} />
+              <Input type="number" min="0" max="600" className="text-xs h-8 px-2 py-1.5" placeholder="—" value={form.duration_min} onChange={(e) => set("duration_min", e.target.value)} />
             </label>
           </div>
           <label className="grid gap-1 text-[11px] font-medium text-slate-500">
             Description
-            <textarea rows={2} className={inputClass} placeholder="e.g. 8×400m @ 5K pace, 90s recovery" value={form.description} onChange={(e) => set("description", e.target.value)} />
+            <Textarea rows={2} className="text-xs min-h-0 px-2 py-1.5" placeholder="e.g. 8×400m @ 5K pace, 90s recovery" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </label>
         </>
       )}
 
       <div className="flex gap-1.5">
-        <button type="submit" className="cta" disabled={loading} style={{ fontSize: "12px", padding: "6px 12px" }}>
+        <Button type="submit" size="sm" className="h-auto text-xs px-3 py-1.5" disabled={loading}>
           {loading ? "Saving…" : initial?.id ? "Update" : "Add"}
-        </button>
-        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "12px", padding: "6px 10px" }}>
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="h-auto text-xs px-2.5 py-1.5" onClick={onCancel} disabled={loading}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -165,15 +168,17 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
       <div className="flex justify-between items-center">
         <span className="wpp-day-label text-xs font-bold text-slate-900">{dayName} {dayNum}</span>
         {!isAddingHere && (
-          <button
+          <Button
             type="button"
-            className="w-6 h-6 rounded-full border border-slate-300 bg-slate-50 text-slate-500 text-base leading-none cursor-pointer flex items-center justify-center p-0 hover:bg-slate-200 disabled:opacity-50"
+            variant="outline"
+            size="icon"
+            className="w-6 h-6 rounded-full text-slate-500 text-base"
             onClick={() => onAdd(date)}
             title="Add workout"
             disabled={loading}
           >
             +
-          </button>
+          </Button>
         )}
       </div>
 
@@ -316,7 +321,7 @@ export default function WeeklyPlanPage() {
           <label className="text-[13px] font-semibold m-0">
             Plan:{" "}
             <select
-              className="ml-1.5 border border-slate-300 rounded-lg px-2 py-1.5 font-inherit text-[13px] bg-white"
+              className={`ml-1.5 ${selectClass}`}
               value={selectedPlanId ?? ""}
               onChange={(e) => { setSelectedPlanId(e.target.value); setAddingTo(null); setEditingEntry(null); }}
             >
@@ -331,10 +336,10 @@ export default function WeeklyPlanPage() {
         </div>
 
         <div className="flex items-center gap-2 ml-auto max-[960px]:ml-0 max-[960px]:w-full max-[960px]:justify-between">
-          <button type="button" className="ghost" style={{ padding: "6px 12px" }} onClick={() => { setWeekStart((w) => isoDateOffset(w, -7)); setAddingTo(null); setEditingEntry(null); }}>←</button>
+          <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5" onClick={() => { setWeekStart((w) => isoDateOffset(w, -7)); setAddingTo(null); setEditingEntry(null); }}>←</Button>
           <span className="wpp-week-label font-semibold text-sm min-w-[220px] text-center max-[960px]:min-w-0 max-[960px]:text-left">{formatWeekLabel(weekStart)}</span>
-          <button type="button" className="ghost" style={{ padding: "6px 12px" }} onClick={() => { setWeekStart((w) => isoDateOffset(w, 7)); setAddingTo(null); setEditingEntry(null); }}>→</button>
-          <button type="button" className="ghost" style={{ padding: "6px 12px", fontSize: "12px" }} onClick={() => { setWeekStart(currentMondayIso()); setAddingTo(null); setEditingEntry(null); }}>Today</button>
+          <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5" onClick={() => { setWeekStart((w) => isoDateOffset(w, 7)); setAddingTo(null); setEditingEntry(null); }}>→</Button>
+          <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5 text-xs" onClick={() => { setWeekStart(currentMondayIso()); setAddingTo(null); setEditingEntry(null); }}>Today</Button>
         </div>
       </div>
 

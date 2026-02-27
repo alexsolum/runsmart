@@ -2,6 +2,35 @@
 @import '../../styles.css';
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* ── Typography: Instrument Serif headings, JetBrains Mono data ── */
+
+h1, h2, h3 {
+  font-family: var(--font-family-serif);
+}
+
+.font-serif  { font-family: var(--font-family-serif); }
+.font-mono   { font-family: var(--font-family-mono); }
+
+/* Mono for KPI/stat values — large numeric displays */
+.dashboard-kpi strong,
+.kpi-card .kpi-value,
+.mobile-kpi-value {
+  font-family: var(--font-family-mono);
+}
+
+/* Brand text uses serif for distinction */
+.app-sidebar__brand,
+.sidebar-logo,
+.topbar-logo {
+  font-family: var(--font-family-serif);
+}
+
 #root {
   width: 100%;
 }

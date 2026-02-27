@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const PHASES = ["Base", "Build", "Peak", "Taper", "Recovery"];
 
@@ -82,7 +85,7 @@ function PhaseSummaryBar({ blocks }) {
   );
 }
 
-const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-2 font-inherit text-[13px] bg-white focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]";
+const selectClass = "w-full border border-input rounded-md px-2.5 py-2 font-inherit text-[13px] bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1";
 
 function BlockForm({ initial, planId, onSave, onCancel, loading }) {
   const [form, setForm] = useState({ ...BLANK_BLOCK, ...initial });
@@ -107,16 +110,15 @@ function BlockForm({ initial, planId, onSave, onCancel, loading }) {
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Phase</span>
-        <select className={inputClass} value={form.phase} onChange={(e) => set("phase", e.target.value)} required>
+        <select className={selectClass} value={form.phase} onChange={(e) => set("phase", e.target.value)} required>
           {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </label>
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Label (optional, e.g. "Base 1")</span>
-        <input
+        <Input
           type="text"
-          className={inputClass}
           placeholder="Leave blank to use phase name"
           value={form.label}
           onChange={(e) => set("label", e.target.value)}
@@ -126,31 +128,31 @@ function BlockForm({ initial, planId, onSave, onCancel, loading }) {
       <div className="grid grid-cols-2 gap-2 mb-2.5">
         <label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">Start date</span>
-          <input type="date" className={inputClass} value={form.start_date} onChange={(e) => set("start_date", e.target.value)} required />
+          <Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} required />
         </label>
         <label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">End date</span>
-          <input type="date" className={inputClass} value={form.end_date} onChange={(e) => set("end_date", e.target.value)} min={form.start_date} required />
+          <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} min={form.start_date} required />
         </label>
       </div>
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Weekly target (km, optional)</span>
-        <input type="number" min="0" max="500" step="0.5" className={inputClass} placeholder="e.g. 60" value={form.target_km} onChange={(e) => set("target_km", e.target.value)} />
+        <Input type="number" min="0" max="500" step="0.5" placeholder="e.g. 60" value={form.target_km} onChange={(e) => set("target_km", e.target.value)} />
       </label>
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Notes (optional)</span>
-        <textarea rows={2} className={inputClass} placeholder="e.g. Focus on aerobic base, keep HR in zone 2" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+        <Textarea rows={2} placeholder="e.g. Focus on aerobic base, keep HR in zone 2" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
       </label>
 
       <div className="flex gap-2 flex-wrap">
-        <button type="submit" className="cta" disabled={loading || !form.start_date || !form.end_date} style={{ fontSize: "13px", padding: "8px 14px" }}>
+        <Button type="submit" size="sm" disabled={loading || !form.start_date || !form.end_date}>
           {loading ? "Saving…" : initial?.id ? "Update block" : "Add block"}
-        </button>
-        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "13px", padding: "8px 14px" }}>
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={loading}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -178,30 +180,30 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Goal race</span>
-        <input type="text" className={inputClass} placeholder="e.g. Stockholm Marathon" value={form.race} onChange={(e) => set("race", e.target.value)} required />
+        <Input type="text" placeholder="e.g. Stockholm Marathon" value={form.race} onChange={(e) => set("race", e.target.value)} required />
       </label>
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Race date</span>
-        <input type="date" className={inputClass} value={form.race_date} onChange={(e) => set("race_date", e.target.value)} min={todayIso()} required />
+        <Input type="date" value={form.race_date} onChange={(e) => set("race_date", e.target.value)} min={todayIso()} required />
       </label>
 
       <div className="grid grid-cols-2 gap-2 mb-2.5">
         <label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">Days/week available</span>
-          <select className={inputClass} value={form.availability} onChange={(e) => set("availability", e.target.value)}>
+          <select className={selectClass} value={form.availability} onChange={(e) => set("availability", e.target.value)}>
             {[3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
         <label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">Current weekly km</span>
-          <input type="number" min="0" max="300" className={inputClass} placeholder="e.g. 50" value={form.current_mileage} onChange={(e) => set("current_mileage", e.target.value)} />
+          <Input type="number" min="0" max="300" placeholder="e.g. 50" value={form.current_mileage} onChange={(e) => set("current_mileage", e.target.value)} />
         </label>
       </div>
 
       <label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Constraints / injuries (optional)</span>
-        <textarea rows={2} className={inputClass} placeholder="e.g. Knee niggle, avoid hills for now" value={form.constraints} onChange={(e) => set("constraints", e.target.value)} />
+        <Textarea rows={2} placeholder="e.g. Knee niggle, avoid hills for now" value={form.constraints} onChange={(e) => set("constraints", e.target.value)} />
       </label>
 
       <label className="flex items-center gap-2 mb-2.5 cursor-pointer">
@@ -210,12 +212,12 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
       </label>
 
       <div className="flex gap-2 flex-wrap">
-        <button type="submit" className="cta" disabled={loading || !form.race || !form.race_date} style={{ fontSize: "13px", padding: "8px 14px" }}>
+        <Button type="submit" size="sm" disabled={loading || !form.race || !form.race_date}>
           {loading ? "Creating…" : "Create plan"}
-        </button>
-        <button type="button" className="ghost" onClick={onCancel} disabled={loading} style={{ fontSize: "13px", padding: "8px 14px" }}>
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={loading}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -324,7 +326,7 @@ export default function LongTermPlanPage() {
             <h3 className="m-0 mb-1 text-sm font-bold">Your plan</h3>
             {plans.plans.length > 0 ? (
               <select
-                className="w-full border border-slate-300 rounded-lg px-2.5 py-2 font-inherit text-[13px] bg-white mb-2.5"
+                className={`${selectClass} mb-2.5`}
                 value={selectedPlanId ?? ""}
                 onChange={(e) => { setSelectedPlanId(e.target.value); setEditingBlock(null); }}
               >
@@ -337,14 +339,14 @@ export default function LongTermPlanPage() {
             ) : (
               <p className="text-[13px] text-slate-500 m-0 mb-2.5">No plans yet.</p>
             )}
-            <button
+            <Button
               type="button"
-              className="ghost"
-              style={{ fontSize: "13px", padding: "6px 12px" }}
+              variant="outline"
+              size="sm"
               onClick={() => { setShowCreatePlan((v) => !v); setEditingBlock(null); }}
             >
               {showCreatePlan ? "Cancel" : "+ New plan"}
-            </button>
+            </Button>
           </div>
 
           {/* Plan details */}
@@ -362,9 +364,9 @@ export default function LongTermPlanPage() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
                   Goal for this plan
                 </label>
-                <textarea
+                <Textarea
                   rows={2}
-                  className="w-full text-[13px] border border-slate-300 rounded-lg px-2.5 py-2 font-inherit bg-white box-border focus:outline-none focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.12)] disabled:opacity-60"
+                  className="text-[13px]"
                   placeholder="e.g. Finish my first 100K under 12 hours, stay healthy, enjoy the process"
                   value={goalDraft}
                   onChange={(e) => setGoalDraft(e.target.value)}
@@ -400,14 +402,13 @@ export default function LongTermPlanPage() {
 
           {/* Add block button */}
           {editingBlock === null && !showCreatePlan && selectedPlanId && (
-            <button
+            <Button
               type="button"
-              className="cta"
-              style={{ fontSize: "13px", padding: "8px 14px" }}
+              size="sm"
               onClick={() => setEditingBlock({})}
             >
               + Add training block
-            </button>
+            </Button>
           )}
 
           {formError && (
@@ -447,22 +448,24 @@ export default function LongTermPlanPage() {
                         {block.label && <strong className="text-sm">{block.label}</strong>}
                       </div>
                       <div className="flex gap-1.5">
-                        <button
+                        <Button
                           type="button"
-                          className="ghost"
-                          style={{ fontSize: "12px", padding: "4px 10px" }}
+                          variant="outline"
+                          size="sm"
+                          className="h-auto text-xs px-2.5 py-1"
                           onClick={() => { setEditingBlock(block); setShowCreatePlan(false); }}
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="ghost"
-                          style={{ fontSize: "12px", padding: "4px 10px", color: "#dc2626" }}
+                          variant="outline"
+                          size="sm"
+                          className="h-auto text-xs px-2.5 py-1 text-destructive hover:text-destructive"
                           onClick={() => handleDeleteBlock(block)}
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </div>
                     <p className="my-0.5 text-[13px] text-slate-500">{formatDateRange(block.start_date, block.end_date)}</p>

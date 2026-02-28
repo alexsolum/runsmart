@@ -68,9 +68,16 @@
 }
 
 /* ── Typography: Instrument Serif headings, JetBrains Mono data ── */
-
+/* Applied to semantic headings; UI headings that use Tailwind `font-sans`
+   class override this with higher specificity (class > element selector). */
 h1, h2, h3 {
   font-family: var(--font-family-serif);
+}
+
+/* shadcn/Tailwind UI headings always use sans-serif */
+h1.font-sans, h2.font-sans, h3.font-sans,
+h1[class*="tracking-tight"], h2[class*="tracking-tight"], h3[class*="tracking-tight"] {
+  font-family: var(--font-family-sans);
 }
 
 .font-serif  { font-family: var(--font-family-serif); }
@@ -263,7 +270,7 @@ h1, h2, h3 {
   border-color: #c7d2fe;
 }
 
-.dashboard-kpi,
+/* .dashboard-kpi — test selector only; shadcn Card handles its own box model */
 .dashboard-card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
@@ -271,21 +278,9 @@ h1, h2, h3 {
   padding: var(--space-4);
 }
 
-.dashboard-kpi p,
-.dashboard-kpi small {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
 .kpi-helper {
   display: block;
   margin-top: var(--space-1);
-}
-
-.dashboard-kpi strong {
-  display: block;
-  margin: var(--space-1) 0;
-  font-size: 1.4rem;
 }
 
 .delta {
@@ -460,10 +455,6 @@ select:focus-visible {
     position: sticky;
     top: 0;
     z-index: 5;
-  }
-
-  .dashboard-kpi {
-    min-width: 210px;
   }
 
   .dashboard-insights {

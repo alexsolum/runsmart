@@ -4,7 +4,7 @@ export default function Section({ title, children, actions }) {
       {(title || actions) && (
         <div className="flex items-center justify-between">
           {title && (
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            <h2 className="font-sans text-lg font-semibold tracking-tight text-foreground">
               {title}
             </h2>
           )}

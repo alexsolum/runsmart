@@ -361,7 +361,7 @@ export default function DailyLogPage() {
   return (
     <PageContainer id="daily-log">
       <div className="mb-5">
-        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Daily log</h2>
+        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Daily log</h2>
         <p className="m-0 text-sm text-slate-500">Track sleep, lifestyle, and training quality to spot what helps you perform.</p>
       </div>
 
@@ -370,7 +370,7 @@ export default function DailyLogPage() {
 
         {/* ── form ── */}
         <form className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-3" onSubmit={onSubmit} noValidate>
-          <h3 className="m-0 text-sm font-bold">{isExistingEntry ? "Edit entry" : "Add today's log"}</h3>
+          <h3 className="m-0 text-sm font-bold font-sans">{isExistingEntry ? "Edit entry" : "Add today's log"}</h3>
 
           <div className={fieldClass}>
             <Label htmlFor="log-date" className={labelTextClass}>Date</Label>
@@ -502,7 +502,7 @@ export default function DailyLogPage() {
 
         {/* ── recent history ── */}
         <section className="bg-white border border-slate-200 rounded-2xl p-4" aria-label="Recent daily logs">
-          <h3 className="m-0 mb-3 text-sm font-bold">Recent entries</h3>
+          <h3 className="m-0 mb-3 text-sm font-bold font-sans">Recent entries</h3>
           {dailyLogs.loading && <p className="text-sm text-slate-500 m-0">Loading…</p>}
           {!dailyLogs.loading && dailyLogs.logs.length === 0 && (
             <div className="py-8 text-center">
@@ -522,7 +522,7 @@ export default function DailyLogPage() {
       {dailyLogs.logs.length >= 3 && (
         <>
           <div className="mt-8 mb-3">
-            <h3 className="m-0 mb-1 text-base font-bold text-slate-900">Wellness trends</h3>
+            <h3 className="m-0 mb-1 text-base font-bold font-sans text-slate-900">Wellness trends</h3>
             <p className="m-0 text-sm text-slate-500">Last 14 logged days — compare how your sleep, mood, fatigue, and training quality track together.</p>
           </div>
 
@@ -531,7 +531,7 @@ export default function DailyLogPage() {
           </div>
 
           <div className="mt-2 mb-3">
-            <h3 className="m-0 mb-1 text-base font-bold text-slate-900">Correlations</h3>
+            <h3 className="m-0 mb-1 text-base font-bold font-sans text-slate-900">Correlations</h3>
             <p className="m-0 text-sm text-slate-500">Average training quality grouped by lifestyle and recovery factors. More entries = more reliable signal.</p>
           </div>
 

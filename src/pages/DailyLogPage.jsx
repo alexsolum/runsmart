@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import PageContainer from "../components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -358,7 +359,7 @@ export default function DailyLogPage() {
   const isExistingEntry = dailyLogs.logs.some((l) => l.log_date === form.log_date);
 
   return (
-    <section className="page" id="daily-log">
+    <PageContainer id="daily-log">
       <div className="mb-5">
         <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Daily log</h2>
         <p className="m-0 text-sm text-slate-500">Track sleep, lifestyle, and training quality to spot what helps you perform.</p>
@@ -570,6 +571,6 @@ export default function DailyLogPage() {
           </div>
         </>
       )}
-    </section>
+    </PageContainer>
   );
 }

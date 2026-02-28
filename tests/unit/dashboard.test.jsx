@@ -66,31 +66,34 @@ describe("Dashboard — error state", () => {
   });
 });
 
-describe("Dashboard — Strava data display", () => {
+describe("Dashboard — KPI metrics", () => {
   beforeEach(() => {
     useAppData.mockReturnValue(makeAppData());
   });
 
-  it("renders four KPI metric cards", () => {
+  it("renders six KPI metric cards", () => {
     render(<HeroPage />);
     const kpiSection = screen.getByRole("region", { name: /weekly metrics/i });
-    // Each KPI is an <article> inside the kpis section
     const cards = kpiSection.querySelectorAll(".dashboard-kpi");
-    expect(cards.length).toBe(4);
+    expect(cards.length).toBe(6);
   });
 
-  it("shows Weekly Distance KPI populated from Strava activities", () => {
+  it("shows Total Distance KPI populated from Strava activities", () => {
     render(<HeroPage />);
-    // At least one KPI should show a km value derived from the sample activities
     const kpiSection = screen.getByRole("region", { name: /weekly metrics/i });
     expect(kpiSection).toHaveTextContent(/km/i);
   });
 
-  it("shows Training Load KPI in minutes", () => {
+  it("shows Active Time KPI in hours or minutes", () => {
     render(<HeroPage />);
-    expect(screen.getByText(/Training Load/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Active Time/i).length).toBeGreaterThan(0);
+  });
+
+  it("shows Training Load / Active Time KPI label", () => {
+    render(<HeroPage />);
     const kpiSection = screen.getByRole("region", { name: /weekly metrics/i });
-    expect(kpiSection).toHaveTextContent(/min/i);
+    // Active time shows hours or minutes
+    expect(kpiSection.textContent).toMatch(/h\s*\d+m|\d+\s*min/);
   });
 
   it("shows Consistency KPI counting sessions", () => {
@@ -102,55 +105,83 @@ describe("Dashboard — Strava data display", () => {
 
   it("shows Readiness KPI as a percentage", () => {
     render(<HeroPage />);
-    // "Readiness" label appears in the KPI cards; use getAllByText to avoid "multiple elements" error
     const readinessLabels = screen.getAllByText(/Readiness/i);
     expect(readinessLabels.length).toBeGreaterThan(0);
     const kpiSection = screen.getByRole("region", { name: /weekly metrics/i });
     expect(kpiSection).toHaveTextContent(/%/i);
   });
+});
 
-  it("renders activity feed in the sidebar", () => {
-    render(<HeroPage />);
-    const rail = screen.getByRole("complementary", { name: /recent activity stream/i });
-    expect(rail).toBeInTheDocument();
+describe("Dashboard — activity history table", () => {
+  beforeEach(() => {
+    useAppData.mockReturnValue(makeAppData());
   });
 
-  it("lists recent activities by name from Strava", () => {
+  it("shows Strava Activity History heading", () => {
     render(<HeroPage />);
-    // SAMPLE_ACTIVITIES — "Morning Run" and "Tempo Tuesday" are timestamped today;
-    // "Long Run Sunday" is 4 days ago. All three fall within the "Week" timeline filter.
+    expect(screen.getByText(/Strava Activity History/i)).toBeInTheDocument();
+  });
+
+  it("lists recent activities by name in the history table", () => {
+    render(<HeroPage />);
     expect(screen.getByText("Morning Run")).toBeInTheDocument();
     expect(screen.getByText("Tempo Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Long Run Sunday")).toBeInTheDocument();
   });
 
-  it("displays Workout Mix section", () => {
+  it("shows duration formatted as H:MM:SS in the table", () => {
     render(<HeroPage />);
-    expect(screen.getByText(/Workout Mix/i)).toBeInTheDocument();
+    // Morning Run: 3120s → 0:52:00
+    expect(screen.getByText("0:52:00")).toBeInTheDocument();
+    // Tempo Tuesday: 2160s → 0:36:00
+    expect(screen.getByText("0:36:00")).toBeInTheDocument();
   });
 
-  it("displays Fatigue & Form section", () => {
+  it("shows 2:00:00 for long run with 7200s moving time", () => {
     render(<HeroPage />);
-    // Use heading role to target the h3, not the "Fatigue-adjusted" KPI helper text
-    expect(screen.getByRole("heading", { name: /Fatigue/i })).toBeInTheDocument();
+    // Long Run Sunday: moving_time 7200s → 2:00:00
+    expect(screen.getByText("2:00:00")).toBeInTheDocument();
   });
 
-  it("shows Weekly Progress section heading", () => {
+  it("shows Add Activity and View All buttons", () => {
     render(<HeroPage />);
-    expect(screen.getByText(/Weekly progress/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add Activity/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /View All/i }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Dashboard — Workout Breakdown section", () => {
+  beforeEach(() => {
+    useAppData.mockReturnValue(makeAppData());
+  });
+
+  it("shows Workout Breakdown heading", () => {
+    render(<HeroPage />);
+    expect(screen.getByText(/Workout Breakdown/i)).toBeInTheDocument();
+  });
+
+  it("shows workout type breakdown for sample activities", () => {
+    render(<HeroPage />);
+    // SAMPLE_ACTIVITIES are all type "Run" → should show "Run" in breakdown
+    expect(screen.getAllByText(/Run/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Dashboard — Weekly Progress section", () => {
+  beforeEach(() => {
+    useAppData.mockReturnValue(makeAppData());
+  });
+
+  it("shows Weekly progression heading", () => {
+    render(<HeroPage />);
+    expect(screen.getByText(/Weekly progression/i)).toBeInTheDocument();
   });
 
   it("shows completed and planned km summary pills", () => {
     render(<HeroPage />);
-    // Use selector:'span' to avoid matching the parent container which also contains the text
+    // Use selector:'span' to avoid matching parent containers
     expect(screen.getByText(/completed/i, { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText(/planned/i, { selector: "span" })).toBeInTheDocument();
-  });
-
-  it("greets the authenticated athlete by username", () => {
-    render(<HeroPage />);
-    // Username is derived from email "athlete@example.com" → "athlete"
-    expect(screen.getByText(/Welcome back, athlete/i)).toBeInTheDocument();
   });
 });
 
@@ -174,43 +205,6 @@ describe("Dashboard — Weekly Progress empty state", () => {
     }));
     render(<HeroPage />);
     expect(screen.getByText(/No workout data for this week/i)).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard — activity feed detail", () => {
-  beforeEach(() => {
-    useAppData.mockReturnValue(makeAppData());
-  });
-
-  it("shows duration in activity cards", () => {
-    render(<HeroPage />);
-    // Morning Run: moving_time 3120s → 52 min
-    expect(screen.getByText(/52 min/)).toBeInTheDocument();
-    // Tempo Tuesday: moving_time 2160s → 36 min
-    expect(screen.getByText(/36 min/)).toBeInTheDocument();
-  });
-
-  it("shows time of day in activity cards", () => {
-    render(<HeroPage />);
-    // Activities are timestamped with today's ISO date — some AM/PM time should be present
-    const rail = screen.getByRole("complementary", { name: /recent activity stream/i });
-    // Locale time string contains either AM/PM or a colon (HH:MM), both indicate a time value
-    expect(rail.textContent).toMatch(/\d{1,2}:\d{2}/);
-  });
-
-  it("shows effort icon for activities with heart rate zone data", () => {
-    render(<HeroPage />);
-    // Tempo Tuesday: z4+z5 dominate → 🔴 Hard
-    expect(screen.getByText(/Hard/)).toBeInTheDocument();
-    // Morning Run: moderate HR zone mix → 🟡 Moderate
-    const moderateItems = screen.getAllByText(/Moderate/);
-    expect(moderateItems.length).toBeGreaterThan(0);
-  });
-
-  it("shows 2h 0m for long run with 7200s moving time", () => {
-    render(<HeroPage />);
-    // Long Run Sunday: moving_time 7200s → 2h
-    expect(screen.getByText(/2h/)).toBeInTheDocument();
   });
 });
 
@@ -241,29 +235,9 @@ describe("Dashboard — filter controls", () => {
     const user = userEvent.setup();
     render(<HeroPage />);
 
-    // Scope to the dashboard controls group to avoid matching the "Month" timeline button
     const controls = screen.getByRole("group", { name: /Dashboard filters/i });
     const monthChip = within(controls).getByRole("button", { name: "Month" });
     await user.click(monthChip);
     expect(monthChip).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("has timeline filter chips (Today / Week / Month) in the activity feed", () => {
-    render(<HeroPage />);
-    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
-    // "Week" appears in multiple places; the activity sidebar also uses it
-    const weekButtons = screen.getAllByRole("button", { name: "Week" });
-    expect(weekButtons.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("filters activity feed by search term", async () => {
-    const user = userEvent.setup();
-    render(<HeroPage />);
-
-    const searchInput = screen.getByRole("searchbox", { name: /search recent activity/i });
-    await user.type(searchInput, "Tempo");
-
-    expect(screen.getByText("Tempo Tuesday")).toBeInTheDocument();
-    expect(screen.queryByText("Morning Run")).not.toBeInTheDocument();
   });
 });

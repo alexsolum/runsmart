@@ -348,7 +348,7 @@ export default function HeroPage() {
       {/* ── 6 KPI Cards ── */}
       <Section>
         <section
-          className="dashboard-kpis grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
+          className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
           aria-label="Weekly metrics"
         >
           {metrics.map((metric) => (

@@ -2,8 +2,8 @@ import React from "react";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { t, setLanguage, getCurrentLanguage, useI18n } from "../src/i18n/translations";
-import LanguageSwitcher from "../src/components/LanguageSwitcher";
+import { t, setLanguage, getCurrentLanguage, useI18n } from "../../src/i18n/translations";
+import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
 // Reset language to English after every test to avoid cross-test pollution
 afterEach(() => {

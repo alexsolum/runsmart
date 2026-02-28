@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import * as Compute from "../src/domain/compute.js";
+import * as Compute from "../../src/domain/compute.js";
 
 describe("getWeekStart", () => {
   it("returns Monday for a Wednesday", () => {

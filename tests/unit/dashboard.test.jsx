@@ -7,11 +7,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import HeroPage from "../src/pages/HeroPage";
+import HeroPage from "../../src/pages/HeroPage";
 import { makeAppData, SAMPLE_ACTIVITIES } from "./mockAppData";
 
 // Mock the context so we can inject controlled data without hitting Supabase
-vi.mock("../src/context/AppDataContext", () => ({
+vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
@@ -32,7 +32,7 @@ vi.mock("@/components/ui/select", () => ({
   SelectItem: ({ value, children }) => <option value={value}>{children}</option>,
 }));
 
-import { useAppData } from "../src/context/AppDataContext";
+import { useAppData } from "../../src/context/AppDataContext";
 
 beforeEach(() => {
   vi.clearAllMocks();

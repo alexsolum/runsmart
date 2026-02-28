@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
-import MiniBarChart from "../components/MiniBarChart";
 import WeeklyProgressChart from "../components/WeeklyProgressChart";
 import { computeWeeklyProgress } from "../domain/compute";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -11,8 +12,17 @@ const DATE_FILTERS = [
   { key: "week", label: "Week" },
   { key: "month", label: "Month" },
 ];
-const TYPE_FILTERS = ["All", "Run", "Ride", "Workout"];
-const TIMELINE_FILTERS = ["Today", "Week", "Month"];
+const TYPE_FILTERS = ["All", "Run", "Ride", "Workout", "Walk", "Swim"];
+
+const TYPE_BAR_COLORS = {
+  Run: "bg-blue-600",
+  Ride: "bg-amber-500",
+  Swim: "bg-cyan-500",
+  Workout: "bg-violet-500",
+  Walk: "bg-green-500",
+};
+
+// ─── Date helpers ────────────────────────────────────────────────────────────
 
 function getDateFilterRange(filter) {
   const now = new Date();
@@ -27,93 +37,91 @@ function getDateFilterRange(filter) {
   return { start, end: now };
 }
 
-function formatDistance(meters) {
+// ─── Format helpers ───────────────────────────────────────────────────────────
+
+function fmtKm(meters) {
   if (!meters) return "—";
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
-function toDayKey(date) {
-  return new Date(date).toISOString().split("T")[0];
+function fmtActiveTime(seconds) {
+  if (!seconds) return "—";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m} min`;
 }
 
-function formatAgo(input) {
-  const diff = Date.now() - new Date(input).getTime();
-  const h = Math.max(1, Math.round(diff / (1000 * 60 * 60)));
-  if (h < 24) return `${h}h ago`;
-  const d = Math.round(h / 24);
-  return `${d}d ago`;
+function fmtPaceDisplay(speedMs) {
+  if (!Number(speedMs)) return "—";
+  const spm = 1000 / Number(speedMs);
+  return `${Math.floor(spm / 60)}:${String(Math.round(spm % 60)).padStart(2, "0")} /km`;
 }
 
-function activityIcon(type) {
-  if (type === "Run") return "🏃";
-  if (type === "Ride") return "🚴";
-  if (type === "Workout") return "🏋️";
-  return "🗓️";
+// H:MM:SS for table rows
+function fmtDuration(seconds) {
+  if (!seconds) return "—";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function deltaMeta(current, previous, suffix = "vs last period") {
-  if (!previous) return { text: "No baseline", tone: "info", suffix };
-  const change = ((current - previous) / previous) * 100;
-  if (change >= 5) return { text: `▲ ${change.toFixed(0)}%`, tone: "success", suffix };
-  if (change <= -5) return { text: `▼ ${Math.abs(change).toFixed(0)}%`, tone: "critical", suffix };
-  return { text: `● ${Math.abs(change).toFixed(0)}%`, tone: "warning", suffix };
+function fmtDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function formatTimeOfDay(dateStr) {
-  if (!dateStr) return null;
-  return new Date(dateStr).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+function fmtTablePace(speedMs) {
+  if (!Number(speedMs)) return "—";
+  const spm = 1000 / Number(speedMs);
+  return `${Math.floor(spm / 60)}:${String(Math.round(spm % 60)).padStart(2, "0")}/km`;
 }
 
-function formatDuration(seconds) {
-  if (!seconds) return null;
-  const mins = Math.round(seconds / 60);
-  if (mins < 60) return `${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
+function barColor(type) {
+  return TYPE_BAR_COLORS[type] || "bg-slate-400";
 }
 
-function effortMeta(zones) {
-  if (!zones) return null;
-  const total = (zones.z1 || 0) + (zones.z2 || 0) + (zones.z3 || 0) + (zones.z4 || 0) + (zones.z5 || 0);
-  if (!total) return null;
-  const hardPct = ((zones.z4 || 0) + (zones.z5 || 0)) / total;
-  const modPct = (zones.z3 || 0) / total;
-  if (hardPct > 0.35) return { icon: "🔴", label: "Hard" };
-  if (modPct > 0.25 || hardPct > 0.15) return { icon: "🟡", label: "Moderate" };
-  return { icon: "🟢", label: "Easy" };
+// ─── Delta badge ──────────────────────────────────────────────────────────────
+
+function computeDelta(current, previous, invert = false) {
+  if (!previous) return { text: "New", variant: "secondary" };
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (Math.abs(pct) <= 2) return { text: `~${Math.abs(pct)}%`, variant: "secondary" };
+  const isPositive = invert ? pct < 0 : pct > 0;
+  return {
+    text: `${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}%`,
+    variant: isPositive ? "success" : "destructive",
+  };
 }
 
-const KPI_COLORS = ["#2563eb", "#8b5cf6", "#16a34a", "#f59e0b"];
-
-const DELTA_COLOR = {
-  success: "text-green-600",
-  critical: "text-red-600",
-  warning: "text-amber-600",
-  info: "text-blue-600",
-};
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function DashboardSkeleton() {
   return (
-    <div className="is-loading grid gap-4" aria-hidden="true">
-      <div className="h-[120px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
-      <div className="grid grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, idx) => (
-          <div key={idx} className="min-h-[120px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
+    <div className="is-loading space-y-5" aria-hidden="true">
+      <div className="h-14 rounded-xl bg-slate-100 animate-pulse" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-28 rounded-xl bg-slate-100 animate-pulse" />
         ))}
       </div>
-      <div className="min-h-[280px] rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse" />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+        <div className="h-72 rounded-xl bg-slate-100 animate-pulse" />
+        <div className="h-72 rounded-xl bg-slate-100 animate-pulse" />
+      </div>
+      <div className="h-64 rounded-xl bg-slate-100 animate-pulse" />
     </div>
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function HeroPage() {
-  const { auth, activities, workoutEntries, plans } = useAppData();
+  const { activities, workoutEntries, plans } = useAppData();
   const [dateFilter, setDateFilter] = useState("week");
   const [typeFilter, setTypeFilter] = useState("All");
-  const [timelineFilter, setTimelineFilter] = useState("Week");
-  const [search, setSearch] = useState("");
 
+  // Restore persisted filters
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
@@ -121,23 +129,19 @@ export default function HeroPage() {
       const parsed = JSON.parse(saved);
       if (parsed.dateFilter) setDateFilter(parsed.dateFilter);
       if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
-      if (parsed.timelineFilter) setTimelineFilter(parsed.timelineFilter);
-      if (typeof parsed.search === "string") setSearch(parsed.search);
     } catch {
-      // Ignore malformed local storage values.
+      // ignore malformed JSON
     }
   }, []);
 
+  // Persist filters
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ dateFilter, typeFilter, timelineFilter, search }),
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ dateFilter, typeFilter }));
     } catch {
-      // Ignore storage errors in restricted browsers.
+      // ignore storage errors in restricted browsers
     }
-  }, [dateFilter, typeFilter, timelineFilter, search]);
+  }, [dateFilter, typeFilter]);
 
   // Load workout entries for the current week
   useEffect(() => {
@@ -152,338 +156,370 @@ export default function HeroPage() {
 
   const { start, end } = useMemo(() => getDateFilterRange(dateFilter), [dateFilter]);
 
-  const filtered = useMemo(() => {
-    return activities.activities
-      .filter((item) => {
-        const started = new Date(item.started_at);
-        const matchesDate = started >= start && started <= end;
-        const matchesType = typeFilter === "All" || item.type === typeFilter;
-        return matchesDate && matchesType;
-      })
-      .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+  // Activities filtered by date + type, sorted ascending
+  const filtered = useMemo(
+    () =>
+      activities.activities
+        .filter((a) => {
+          const t = new Date(a.started_at);
+          return (
+            t >= start &&
+            t <= end &&
+            (typeFilter === "All" || a.type === typeFilter)
+          );
+        })
+        .sort((a, b) => new Date(a.started_at) - new Date(b.started_at)),
+    [activities.activities, start, end, typeFilter],
+  );
+
+  // Previous-period activities for delta comparison
+  const prevFiltered = useMemo(() => {
+    const rangeMs = end.getTime() - start.getTime();
+    const prevStart = new Date(start.getTime() - rangeMs);
+    const prevEnd = new Date(start);
+    return activities.activities.filter((a) => {
+      const t = new Date(a.started_at);
+      return (
+        t >= prevStart &&
+        t < prevEnd &&
+        (typeFilter === "All" || a.type === typeFilter)
+      );
+    });
   }, [activities.activities, start, end, typeFilter]);
 
+  // ── 6 KPI metrics ──────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
-    const rangeMs = end.getTime() - start.getTime();
-    const previousStart = new Date(start.getTime() - rangeMs);
-    const previousEnd = new Date(start);
+    const sum = (arr, key) => arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 
-    const previousActivities = activities.activities.filter((item) => {
-      const ts = new Date(item.started_at);
-      const matchesType = typeFilter === "All" || item.type === typeFilter;
-      return ts >= previousStart && ts < previousEnd && matchesType;
-    });
+    const curDist = sum(filtered, "distance");
+    const prevDist = sum(prevFiltered, "distance");
 
-    const sum = (collection, key) => collection.reduce((acc, row) => acc + (Number(row[key]) || 0), 0);
-    const currentDistance = sum(filtered, "distance");
-    const previousDistance = sum(previousActivities, "distance");
-    const currentLoad = sum(filtered, "moving_time") / 60;
-    const previousLoad = sum(previousActivities, "moving_time") / 60;
-    const currentConsistency = filtered.length;
-    const previousConsistency = previousActivities.length;
-    const currentReadiness = Math.max(0, Math.round(75 - (currentLoad - previousLoad) * 0.08));
-    const previousReadiness = Math.max(0, Math.round(75 - (previousLoad - currentLoad) * 0.08));
+    const curTime = sum(filtered, "moving_time");
+    const prevTime = sum(prevFiltered, "moving_time");
+
+    const curElev = sum(filtered, "elevation_gain");
+    const prevElev = sum(prevFiltered, "elevation_gain");
+
+    const curSessions = filtered.length;
+    const prevSessions = prevFiltered.length;
+
+    // Average pace (seconds per km) — lower is better → invert delta
+    const speedRuns = (arr) => arr.filter((a) => Number(a.average_speed) > 0);
+    const avgSpeed = (arr) => {
+      const r = speedRuns(arr);
+      return r.length ? sum(r, "average_speed") / r.length : 0;
+    };
+    const curSpeed = avgSpeed(filtered);
+    const prevSpeed = avgSpeed(prevFiltered);
+    const curPaceSec = curSpeed ? 1000 / curSpeed : 0;
+    const prevPaceSec = prevSpeed ? 1000 / prevSpeed : 0;
+
+    // Readiness: simple heuristic based on load vs prev load
+    const curReadiness = Math.max(0, Math.round(75 - (curTime / 60 - prevTime / 60) * 0.08));
+    const prevReadiness = Math.max(0, Math.round(75 - (prevTime / 60 - curTime / 60) * 0.08));
 
     return [
       {
-        label: "Weekly Distance",
-        value: currentDistance ? formatDistance(currentDistance) : "—",
+        label: "Total Distance",
+        value: fmtKm(curDist),
         helper: "Total distance",
-        delta: deltaMeta(currentDistance, previousDistance),
+        delta: computeDelta(curDist, prevDist),
       },
       {
-        label: "Training Load",
-        value: `${Math.round(currentLoad)} min`,
+        label: "Active Time",
+        value: fmtActiveTime(curTime),
         helper: "Session minutes",
-        delta: deltaMeta(currentLoad, previousLoad),
+        delta: computeDelta(curTime, prevTime),
+      },
+      {
+        label: "Avg. Pace",
+        value: fmtPaceDisplay(curSpeed),
+        helper: "Avg per km",
+        delta: computeDelta(curPaceSec, prevPaceSec, true),
+      },
+      {
+        label: "Elevation Gain",
+        value: curElev ? `${Math.round(curElev).toLocaleString()} m` : "—",
+        helper: "Total ascent",
+        delta: computeDelta(curElev, prevElev),
       },
       {
         label: "Consistency",
-        value: `${currentConsistency} sessions`,
+        value: `${curSessions} sessions`,
         helper: "Completed workouts",
-        delta: deltaMeta(currentConsistency, previousConsistency),
+        delta: computeDelta(curSessions, prevSessions),
       },
       {
         label: "Readiness",
-        value: `${currentReadiness}%`,
+        value: `${curReadiness}%`,
         helper: "Fatigue-adjusted",
-        delta: deltaMeta(currentReadiness, previousReadiness, "Readiness trend"),
+        delta: computeDelta(curReadiness, prevReadiness),
       },
     ];
-  }, [activities.activities, end, filtered, start, typeFilter]);
+  }, [filtered, prevFiltered]);
 
+  // ── Workout breakdown ───────────────────────────────────────────────────────
+  const workoutBreakdown = useMemo(() => {
+    if (!filtered.length) return [];
+    const counts = {};
+    filtered.forEach((a) => {
+      const t = a.type || "Other";
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    const total = filtered.length;
+    return Object.entries(counts)
+      .map(([type, count]) => ({ type, count, pct: Math.round((count / total) * 100) }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [filtered]);
+
+  // ── Recent activities for table ─────────────────────────────────────────────
+  const recentActivities = useMemo(
+    () => [...filtered].sort((a, b) => new Date(b.started_at) - new Date(a.started_at)).slice(0, 10),
+    [filtered],
+  );
+
+  // ── Weekly Progress ─────────────────────────────────────────────────────────
   const weeklyProgress = useMemo(
     () => computeWeeklyProgress(activities.activities, workoutEntries.entries),
     [activities.activities, workoutEntries.entries],
   );
 
-  const activityFeed = useMemo(() => {
-    const now = new Date();
-    const filterStart = new Date(now);
-    if (timelineFilter === "Today") {
-      filterStart.setHours(0, 0, 0, 0);
-    } else if (timelineFilter === "Week") {
-      filterStart.setDate(filterStart.getDate() - 7);
-    } else {
-      filterStart.setDate(filterStart.getDate() - 30);
-    }
-
-    return activities.activities
-      .filter((item) => new Date(item.started_at) >= filterStart)
-      .filter((item) => {
-        if (!search.trim()) return true;
-        return `${item.name || ""} ${item.type || ""}`.toLowerCase().includes(search.toLowerCase());
-      })
-      .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
-      .slice(0, 8);
-  }, [activities.activities, timelineFilter, search]);
-
-  const workoutMix = useMemo(() => {
-    const mix = filtered.reduce((acc, item) => {
-      const key = item.type || "Other";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(mix).sort((a, b) => b[1] - a[1]);
-  }, [filtered]);
-
-  const fatigueSummary = useMemo(() => {
-    const totalHours = filtered.reduce((acc, item) => acc + (Number(item.moving_time) || 0), 0) / 3600;
-    if (!totalHours) return "Not enough data yet. Add activities to unlock fatigue and form insights.";
-    if (totalHours > 8) return "High load week. Prioritize sleep and keep tomorrow easy.";
-    if (totalHours > 5) return "Balanced load. Maintain quality sessions and monitor soreness.";
-    return "Light training week. Consider adding an aerobic support run.";
-  }, [filtered]);
-
-  const dailyDistances = useMemo(() => {
-    const result = Array(7).fill(0);
-    const now = new Date();
-    filtered.forEach((item) => {
-      const dayDiff = Math.floor((now - new Date(item.started_at)) / (1000 * 60 * 60 * 24));
-      if (dayDiff >= 0 && dayDiff < 7) {
-        result[6 - dayDiff] += (Number(item.distance) || 0) / 1000;
-      }
-    });
-    return result;
-  }, [filtered]);
-
-  if (activities.loading) {
-    return <DashboardSkeleton />;
-  }
+  // ── Render states ───────────────────────────────────────────────────────────
+  if (activities.loading) return <DashboardSkeleton />;
 
   if (activities.error) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <h2 className="m-0 mb-2 text-xl font-bold text-slate-900">Dashboard temporarily unavailable</h2>
-        <p className="m-0 text-sm text-slate-500">We could not load activity data. Please retry from the Data tab or refresh the page.</p>
-      </div>
+      <Card className="p-5">
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Dashboard temporarily unavailable</h2>
+        <p className="text-sm text-slate-500">We could not load activity data. Please retry from the Data tab or refresh the page.</p>
+      </Card>
     );
   }
 
   return (
-    <div className="dashboard-shell">
-      <section className="dashboard-main">
-        {/* Header: greeting + filters */}
-        <header className="bg-white rounded-2xl p-5 shadow-sm flex flex-col lg:flex-row justify-between gap-4">
-          <div>
-            <p className="text-sm text-slate-500 mb-1">
-              {new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-            </p>
-            <h2 className="text-xl font-bold text-slate-900 mb-1">
-              Welcome back, {auth.user?.email?.split("@")[0] || "Athlete"}
-            </h2>
-            <p className="text-sm text-slate-500">
-              Current phase: Build · focus on aerobic durability and controlled intensity.
-            </p>
+    <div className="space-y-5">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Training Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Dashboard filters">
+          <span className="text-sm text-slate-500 font-medium hidden sm:inline">Global filter:</span>
+          <div className="inline-flex gap-1 p-1 bg-slate-100 rounded-full">
+            {DATE_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={dateFilter === f.key}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  dateFilter === f.key
+                    ? "bg-white shadow-sm text-slate-900"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+                onClick={() => setDateFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Dashboard filters">
-            <div className="inline-flex gap-1 p-1 bg-slate-100 rounded-full">
-              {DATE_FILTERS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  aria-pressed={dateFilter === item.key}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                    dateFilter === item.key
-                      ? "bg-white shadow-sm text-slate-900"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                  onClick={() => setDateFilter(item.key)}
-                >
-                  {item.label}
-                </button>
+          <Select value={typeFilter} onValueChange={setTypeFilter} aria-label="Workout type filter">
+            <SelectTrigger
+              className="h-8 w-36 rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-700"
+              aria-label="Workout type filter"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPE_FILTERS.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
               ))}
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter} aria-label="Workout type filter">
-              <SelectTrigger className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" aria-label="Workout type filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TYPE_FILTERS.map((item) => (
-                  <SelectItem key={item} value={item}>{item}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </header>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-        {/* KPI Cards */}
-        <section className="dashboard-kpis" aria-label="Weekly metrics">
-          {metrics.map((metric, idx) => (
-            <article key={metric.label} className="dashboard-kpi bg-white rounded-2xl p-5 shadow-sm flex items-start justify-between gap-3">
+      {/* ── 6 KPI Cards ── */}
+      <section
+        className="dashboard-kpis grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
+        aria-label="Weekly metrics"
+      >
+        {metrics.map((metric) => (
+          <Card key={metric.label} className="dashboard-kpi">
+            <CardContent className="pt-5 pb-4">
+              <p className="text-xs font-medium text-slate-500 mb-2">{metric.label}</p>
+              <p className="text-xl font-bold text-slate-900 tracking-tight leading-none mb-2.5 kpi-value">
+                {metric.value}
+              </p>
+              <Badge variant={metric.delta.variant} className="text-[11px] px-2 py-0.5">
+                {metric.delta.text}
+              </Badge>
+              <p className="kpi-helper text-xs text-slate-400 mt-1">{metric.helper}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      {/* ── Chart + Workout Breakdown ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+
+        {/* Weekly Progress */}
+        <Card>
+          <CardHeader className="pb-1">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm text-slate-500 mb-1">{metric.label}</p>
-                <strong className="font-mono text-2xl font-bold text-slate-900 block">{metric.value}</strong>
-                <span className={`text-xs font-semibold mt-1 inline-block ${DELTA_COLOR[metric.delta.tone] || "text-blue-600"}`}>
-                  {metric.delta.text}
-                </span>
-                <small className="block text-xs text-slate-400 mt-0.5">{metric.delta.suffix}</small>
-                <small className="kpi-helper block text-xs text-slate-400 mt-1">{metric.helper}</small>
+                <CardTitle className="text-base font-semibold">Weekly progression</CardTitle>
+                <CardDescription className="mt-0.5">
+                  Cumulative km — completed vs planned, vs 4-week avg
+                </CardDescription>
               </div>
-              <MiniBarChart data={dailyDistances} color={KPI_COLORS[idx]} />
-            </article>
-          ))}
-        </section>
+              <div className="flex gap-3 text-xs text-slate-400 shrink-0 pt-0.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-0.5 bg-blue-600 rounded inline-block" />
+                  Distance
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-px bg-slate-300 border-dashed inline-block" />
+                  Avg
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-3">
+            <WeeklyProgressChart
+              days={weeklyProgress.days}
+              totalExecuted={weeklyProgress.totalExecuted}
+              totalPlanned={weeklyProgress.totalPlanned}
+            />
+          </CardContent>
+        </Card>
 
-        {/* Weekly Progress Chart */}
-        <article className="bg-white rounded-2xl p-5 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-base font-semibold text-slate-900">Weekly progress</h3>
-            <p className="text-sm text-slate-500">Cumulative km — completed vs planned, vs 4-week avg</p>
-          </div>
-          <WeeklyProgressChart
-            days={weeklyProgress.days}
-            totalExecuted={weeklyProgress.totalExecuted}
-            totalPlanned={weeklyProgress.totalPlanned}
-          />
-        </article>
-
-        {/* Workout Mix + Fatigue & Form */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <article className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900 mb-3">Workout Mix</h3>
-            {workoutMix.length ? (
-              <div className="space-y-2">
-                {workoutMix.map(([type, count]) => (
-                  <div key={type} className="flex items-center justify-between text-sm border-b border-slate-100 pb-2">
-                    <span className="text-slate-600">{type}</span>
-                    <strong className="text-slate-900">{count}</strong>
+        {/* Workout Breakdown */}
+        <Card>
+          <CardHeader className="pb-1">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Workout Breakdown</CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-slate-500 -mr-1">
+                View All
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {workoutBreakdown.length ? (
+              <div className="space-y-4">
+                {workoutBreakdown.map((item) => (
+                  <div key={item.type}>
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <span className="font-medium text-slate-700">{item.type}</span>
+                      <span className="text-slate-400 tabular-nums">{item.pct}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${barColor(item.type)}`}
+                        style={{ width: `${item.pct}%` }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-slate-400 text-sm">No completed sessions yet.</p>
+              <p className="text-sm text-slate-400 py-8 text-center">
+                No activity data for this period.
+              </p>
             )}
-          </article>
-          <article className="bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="text-base font-semibold text-slate-900 mb-3">Fatigue &amp; Form</h3>
-            <p className="text-sm text-slate-600">{fatigueSummary}</p>
-            <Button variant="ghost" size="sm" className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium px-0">
-              View details
-            </Button>
-          </article>
-        </section>
-      </section>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Right Rail */}
-      <aside className="dashboard-rail" aria-label="Recent activity stream">
-        {/* Statistics Panel */}
-        <article className="bg-white rounded-2xl p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">Statistics</h3>
-
-          <div className="mb-4">
-            <div className="flex justify-between text-sm mb-1.5">
-              <span className="text-slate-600">Weekly Regularity</span>
-              <span className="font-semibold text-slate-900">{metrics[2].value}</span>
-            </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-600 rounded-full transition-all"
-                style={{ width: `${Math.min(100, (parseInt(metrics[2].value) / 7) * 100)}%` }}
-              />
+      {/* ── Activity History Table ── */}
+      <Card>
+        <CardHeader className="border-b border-slate-100 pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">Strava Activity History</CardTitle>
+            <div className="flex gap-2">
+              <Button size="sm" className="h-8 text-xs">Add Activity</Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs">View All</Button>
             </div>
           </div>
-
-          <div className="mb-4">
-            <div className="flex justify-between text-sm mb-1.5">
-              <span className="text-slate-600">Form Score</span>
-              <span className="font-semibold text-slate-900">{metrics[3].value}</span>
+        </CardHeader>
+        <CardContent className="p-0">
+          {recentActivities.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left py-3 pl-5 pr-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Date</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Name</th>
+                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Distance</th>
+                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Time</th>
+                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Pace</th>
+                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Elevation</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
+                    <th className="py-3 pr-5 w-8" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentActivities.map((item, idx) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="py-3 pl-5 pr-3 text-xs text-slate-500 whitespace-nowrap">
+                        {idx + 1}.&nbsp;{fmtDate(item.started_at)}
+                      </td>
+                      <td className="py-3 px-3 font-medium text-slate-900 max-w-[180px] truncate">
+                        {item.name || item.type || "Workout"}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
+                        {fmtKm(item.distance)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
+                        {fmtDuration(item.moving_time)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
+                        {fmtTablePace(item.average_speed)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
+                        {item.elevation_gain ? `${Math.round(item.elevation_gain)} m` : "—"}
+                      </td>
+                      <td className="py-3 px-3 text-xs text-slate-600">{item.type || "—"}</td>
+                      <td className="py-3 pr-5 text-center">
+                        {item.strava_url ? (
+                          <a
+                            href={item.strava_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-300 hover:text-blue-600 transition-colors"
+                            aria-label="View on Strava"
+                          >
+                            <svg className="w-4 h-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        ) : (
+                          <svg className="w-4 h-4 inline text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500 rounded-full transition-all"
-                style={{ width: metrics[3].value }}
-              />
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-slate-400 py-10 text-center">
+              No activities for this period. Sync Strava to populate your history.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
-          <div className="p-3 bg-slate-50 rounded-xl">
-            <p className="text-sm text-slate-600">{fatigueSummary}</p>
-          </div>
-        </article>
-
-        {/* Recent Activity */}
-        <article className="bg-white rounded-2xl p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-slate-900 mb-3">Recent Activity</h3>
-          <div className="flex gap-1 mb-3">
-            {TIMELINE_FILTERS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                aria-pressed={timelineFilter === item}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors border ${
-                  timelineFilter === item
-                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                    : "text-slate-500 hover:text-slate-700 border-transparent"
-                }`}
-                onClick={() => setTimelineFilter(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search workouts"
-            aria-label="Search recent activity"
-            className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 mb-3"
-          />
-          <div className="space-y-1">
-            {activityFeed.length ? (
-              activityFeed.map((item) => {
-                const duration = formatDuration(item.moving_time);
-                const timeOfDay = formatTimeOfDay(item.started_at);
-                const effort = effortMeta(item.heart_rate_zones);
-                return (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className="w-full grid grid-cols-[28px_1fr_auto] gap-2 items-start text-left border-t border-slate-100 py-2.5 hover:bg-slate-50 rounded-lg transition-colors"
-                  >
-                    <span className="text-base mt-0.5" aria-hidden="true">{activityIcon(item.type)}</span>
-                    <span>
-                      <strong className="block text-sm text-slate-900">{item.name || item.type || "Workout"}</strong>
-                      <small className="block text-xs text-slate-500">
-                        {item.type || "Session"} · <span className="font-mono">{formatDistance(Number(item.distance) || 0)}{duration ? ` · ${duration}` : ""}</span>
-                      </small>
-                      {(timeOfDay || effort) && (
-                        <small className="block text-xs text-slate-400 mt-0.5">
-                          {timeOfDay}{effort ? ` · ${effort.icon} ${effort.label}` : ""}
-                        </small>
-                      )}
-                    </span>
-                    <span className="text-xs text-slate-400 mt-1">{formatAgo(item.started_at)}</span>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="text-slate-400 text-sm py-4 text-center">No activity matches this filter.</p>
-            )}
-          </div>
-        </article>
-      </aside>
     </div>
   );
 }

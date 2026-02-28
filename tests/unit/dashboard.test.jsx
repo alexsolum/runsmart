@@ -135,12 +135,16 @@ describe("Dashboard — Strava data display", () => {
     expect(screen.getByRole("heading", { name: /Fatigue/i })).toBeInTheDocument();
   });
 
-  it("shows Training Trend chart with overlay controls", () => {
+  it("shows Weekly Progress section heading", () => {
     render(<HeroPage />);
-    expect(screen.getByText(/Training Trend/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Distance/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Load/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Pace/i })).toBeInTheDocument();
+    expect(screen.getByText(/Weekly progress/i)).toBeInTheDocument();
+  });
+
+  it("shows completed and planned km summary pills", () => {
+    render(<HeroPage />);
+    // Use selector:'span' to avoid matching the parent container which also contains the text
+    expect(screen.getByText(/completed/i, { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText(/planned/i, { selector: "span" })).toBeInTheDocument();
   });
 
   it("greets the authenticated athlete by username", () => {
@@ -151,13 +155,25 @@ describe("Dashboard — Strava data display", () => {
 });
 
 describe("Dashboard — empty state (no Strava data)", () => {
-  it("shows empty state message when there are no activities", () => {
+  it("shows empty state message when there are no activities and no workout entries", () => {
     useAppData.mockReturnValue(makeAppData({
       activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
+      workoutEntries: { entries: [], loading: false, loadEntriesForWeek: vi.fn().mockResolvedValue([]) },
     }));
 
     render(<HeroPage />);
-    expect(screen.getByText(/No trend data for this period/i)).toBeInTheDocument();
+    expect(screen.getByText(/No workout data for this week/i)).toBeInTheDocument();
+  });
+});
+
+describe("Dashboard — Weekly Progress empty state", () => {
+  it("shows empty state when no activities and no workout entries", () => {
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
+      workoutEntries: { entries: [], loading: false, loadEntriesForWeek: vi.fn().mockResolvedValue([]) },
+    }));
+    render(<HeroPage />);
+    expect(screen.getByText(/No workout data for this week/i)).toBeInTheDocument();
   });
 });
 

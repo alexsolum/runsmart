@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import MiniBarChart from "../components/MiniBarChart";
-import TrainingVolumeChart from "../components/TrainingVolumeChart";
+import WeeklyProgressChart from "../components/WeeklyProgressChart";
+import { computeWeeklyProgress } from "../domain/compute";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -12,11 +13,6 @@ const DATE_FILTERS = [
 ];
 const TYPE_FILTERS = ["All", "Run", "Ride", "Workout"];
 const TIMELINE_FILTERS = ["Today", "Week", "Month"];
-const OVERLAY_FILTERS = [
-  { key: "distance", label: "Distance" },
-  { key: "load", label: "Load" },
-  { key: "pace", label: "Pace" },
-];
 
 function getDateFilterRange(filter) {
   const now = new Date();
@@ -112,12 +108,11 @@ function DashboardSkeleton() {
 }
 
 export default function HeroPage() {
-  const { auth, activities } = useAppData();
+  const { auth, activities, workoutEntries, plans } = useAppData();
   const [dateFilter, setDateFilter] = useState("week");
   const [typeFilter, setTypeFilter] = useState("All");
   const [timelineFilter, setTimelineFilter] = useState("Week");
   const [search, setSearch] = useState("");
-  const [overlayFilter, setOverlayFilter] = useState("distance");
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -127,7 +122,6 @@ export default function HeroPage() {
       if (parsed.dateFilter) setDateFilter(parsed.dateFilter);
       if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
       if (parsed.timelineFilter) setTimelineFilter(parsed.timelineFilter);
-      if (parsed.overlayFilter) setOverlayFilter(parsed.overlayFilter);
       if (typeof parsed.search === "string") setSearch(parsed.search);
     } catch {
       // Ignore malformed local storage values.
@@ -138,12 +132,23 @@ export default function HeroPage() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ dateFilter, typeFilter, timelineFilter, overlayFilter, search }),
+        JSON.stringify({ dateFilter, typeFilter, timelineFilter, search }),
       );
     } catch {
       // Ignore storage errors in restricted browsers.
     }
-  }, [dateFilter, typeFilter, timelineFilter, overlayFilter, search]);
+  }, [dateFilter, typeFilter, timelineFilter, search]);
+
+  // Load workout entries for the current week
+  useEffect(() => {
+    const planId = plans.plans[0]?.id;
+    if (!planId) return;
+    const mon = new Date();
+    const utcDay = mon.getUTCDay();
+    mon.setUTCDate(mon.getUTCDate() + (utcDay === 0 ? -6 : 1 - utcDay));
+    mon.setUTCHours(0, 0, 0, 0);
+    workoutEntries.loadEntriesForWeek(planId, mon.toISOString().split("T")[0]);
+  }, [plans.plans[0]?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { start, end } = useMemo(() => getDateFilterRange(dateFilter), [dateFilter]);
 
@@ -207,29 +212,10 @@ export default function HeroPage() {
     ];
   }, [activities.activities, end, filtered, start, typeFilter]);
 
-  const weeklySeries = useMemo(() => {
-    const grouped = filtered.reduce((acc, item) => {
-      const key = toDayKey(item.started_at);
-      const pace = Number(item.average_speed) > 0 ? 1000 / Number(item.average_speed) : null;
-      if (!acc[key]) acc[key] = { distance: 0, load: 0, pace: [] };
-      acc[key].distance += Number(item.distance) || 0;
-      acc[key].load += (Number(item.moving_time) || 0) / 60;
-      if (pace) acc[key].pace.push(pace);
-      return acc;
-    }, {});
-
-    return Object.entries(grouped)
-      .map(([date, values]) => ({
-        date,
-        label: new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-        distance: +(values.distance / 1000).toFixed(1),
-        load: +values.load.toFixed(0),
-        pace: values.pace.length
-          ? +(values.pace.reduce((acc, value) => acc + value, 0) / values.pace.length / 60).toFixed(2)
-          : null,
-      }))
-      .slice(-8);
-  }, [filtered]);
+  const weeklyProgress = useMemo(
+    () => computeWeeklyProgress(activities.activities, workoutEntries.entries),
+    [activities.activities, workoutEntries.entries],
+  );
 
   const activityFeed = useMemo(() => {
     const now = new Date();
@@ -359,41 +345,17 @@ export default function HeroPage() {
           ))}
         </section>
 
-        {/* Training Trend Chart */}
+        {/* Weekly Progress Chart */}
         <article className="bg-white rounded-2xl p-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-semibold text-slate-900">Training Trend</h3>
-              <p className="text-sm text-slate-500">Distance, load, and pace overlays</p>
-            </div>
-            <div className="inline-flex gap-1 p-1 bg-slate-100 rounded-full" role="group" aria-label="Trend overlay selector">
-              {OVERLAY_FILTERS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  aria-pressed={overlayFilter === item.key}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                    overlayFilter === item.key
-                      ? "bg-white shadow-sm text-slate-900"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                  onClick={() => setOverlayFilter(item.key)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-slate-900">Weekly progress</h3>
+            <p className="text-sm text-slate-500">Cumulative km — completed vs planned, vs 4-week avg</p>
           </div>
-          {weeklySeries.length ? (
-            <TrainingVolumeChart data={weeklySeries} overlayFilter={overlayFilter} />
-          ) : (
-            <p className="text-slate-400 text-sm py-12 text-center">
-              No trend data for this period. Connect Strava or log your next workout to populate the chart.
-            </p>
-          )}
-          <p className="text-xs text-slate-400 mt-3">
-            Summary: recent load is {metrics[1].value}, with readiness currently at {metrics[3].value}.
-          </p>
+          <WeeklyProgressChart
+            days={weeklyProgress.days}
+            totalExecuted={weeklyProgress.totalExecuted}
+            totalPlanned={weeklyProgress.totalPlanned}
+          />
         </article>
 
         {/* Workout Mix + Fatigue & Form */}

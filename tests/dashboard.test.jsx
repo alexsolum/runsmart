@@ -15,6 +15,23 @@ vi.mock("../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
+// Render shadcn Select as a native <select> so tests can use .options
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ children, value, onValueChange, "aria-label": ariaLabel }) => (
+    <select
+      aria-label={ariaLabel}
+      value={value ?? ""}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: () => null,
+  SelectValue: () => null,
+  SelectContent: ({ children }) => <>{children}</>,
+  SelectItem: ({ value, children }) => <option value={value}>{children}</option>,
+}));
+
 import { useAppData } from "../src/context/AppDataContext";
 
 beforeEach(() => {

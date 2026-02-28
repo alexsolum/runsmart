@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function AuthPage() {
@@ -83,9 +84,10 @@ export default function AuthPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-            <label className="grid gap-1.5 text-sm font-medium">
-              <span className="text-slate-500">Email</span>
+            <div className="grid gap-1.5">
+              <Label htmlFor="auth-email" className="text-slate-500">Email</Label>
               <Input
+                id="auth-email"
                 type="email"
                 className="h-auto py-2.5"
                 value={email}
@@ -94,11 +96,12 @@ export default function AuthPage() {
                 required
                 disabled={submitting}
               />
-            </label>
+            </div>
 
-            <label className="grid gap-1.5 text-sm font-medium">
-              <span className="text-slate-500">Password</span>
+            <div className="grid gap-1.5">
+              <Label htmlFor="auth-password" className="text-slate-500">Password</Label>
               <Input
+                id="auth-password"
                 type="password"
                 className="h-auto py-2.5"
                 value={password}
@@ -108,7 +111,7 @@ export default function AuthPage() {
                 disabled={submitting}
                 minLength={6}
               />
-            </label>
+            </div>
 
             <Button
               type="submit"

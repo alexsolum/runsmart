@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -371,8 +372,9 @@ export default function DailyLogPage() {
           <h3 className="m-0 text-sm font-bold">{isExistingEntry ? "Edit entry" : "Add today's log"}</h3>
 
           <div className={fieldClass}>
-            <span className={labelTextClass}>Date</span>
+            <Label htmlFor="log-date" className={labelTextClass}>Date</Label>
             <Input
+              id="log-date"
               type="date"
               name="log_date"
               value={form.log_date}
@@ -389,8 +391,9 @@ export default function DailyLogPage() {
               <RatingInput name="training_quality" value={form.training_quality} onChange={onRating} labels={QUALITY_LABELS} />
             </div>
             <div className={fieldClass}>
-              <span className={labelTextClass}>Workout notes</span>
+              <Label htmlFor="workout-notes" className={labelTextClass}>Workout notes</Label>
               <Input
+                id="workout-notes"
                 type="text"
                 name="workout_notes"
                 value={form.workout_notes}
@@ -404,8 +407,9 @@ export default function DailyLogPage() {
           <fieldset className={fieldsetClass}>
             <legend className={legendClass}>Recovery</legend>
             <div className={fieldClass}>
-              <span className={labelTextClass}>Sleep hours</span>
+              <Label htmlFor="sleep-hours" className={labelTextClass}>Sleep hours</Label>
               <Input
+                id="sleep-hours"
                 type="number"
                 name="sleep_hours"
                 value={form.sleep_hours}
@@ -420,8 +424,9 @@ export default function DailyLogPage() {
               <RatingInput name="sleep_quality" value={form.sleep_quality} onChange={onRating} labels={SLEEP_LABELS} />
             </div>
             <div className={fieldClass}>
-              <span className={labelTextClass}>Resting HR <span className="text-slate-400">(bpm, optional)</span></span>
+              <Label htmlFor="resting-hr" className={labelTextClass}>Resting HR <span className="text-slate-400">(bpm, optional)</span></Label>
               <Input
+                id="resting-hr"
                 type="number"
                 name="resting_hr"
                 value={form.resting_hr}

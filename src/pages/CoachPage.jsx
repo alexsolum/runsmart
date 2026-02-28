@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import PageContainer from "../components/layout/PageContainer";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import CoachAvatar from "../components/CoachAvatar";
 import { useI18n } from "../i18n/translations";
@@ -501,7 +502,7 @@ export default function CoachPage() {
   const hasAssistantMessage = localMessages.some((m) => m.role === "assistant");
 
   return (
-    <section className="page" id="coach">
+    <PageContainer id="coach">
       {/* ── Header ── */}
       <header className="flex items-center gap-4 mb-5 flex-wrap">
         <CoachAvatar size={48} />
@@ -715,6 +716,6 @@ export default function CoachPage() {
           </div>
         </div>
       </div>
-    </section>
+    </PageContainer>
   );
 }

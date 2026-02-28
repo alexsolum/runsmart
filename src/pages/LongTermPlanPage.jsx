@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import PageContainer from "../components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -313,7 +314,7 @@ export default function LongTermPlanPage() {
     : null;
 
   return (
-    <section className="page">
+    <PageContainer>
       <div className="mb-5">
         <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Training Plan</h2>
         <p className="m-0 text-sm text-slate-500">Build your macro plan — phases and training blocks towards your goal race.</p>
@@ -483,6 +484,6 @@ export default function LongTermPlanPage() {
           )}
         </div>
       </div>
-    </section>
+    </PageContainer>
   );
 }

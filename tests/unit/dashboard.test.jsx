@@ -117,9 +117,9 @@ describe("Dashboard — activity history table", () => {
     useAppData.mockReturnValue(makeAppData());
   });
 
-  it("shows Strava Activity History heading", () => {
+  it("shows Latest Activities section heading", () => {
     render(<HeroPage />);
-    expect(screen.getByText(/Strava Activity History/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /latest activities/i })).toBeInTheDocument();
   });
 
   it("lists recent activities by name in the history table", () => {
@@ -174,7 +174,8 @@ describe("Dashboard — Weekly Progress section", () => {
 
   it("shows Weekly progression heading", () => {
     render(<HeroPage />);
-    expect(screen.getByText(/Weekly progression/i)).toBeInTheDocument();
+    // Section renders <h2>; use heading role to avoid matching CardTitle div
+    expect(screen.getByRole("heading", { name: /weekly progression/i })).toBeInTheDocument();
   });
 
   it("shows completed and planned km summary pills", () => {

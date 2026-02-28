@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PageContainer from "../components/layout/PageContainer";
+import Section from "../components/layout/Section";
+import ActivitiesTable from "../components/dashboard/ActivitiesTable";
 
 const STORAGE_KEY = "runsmart.dashboard.filters";
 const DATE_FILTERS = [
@@ -297,7 +300,7 @@ export default function HeroPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -343,27 +346,30 @@ export default function HeroPage() {
       </div>
 
       {/* ── 6 KPI Cards ── */}
-      <section
-        className="dashboard-kpis grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
-        aria-label="Weekly metrics"
-      >
-        {metrics.map((metric) => (
-          <Card key={metric.label} className="dashboard-kpi">
-            <CardContent className="pt-5 pb-4">
-              <p className="text-xs font-medium text-slate-500 mb-2">{metric.label}</p>
-              <p className="text-xl font-bold text-slate-900 tracking-tight leading-none mb-2.5 kpi-value">
-                {metric.value}
-              </p>
-              <Badge variant={metric.delta.variant} className="text-[11px] px-2 py-0.5">
-                {metric.delta.text}
-              </Badge>
-              <p className="kpi-helper text-xs text-slate-400 mt-1">{metric.helper}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
+      <Section>
+        <section
+          className="dashboard-kpis grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
+          aria-label="Weekly metrics"
+        >
+          {metrics.map((metric) => (
+            <Card key={metric.label} className="dashboard-kpi hover:shadow-md transition-shadow">
+              <CardContent className="pt-5 pb-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2">{metric.label}</p>
+                <p className="text-xl font-bold text-foreground tracking-tight leading-none mb-2.5 kpi-value">
+                  {metric.value}
+                </p>
+                <Badge variant={metric.delta.variant} className="text-[11px] px-2 py-0.5">
+                  {metric.delta.text}
+                </Badge>
+                <p className="kpi-helper text-xs text-muted-foreground/70 mt-1">{metric.helper}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      </Section>
 
       {/* ── Chart + Workout Breakdown ── */}
+      <Section title="Weekly Progression">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
 
         {/* Weekly Progress */}
@@ -433,93 +439,25 @@ export default function HeroPage() {
           </CardContent>
         </Card>
       </div>
+      </Section>
 
       {/* ── Activity History Table ── */}
-      <Card>
-        <CardHeader className="border-b border-slate-100 pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">Strava Activity History</CardTitle>
-            <div className="flex gap-2">
-              <Button size="sm" className="h-8 text-xs">Add Activity</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs">View All</Button>
-            </div>
+      <Section
+        title="Latest Activities"
+        actions={
+          <div className="flex gap-2">
+            <Button size="sm" className="h-8 text-xs">Add Activity</Button>
+            <Button variant="outline" size="sm" className="h-8 text-xs">View All</Button>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {recentActivities.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-3 pl-5 pr-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Date</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Name</th>
-                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Distance</th>
-                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Time</th>
-                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Pace</th>
-                    <th className="text-right py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Elevation</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-slate-400 uppercase tracking-wide">Type</th>
-                    <th className="py-3 pr-5 w-8" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentActivities.map((item, idx) => (
-                    <tr
-                      key={item.id}
-                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="py-3 pl-5 pr-3 text-xs text-slate-500 whitespace-nowrap">
-                        {idx + 1}.&nbsp;{fmtDate(item.started_at)}
-                      </td>
-                      <td className="py-3 px-3 font-medium text-slate-900 max-w-[180px] truncate">
-                        {item.name || item.type || "Workout"}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
-                        {fmtKm(item.distance)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
-                        {fmtDuration(item.moving_time)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
-                        {fmtTablePace(item.average_speed)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700">
-                        {item.elevation_gain ? `${Math.round(item.elevation_gain)} m` : "—"}
-                      </td>
-                      <td className="py-3 px-3 text-xs text-slate-600">{item.type || "—"}</td>
-                      <td className="py-3 pr-5 text-center">
-                        {item.strava_url ? (
-                          <a
-                            href={item.strava_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-slate-300 hover:text-blue-600 transition-colors"
-                            aria-label="View on Strava"
-                          >
-                            <svg className="w-4 h-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </a>
-                        ) : (
-                          <svg className="w-4 h-4 inline text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400 py-10 text-center">
-              No activities for this period. Sync Strava to populate your history.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+        }
+      >
+        <Card>
+          <CardContent className="px-5 py-0">
+            <ActivitiesTable activities={recentActivities} />
+          </CardContent>
+        </Card>
+      </Section>
 
-    </div>
+    </PageContainer>
   );
 }

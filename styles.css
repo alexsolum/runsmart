@@ -280,7 +280,7 @@ a {
 
 .page {
   display: block;
-  padding: 40px 48px;
+  padding: 0;
   flex: 1;
 }
 

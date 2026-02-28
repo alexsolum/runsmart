@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { useAppData } from "../context/AppDataContext";
+import PageContainer from "../components/layout/PageContainer";
 import {
   computeLongRuns,
   computeTrainingLoad,
@@ -290,7 +291,7 @@ export default function InsightsPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <section id="insights" className="page">
+    <PageContainer id="insights">
 
       {/* Page header */}
       <div className="mb-6">
@@ -777,6 +778,6 @@ export default function InsightsPage() {
 
         </div>
       )}
-    </section>
+    </PageContainer>
   );
 }

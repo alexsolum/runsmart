@@ -34,28 +34,31 @@ test.describe('Authenticated navigation', () => {
     await page.goto('/');
     // A logged-in user should NOT see the sign-in form.
     await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeVisible({ timeout: 10000 });
+    // Dashboard shows a welcome heading.
+    await expect(page.getByRole('heading', { level: 2 })).toBeVisible({ timeout: 10000 });
   });
 
-  test('weekly plan page loads', async ({ page }) => {
+  test('weekly plan page loads via sidebar', async ({ page }) => {
     await page.goto('/');
-    // Navigate to Weekly Plan via sidebar.
-    const weeklyLink = page.getByRole('link', { name: /Weekly Plan/i })
-      .or(page.getByRole('button', { name: /Weekly Plan/i }));
-    if (await weeklyLink.count() > 0) {
-      await weeklyLink.first().click();
-    }
+    // Wait for the sidebar to be ready.
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 10000 });
+    // Click the Weekly Plan sidebar button.
+    await page.getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'Weekly Plan' })
+      .click();
     // Verify Weekly Plan heading is visible.
     await expect(page.getByRole('heading', { name: /Weekly Plan/i })).toBeVisible({ timeout: 10000 });
   });
 
-  test('coach page loads', async ({ page }) => {
+  test('coach page loads via sidebar', async ({ page }) => {
     await page.goto('/');
-    const coachLink = page.getByRole('link', { name: /Coach|Marius/i })
-      .or(page.getByRole('button', { name: /Coach|Marius/i }));
-    if (await coachLink.count() > 0) {
-      await coachLink.first().click();
-    }
-    await expect(page.getByRole('heading', { name: /Coach|Marius/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 10000 });
+    // Click the Coach sidebar button.
+    await page.getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'Coach' })
+      .click();
+    // Coach page shows the AI coach heading.
+    await expect(page.getByRole('heading', { level: 2 })).toBeVisible({ timeout: 10000 });
   });
 
   test('no unexpected console errors on dashboard', async ({ page }) => {

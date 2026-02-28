@@ -24,6 +24,18 @@ function tomorrowInWeek() {
   return weekdayIso(todayDay < 7 ? todayDay + 1 : 7);
 }
 
+// Returns the ISO date for a given day-of-week (0=Sun…6=Sat) in a prior week.
+// weeksAgo=1 means last week, weeksAgo=2 two weeks ago, etc.
+function weeksAgoOnDow(weeksAgo, dow /* 0=Sun, 1=Mon, ..., 6=Sat */) {
+  const d = new Date();
+  // Find Monday of current week
+  const utcDay = d.getUTCDay();
+  const diffToMon = utcDay === 0 ? -6 : 1 - utcDay;
+  d.setUTCDate(d.getUTCDate() + diffToMon - weeksAgo * 7 + dow);
+  d.setUTCHours(12, 0, 0, 0); // noon to avoid timezone edge cases
+  return d.toISOString();
+}
+
 /**
  * Sample Strava activities stored in Supabase.
  * These represent data synced from Strava into the `activities` table.
@@ -70,6 +82,30 @@ export const SAMPLE_ACTIVITIES = [
     elevation_gain: 210,
     heart_rate_zones: { z1: 600, z2: 3600, z3: 1800, z4: 1200, z5: 0 },
   },
+];
+
+/**
+ * Multi-week activities for 4-week-average coverage tests.
+ * Pattern: Mon(10km) / Wed(8km) / Sat(18km) across last 4 prior weeks.
+ * dow: 1=Mon, 3=Wed, 6=Sat (0-indexed from Sunday per JS Date).
+ */
+export const SAMPLE_ACTIVITIES_MULTIWEEK = [
+  // Week -1
+  { id: "mw-1-1", user_id: "user-1", name: "Easy Monday", type: "Run", started_at: weeksAgoOnDow(1, 1), distance: 10000, moving_time: 3000, average_speed: 3.33, elevation_gain: 60 },
+  { id: "mw-1-3", user_id: "user-1", name: "Tempo Wednesday", type: "Run", started_at: weeksAgoOnDow(1, 3), distance: 8000, moving_time: 2400, average_speed: 3.33, elevation_gain: 40 },
+  { id: "mw-1-6", user_id: "user-1", name: "Long Saturday", type: "Run", started_at: weeksAgoOnDow(1, 6), distance: 18000, moving_time: 5400, average_speed: 3.33, elevation_gain: 120 },
+  // Week -2
+  { id: "mw-2-1", user_id: "user-1", name: "Easy Monday", type: "Run", started_at: weeksAgoOnDow(2, 1), distance: 10000, moving_time: 3000, average_speed: 3.33, elevation_gain: 60 },
+  { id: "mw-2-3", user_id: "user-1", name: "Tempo Wednesday", type: "Run", started_at: weeksAgoOnDow(2, 3), distance: 8000, moving_time: 2400, average_speed: 3.33, elevation_gain: 40 },
+  { id: "mw-2-6", user_id: "user-1", name: "Long Saturday", type: "Run", started_at: weeksAgoOnDow(2, 6), distance: 18000, moving_time: 5400, average_speed: 3.33, elevation_gain: 120 },
+  // Week -3
+  { id: "mw-3-1", user_id: "user-1", name: "Easy Monday", type: "Run", started_at: weeksAgoOnDow(3, 1), distance: 10000, moving_time: 3000, average_speed: 3.33, elevation_gain: 60 },
+  { id: "mw-3-3", user_id: "user-1", name: "Tempo Wednesday", type: "Run", started_at: weeksAgoOnDow(3, 3), distance: 8000, moving_time: 2400, average_speed: 3.33, elevation_gain: 40 },
+  { id: "mw-3-6", user_id: "user-1", name: "Long Saturday", type: "Run", started_at: weeksAgoOnDow(3, 6), distance: 18000, moving_time: 5400, average_speed: 3.33, elevation_gain: 120 },
+  // Week -4
+  { id: "mw-4-1", user_id: "user-1", name: "Easy Monday", type: "Run", started_at: weeksAgoOnDow(4, 1), distance: 10000, moving_time: 3000, average_speed: 3.33, elevation_gain: 60 },
+  { id: "mw-4-3", user_id: "user-1", name: "Tempo Wednesday", type: "Run", started_at: weeksAgoOnDow(4, 3), distance: 8000, moving_time: 2400, average_speed: 3.33, elevation_gain: 40 },
+  { id: "mw-4-6", user_id: "user-1", name: "Long Saturday", type: "Run", started_at: weeksAgoOnDow(4, 6), distance: 18000, moving_time: 5400, average_speed: 3.33, elevation_gain: 120 },
 ];
 
 export const SAMPLE_PLAN = {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
@@ -82,29 +83,29 @@ function WorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
 
   return (
     <form className={`border-t border-slate-200 pt-2.5 grid gap-2${className ? ` ${className}` : ""}`} onSubmit={handleSubmit} noValidate>
-      <label className="grid gap-1 text-[11px] font-medium text-slate-500">
+      <Label className="grid gap-1 text-[11px] font-medium text-slate-500">
         Type
         <select className={selectClass} value={form.workout_type} onChange={(e) => set("workout_type", e.target.value)}>
           {WORKOUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-      </label>
+      </Label>
 
       {form.workout_type !== "Rest" && (
         <>
           <div className="grid grid-cols-2 gap-1.5">
-            <label className="grid gap-1 text-[11px] font-medium text-slate-500">
+            <Label className="grid gap-1 text-[11px] font-medium text-slate-500">
               Distance (km)
               <Input type="number" min="0" max="200" step="0.1" className="text-xs h-8 px-2 py-1.5" placeholder="—" value={form.distance_km} onChange={(e) => set("distance_km", e.target.value)} />
-            </label>
-            <label className="grid gap-1 text-[11px] font-medium text-slate-500">
+            </Label>
+            <Label className="grid gap-1 text-[11px] font-medium text-slate-500">
               Duration (min)
               <Input type="number" min="0" max="600" className="text-xs h-8 px-2 py-1.5" placeholder="—" value={form.duration_min} onChange={(e) => set("duration_min", e.target.value)} />
-            </label>
+            </Label>
           </div>
-          <label className="grid gap-1 text-[11px] font-medium text-slate-500">
+          <Label className="grid gap-1 text-[11px] font-medium text-slate-500">
             Description
             <Textarea rows={2} className="text-xs min-h-0 px-2 py-1.5" placeholder="e.g. 8×400m @ 5K pace, 90s recovery" value={form.description} onChange={(e) => set("description", e.target.value)} />
-          </label>
+          </Label>
         </>
       )}
 
@@ -318,7 +319,7 @@ export default function WeeklyPlanPage() {
       {/* Header: plan select + week nav */}
       <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 flex items-center gap-4 flex-wrap mb-5 max-[960px]:flex-col max-[960px]:items-start">
         <div className="flex items-center gap-2.5">
-          <label className="text-[13px] font-semibold m-0">
+          <Label className="text-[13px] font-semibold m-0">
             Plan:{" "}
             <select
               className={`ml-1.5 ${selectClass}`}
@@ -332,7 +333,7 @@ export default function WeeklyPlanPage() {
                 </option>
               ))}
             </select>
-          </label>
+          </Label>
         </div>
 
         <div className="flex items-center gap-2 ml-auto max-[960px]:ml-0 max-[960px]:w-full max-[960px]:justify-between">

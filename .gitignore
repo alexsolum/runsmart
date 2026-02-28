@@ -1,6 +1,11 @@
 node_modules/
 dist/
 
+# Environment secrets — never commit
+.env
+.env.*
+!.env.example
+
 # Playwright
 /test-results/
 /playwright-report/

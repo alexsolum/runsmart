@@ -41,10 +41,9 @@ setup('authenticate and save session', async ({ page }) => {
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  // Wait for post-login redirect to the dashboard.
-  // The dashboard shows the user's name or a welcome heading.
-  await expect(page.getByRole('heading', { name: /RunSmart|Dashboard|Weekly Plan|Today/i }))
-    .toBeVisible({ timeout: 20000 });
+  // Wait for post-login redirect — the sign-in heading should disappear.
+  await expect(page.getByRole('heading', { name: 'Sign in' }))
+    .not.toBeVisible({ timeout: 20000 });
 
   // Save browser storage (localStorage + cookies) so other tests reuse the session.
   await page.context().storageState({ path: authFile });

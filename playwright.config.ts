@@ -37,12 +37,26 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
 
+    // ── Data seed ──────────────────────────────────────────────────────────
+    // Seeds mock activities for the test user if they have none.
+    // Runs after auth so the session token is available.
+    {
+      name: 'seed',
+      testDir: './tests/setup',
+      testMatch: 'seed.setup.ts',
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+    },
+
     // ── Authenticated E2E ───────────────────────────────────────────────────
     // Navigation smoke tests — reuse session saved by the setup project.
     {
       name: 'authenticated',
       testMatch: '**/e2e/navigation.spec.ts',
-      dependencies: ['setup'],
+      dependencies: ['seed'],
       use: {
         ...devices['Desktop Chrome'],
         storageState: authFile,
@@ -54,7 +68,7 @@ export default defineConfig({
     {
       name: 'integration',
       testMatch: '**/integration/**/*.spec.ts',
-      dependencies: ['setup'],
+      dependencies: ['seed'],
       use: {
         ...devices['Desktop Chrome'],
         storageState: authFile,

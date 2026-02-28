@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import DataPage from "../src/pages/DataPage";
+import DataPage from "../../src/pages/DataPage";
 import { makeAppData } from "./mockAppData";
 
-vi.mock("../src/context/AppDataContext", () => ({
+vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
-import { useAppData } from "../src/context/AppDataContext";
+import { useAppData } from "../../src/context/AppDataContext";
 
 function makeStravaData(overrides = {}) {
   return {

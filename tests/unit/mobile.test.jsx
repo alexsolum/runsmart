@@ -1,15 +1,15 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { useAppData } from "../src/context/AppDataContext";
-import MobileNavBar from "../src/components/MobileNavBar";
-import MobilePage from "../src/pages/MobilePage";
+import { useAppData } from "../../src/context/AppDataContext";
+import MobileNavBar from "../../src/components/MobileNavBar";
+import MobilePage from "../../src/pages/MobilePage";
 import { makeAppData, SAMPLE_ACTIVITIES, SAMPLE_WORKOUT_ENTRIES } from "./mockAppData";
 
-vi.mock("../src/context/AppDataContext", () => ({ useAppData: vi.fn() }));
+vi.mock("../../src/context/AppDataContext", () => ({ useAppData: vi.fn() }));
 
 // computeTrainingLoad is used inside MobilePage — mock the domain module
-vi.mock("../src/domain/compute", () => ({
+vi.mock("../../src/domain/compute", () => ({
   computeTrainingLoad: vi.fn().mockReturnValue([{ date: "2026-02-26", atl: 10, ctl: 15, tsb: 5 }]),
 }));
 
@@ -129,14 +129,14 @@ describe("MobilePage — Analytics tab", () => {
   });
 
   it("shows Fresh when TSB > 5", async () => {
-    const { computeTrainingLoad } = await import("../src/domain/compute");
+    const { computeTrainingLoad } = await import("../../src/domain/compute");
     computeTrainingLoad.mockReturnValueOnce([{ date: "2026-02-26", atl: 5, ctl: 20, tsb: 15 }]);
     render(<MobilePage defaultTab="analytics" />);
     expect(screen.getByText("Fresh")).toBeInTheDocument();
   });
 
   it("shows Fatigued when TSB <= -10", async () => {
-    const { computeTrainingLoad } = await import("../src/domain/compute");
+    const { computeTrainingLoad } = await import("../../src/domain/compute");
     computeTrainingLoad.mockReturnValueOnce([{ date: "2026-02-26", atl: 25, ctl: 10, tsb: -15 }]);
     render(<MobilePage defaultTab="analytics" />);
     expect(screen.getByText("Fatigued")).toBeInTheDocument();

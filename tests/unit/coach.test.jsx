@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import CoachPage from "../src/pages/CoachPage";
+import CoachPage from "../../src/pages/CoachPage";
 import {
   makeAppData,
   SAMPLE_DAILY_LOGS,
@@ -24,17 +24,17 @@ import {
   SAMPLE_MESSAGES,
 } from "./mockAppData";
 
-vi.mock("../src/context/AppDataContext", () => ({
+vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
-vi.mock("../src/lib/supabaseClient", () => ({
+vi.mock("../../src/lib/supabaseClient", () => ({
   getSupabaseClient: vi.fn(),
   isSupabaseConfigured: true,
 }));
 
-import { useAppData } from "../src/context/AppDataContext";
-import { getSupabaseClient } from "../src/lib/supabaseClient";
+import { useAppData } from "../../src/context/AppDataContext";
+import { getSupabaseClient } from "../../src/lib/supabaseClient";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 

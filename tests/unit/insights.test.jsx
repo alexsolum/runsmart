@@ -6,14 +6,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import InsightsPage from "../src/pages/InsightsPage";
+import InsightsPage from "../../src/pages/InsightsPage";
 import { makeAppData, SAMPLE_ACTIVITIES } from "./mockAppData";
 
-vi.mock("../src/context/AppDataContext", () => ({
+vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
-import { useAppData } from "../src/context/AppDataContext";
+import { useAppData } from "../../src/context/AppDataContext";
 
 beforeEach(() => {
   vi.clearAllMocks();

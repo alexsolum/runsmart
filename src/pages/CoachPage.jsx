@@ -4,6 +4,8 @@ import { getSupabaseClient } from "../lib/supabaseClient";
 import CoachAvatar from "../components/CoachAvatar";
 import { useI18n } from "../i18n/translations";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -214,10 +216,10 @@ function RunnerProfileSection({ background, onSave, saving }) {
           {t("coach.profileDescPre")} <strong>{t("nav.trainingPlan")}</strong> {t("coach.profileDescPost")}
         </p>
       </div>
-      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1" htmlFor="runner-background">
+      <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1" htmlFor="runner-background">
         {t("coach.runningBackground")}
-      </label>
-      <textarea
+      </Label>
+      <Textarea
         id="runner-background"
         className="w-full px-3 py-2 border border-slate-200 rounded-lg font-inherit text-[12px] text-slate-900 bg-slate-50 resize-none leading-relaxed box-border focus:outline-none focus:border-blue-600 focus:bg-white placeholder:text-slate-400 disabled:opacity-60"
         rows={2}
@@ -691,7 +693,7 @@ export default function CoachPage() {
               </Button>
             ) : (
               <div className="flex gap-2">
-                <textarea
+                <Textarea
                   className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl font-inherit text-sm text-slate-900 bg-slate-50 resize-none leading-relaxed focus:outline-none focus:border-blue-600 focus:bg-white placeholder:text-slate-400 disabled:opacity-60"
                   rows={2}
                   placeholder={t("coach.followupPlaceholder")}

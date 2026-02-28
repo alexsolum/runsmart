@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { computeLongRuns, computeTrainingLoad, computeWeeklyHRZones, computeRecentActivityZones } from "../domain/compute";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -273,7 +274,7 @@ function LongRunChart({ points }) {
   );
 }
 
-const cardClass = "bg-white border border-slate-200 rounded-2xl p-4 shadow-sm";
+const cardClass = "p-4";
 const sectionHeaderClass = "mt-8 mb-3";
 
 export default function InsightsPage() {
@@ -462,22 +463,22 @@ export default function InsightsPage() {
       ) : hasData ? (
         <div className="grid gap-6">
           {trainingLoadSeries.length >= 7 && (
-            <div className={cardClass} id="training-load-section">
+            <Card className={cardClass} id="training-load-section">
               <h4 className="m-0 mb-3 text-sm font-bold text-slate-900">Training load trend</h4>
               <TrainingLoadChart series={trainingLoadSeries} />
-            </div>
+            </Card>
           )}
 
           {weeklyLoadPoints.length >= 3 && (
-            <div className={cardClass} id="weekly-load-section">
+            <Card className={cardClass} id="weekly-load-section">
               <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Weekly load</h4>
               <p className="m-0 mb-3 text-xs text-slate-500">Rolling 8-week view of accumulated training minutes.</p>
               <WeeklyLoadChart points={weeklyLoadPoints} />
-            </div>
+            </Card>
           )}
 
           {(weeklyZones.length >= 1 || activityZones.length >= 1) && (
-            <div className={cardClass} id="hr-zones-section">
+            <Card className={cardClass} id="hr-zones-section">
               <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Heart rate zone distribution</h4>
               <p className="m-0 mb-3 text-xs text-slate-500">Time spent in each training zone — use this to balance aerobic base (Z1–Z2) against intensity (Z3–Z5) week by week.</p>
               {weeklyZones.length >= 2 && <HRZoneWeeklyChart weeks={weeklyZones} />}
@@ -488,11 +489,11 @@ export default function InsightsPage() {
                   <HRZoneActivityBreakdown activityZones={activityZones} />
                 </>
               )}
-            </div>
+            </Card>
           )}
 
           {/* fitness-meter and fitness-meter__fill classes preserved for tests */}
-          <div className={`${cardClass}`} id="fitness-level-section">
+          <Card className={cardClass} id="fitness-level-section">
             <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Fitness level</h4>
             <p className="m-0 mb-3 text-xs text-slate-500">Calculated from current chronic load (CTL).</p>
             <div
@@ -506,10 +507,10 @@ export default function InsightsPage() {
               <span className="text-slate-600">Level: {fitnessLevel}</span>
               <strong className="font-mono font-bold text-slate-900">{fitnessScore}/100</strong>
             </div>
-          </div>
+          </Card>
 
           {longRunPoints.length >= 2 && (
-            <div className={cardClass} id="long-run-section">
+            <Card className={cardClass} id="long-run-section">
               <h4 className="m-0 mb-2 text-sm font-bold text-slate-900">Long run progression</h4>
               <div className="flex justify-between items-center text-sm mb-2">
                 <span className="text-slate-600">
@@ -521,10 +522,10 @@ export default function InsightsPage() {
                 <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${longRunCompletion}%` }} />
               </div>
               <LongRunChart points={longRunPoints} />
-            </div>
+            </Card>
           )}
 
-          <div className={`${cardClass} grid gap-4 grid-cols-2 max-[600px]:grid-cols-1`} id="insight-summary">
+          <Card className={`${cardClass} grid gap-4 grid-cols-2 max-[600px]:grid-cols-1`} id="insight-summary">
             <div>
               <h4 className="m-0 mb-1 text-sm font-bold text-slate-900">Latest check-in</h4>
               <p className="m-0 text-xs text-slate-500" id="latest-checkin-text">{latestText}</p>
@@ -543,7 +544,7 @@ export default function InsightsPage() {
                 <strong id="stat-risk" className="font-mono text-sm font-bold text-slate-900">{risk}</strong>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       ) : null}
     </section>

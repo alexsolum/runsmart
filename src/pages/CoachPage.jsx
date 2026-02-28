@@ -212,7 +212,7 @@ function RunnerProfileSection({ background, onSave, saving }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-3" aria-label="Runner profile">
       <div className="flex items-baseline gap-2 mb-2 flex-wrap">
-        <h3 className="m-0 text-xs font-bold text-slate-900">{t("coach.aboutYou")}</h3>
+        <h3 className="m-0 text-xs font-bold font-sans text-slate-900">{t("coach.aboutYou")}</h3>
         <p className="m-0 text-[11px] text-slate-500">
           {t("coach.profileDescPre")} <strong>{t("nav.trainingPlan")}</strong> {t("coach.profileDescPost")}
         </p>
@@ -507,7 +507,7 @@ export default function CoachPage() {
       <header className="flex items-center gap-4 mb-5 flex-wrap">
         <CoachAvatar size={48} />
         <div className="flex-1 min-w-0">
-          <h2 className="m-0 mb-0.5 text-2xl font-bold text-slate-900">Marius AI Bakken</h2>
+          <h2 className="m-0 mb-0.5 text-2xl font-bold font-sans text-slate-900">Marius AI Bakken</h2>
           <p className="m-0 text-sm text-slate-500">{t("coach.aiCoachSubtitle")}</p>
         </div>
         {/* Mobile sidebar toggle */}

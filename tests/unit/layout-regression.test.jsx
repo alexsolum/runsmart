@@ -86,6 +86,32 @@ describe("PageContainer — Tailwind class scanning", () => {
   });
 });
 
+// ─── Bug 1b: Global section/button rules in styles.css override Tailwind utilities ───
+
+describe("styles.css — no non-layered element rules that beat Tailwind utilities", () => {
+  it("styles.css does not define border-top on the section element selector", () => {
+    const css = fs.readFileSync(
+      path.join(ROOT, "src/styles.css"),
+      "utf-8"
+    );
+    // Non-layered `section { border-top }` overrides @layer utilities, adding
+    // a gray divider line to every <Section> component and every <section> element.
+    expect(css).not.toMatch(/^section\s*\{[^}]*border-top/m);
+  });
+
+  it("styles.css does not define margin-top on the section element selector", () => {
+    const css = fs.readFileSync(path.join(ROOT, "src/styles.css"), "utf-8");
+    // Non-layered `section { margin-top }` fights with PageContainer space-y-* spacing.
+    expect(css).not.toMatch(/^section\s*\{[^}]*margin-top/m);
+  });
+
+  it("styles.css does not define background on the button element selector", () => {
+    const css = fs.readFileSync(path.join(ROOT, "src/styles.css"), "utf-8");
+    // Non-layered `button { background: #2f65ff }` overrides ghost/outline shadcn variants.
+    expect(css).not.toMatch(/^button\s*\{[^}]*background/m);
+  });
+});
+
 // ─── Bug 2: Legacy .dashboard-kpi CSS box-model conflict ─────────────────────
 
 describe("legacy CSS — .dashboard-kpi no longer carries box-model properties", () => {

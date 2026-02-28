@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { computeTrainingLoad } from "../domain/compute";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ── Workout types ─────────────────────────────────────────────────────────────
 
@@ -219,13 +223,14 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
   }
 
   return (
-    <div className="mobile-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="mobile-modal" role="dialog" aria-modal="true" aria-label={isEdit ? "Edit workout" : "Add workout"}>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="mobile-modal">
         <div className="mobile-modal-handle" />
-        <div className="mobile-modal-header">
-          <h2 className="mobile-modal-title">{isEdit ? "Edit Workout" : "Add Workout"}</h2>
-          <button type="button" className="mobile-icon-btn" onClick={onClose} aria-label="Close">✕</button>
-        </div>
+        <DialogHeader className="mobile-modal-header">
+          <DialogTitle className="mobile-modal-title">
+            {isEdit ? "Edit workout" : "Add workout"}
+          </DialogTitle>
+        </DialogHeader>
 
         <div className="mobile-modal-body">
           <div>
@@ -249,7 +254,7 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
               <div className="mobile-two-col">
                 <div>
                   <label className="mobile-field-label" htmlFor="mob-distance">Distance (km)</label>
-                  <input
+                  <Input
                     id="mob-distance"
                     type="number"
                     min="0"
@@ -263,7 +268,7 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
                 </div>
                 <div>
                   <label className="mobile-field-label" htmlFor="mob-duration">Duration (min)</label>
-                  <input
+                  <Input
                     id="mob-duration"
                     type="number"
                     min="0"
@@ -278,7 +283,7 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
 
               <div>
                 <label className="mobile-field-label" htmlFor="mob-desc">Description</label>
-                <textarea
+                <Textarea
                   id="mob-desc"
                   rows={3}
                   className="mobile-field-input"
@@ -290,15 +295,15 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
             </>
           )}
 
-          <button type="button" className="mobile-btn-primary" disabled={saving} onClick={handleSave}>
+          <Button type="button" className="mobile-btn-primary" disabled={saving} onClick={handleSave}>
             {saving ? "Saving…" : isEdit ? "Update" : "Add Workout"}
-          </button>
-          <button type="button" className="mobile-btn-secondary" onClick={onClose} disabled={saving}>
+          </Button>
+          <Button type="button" variant="outline" className="mobile-btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

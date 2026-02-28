@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 const PHASES = ["Base", "Build", "Peak", "Taper", "Recovery"];
@@ -108,14 +109,14 @@ function BlockForm({ initial, planId, onSave, onCancel, loading }) {
     <form className="ltp-block-form border-t border-slate-200 pt-3.5" onSubmit={handleSubmit} noValidate>
       <h4 className="m-0 mb-3 text-sm font-bold">{initial?.id ? "Edit block" : "Add training block"}</h4>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Phase</span>
         <select className={selectClass} value={form.phase} onChange={(e) => set("phase", e.target.value)} required>
           {PHASES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-      </label>
+      </Label>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Label (optional, e.g. "Base 1")</span>
         <Input
           type="text"
@@ -123,28 +124,28 @@ function BlockForm({ initial, planId, onSave, onCancel, loading }) {
           value={form.label}
           onChange={(e) => set("label", e.target.value)}
         />
-      </label>
+      </Label>
 
       <div className="grid grid-cols-2 gap-2 mb-2.5">
-        <label className="block">
+        <Label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">Start date</span>
           <Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} required />
-        </label>
-        <label className="block">
+        </Label>
+        <Label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">End date</span>
           <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} min={form.start_date} required />
-        </label>
+        </Label>
       </div>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Weekly target (km, optional)</span>
         <Input type="number" min="0" max="500" step="0.5" placeholder="e.g. 60" value={form.target_km} onChange={(e) => set("target_km", e.target.value)} />
-      </label>
+      </Label>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Notes (optional)</span>
         <Textarea rows={2} placeholder="e.g. Focus on aerobic base, keep HR in zone 2" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-      </label>
+      </Label>
 
       <div className="flex gap-2 flex-wrap">
         <Button type="submit" size="sm" disabled={loading || !form.start_date || !form.end_date}>
@@ -178,38 +179,38 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
     <form className="border-t border-slate-200 pt-3.5" onSubmit={handleSubmit} noValidate>
       <h4 className="m-0 mb-3 text-sm font-bold">New training plan</h4>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Goal race</span>
         <Input type="text" placeholder="e.g. Stockholm Marathon" value={form.race} onChange={(e) => set("race", e.target.value)} required />
-      </label>
+      </Label>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Race date</span>
         <Input type="date" value={form.race_date} onChange={(e) => set("race_date", e.target.value)} min={todayIso()} required />
-      </label>
+      </Label>
 
       <div className="grid grid-cols-2 gap-2 mb-2.5">
-        <label className="block">
+        <Label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">Days/week available</span>
           <select className={selectClass} value={form.availability} onChange={(e) => set("availability", e.target.value)}>
             {[3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
-        </label>
-        <label className="block">
+        </Label>
+        <Label className="block">
           <span className="block text-xs text-slate-500 font-medium mb-1">Current weekly km</span>
           <Input type="number" min="0" max="300" placeholder="e.g. 50" value={form.current_mileage} onChange={(e) => set("current_mileage", e.target.value)} />
-        </label>
+        </Label>
       </div>
 
-      <label className="block mb-2.5">
+      <Label className="block mb-2.5">
         <span className="block text-xs text-slate-500 font-medium mb-1">Constraints / injuries (optional)</span>
         <Textarea rows={2} placeholder="e.g. Knee niggle, avoid hills for now" value={form.constraints} onChange={(e) => set("constraints", e.target.value)} />
-      </label>
+      </Label>
 
-      <label className="flex items-center gap-2 mb-2.5 cursor-pointer">
+      <Label className="flex items-center gap-2 mb-2.5 cursor-pointer">
         <input type="checkbox" checked={form.b2b_long_runs} onChange={(e) => set("b2b_long_runs", e.target.checked)} />
         <span className="text-sm">Back-to-back long runs</span>
-      </label>
+      </Label>
 
       <div className="flex gap-2 flex-wrap">
         <Button type="submit" size="sm" disabled={loading || !form.race || !form.race_date}>
@@ -361,9 +362,9 @@ export default function LongTermPlanPage() {
                 <p className="my-0.5 text-[13px]">Base volume: {selectedPlan.current_mileage} km/week</p>
               )}
               <div className="mt-3">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <Label className="block text-xs font-semibold text-slate-600 mb-1">
                   Goal for this plan
-                </label>
+                </Label>
                 <Textarea
                   rows={2}
                   className="text-[13px]"

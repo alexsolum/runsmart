@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import PageContainer from "../components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -310,7 +311,7 @@ export default function WeeklyPlanPage() {
   );
 
   return (
-    <section className="page">
+    <PageContainer>
       <div className="mb-5">
         <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Weekly Plan</h2>
         <p className="m-0 text-sm text-slate-500">Plan your workouts day by day. Check off sessions as you complete them.</p>
@@ -379,6 +380,6 @@ export default function WeeklyPlanPage() {
           ))}
         </div>
       )}
-    </section>
+    </PageContainer>
   );
 }

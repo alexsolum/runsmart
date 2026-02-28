@@ -1,5 +1,6 @@
 import React from "react";
 import { useAppData } from "../context/AppDataContext";
+import PageContainer from "../components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -41,7 +42,7 @@ export default function DataPage() {
   };
 
   return (
-    <section className="page">
+    <PageContainer>
       <div className="mb-5">
         <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Reliable data ingestion</h2>
         <p className="m-0 text-sm text-slate-500">Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
@@ -136,6 +137,6 @@ export default function DataPage() {
           </CardContent>
         </Card>
       </div>
-    </section>
+    </PageContainer>
   );
 }

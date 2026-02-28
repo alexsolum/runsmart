@@ -263,13 +263,6 @@ h1, h2, h3 {
   border-color: #c7d2fe;
 }
 
-.dashboard-kpis {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  overflow-x: auto;
-}
-
 .dashboard-kpi,
 .dashboard-card {
   background: var(--color-surface);
@@ -467,11 +460,6 @@ select:focus-visible {
     position: sticky;
     top: 0;
     z-index: 5;
-  }
-
-  .dashboard-kpis {
-    display: flex;
-    padding-bottom: 4px;
   }
 
   .dashboard-kpi {

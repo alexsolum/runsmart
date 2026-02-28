@@ -15,12 +15,12 @@ export default defineConfig({
         // Pure compute / domain logic — fast, no DOM needed
         test: {
           name: "unit",
-          include: ["tests/compute.test.js"],
+          include: ["tests/unit/compute.test.js"],
           environment: "node",
         },
       },
       {
-        // React component tests — require jsdom + React Testing Library
+        // React component and UI contract tests — require jsdom + React Testing Library
         plugins: [react()],
         resolve: {
           alias: {
@@ -29,9 +29,9 @@ export default defineConfig({
         },
         test: {
           name: "components",
-          include: ["tests/**/*.test.jsx"],
+          include: ["tests/unit/**/*.test.jsx", "tests/ui/**/*.test.jsx"],
           environment: "jsdom",
-          setupFiles: ["./tests/setup.js"],
+          setupFiles: ["./tests/unit/setup.js"],
           globals: true,
         },
       },

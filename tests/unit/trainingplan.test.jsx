@@ -7,14 +7,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import LongTermPlanPage from "../src/pages/LongTermPlanPage";
+import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
 import { makeAppData, SAMPLE_BLOCKS, SAMPLE_PLAN } from "./mockAppData";
 
-vi.mock("../src/context/AppDataContext", () => ({
+vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
-import { useAppData } from "../src/context/AppDataContext";
+import { useAppData } from "../../src/context/AppDataContext";
 
 beforeEach(() => {
   vi.clearAllMocks();

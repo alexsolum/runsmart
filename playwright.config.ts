@@ -1,11 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load test credentials from .env.test (git-ignored)
+dotenv.config({ path: path.resolve(__dirname, '.env.test') });
+
+const authFile = path.join(__dirname, 'playwright/.auth/user.json');
 
 export default defineConfig({
-  testDir: './e2e',
-  fullyParallel: true,
+  testDir: './tests',
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:5173',
@@ -13,17 +20,57 @@ export default defineConfig({
   },
 
   projects: [
+    // ── Auth bootstrap ──────────────────────────────────────────────────────
+    // Logs in once and saves session to playwright/.auth/user.json.
+    // Skipped silently when TEST_USER_EMAIL/PASSWORD are not set.
     {
-      name: 'chromium',
+      name: 'setup',
+      testMatch: '**/setup/auth.setup.ts',
       use: { ...devices['Desktop Chrome'] },
     },
+
+    // ── Unauthenticated E2E ─────────────────────────────────────────────────
+    // Auth-page tests — run without a stored session.
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: 'public',
+      testMatch: '**/e2e/auth.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
     },
+
+    // ── Authenticated E2E ───────────────────────────────────────────────────
+    // Navigation smoke tests — reuse session saved by the setup project.
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: 'authenticated',
+      testMatch: '**/e2e/navigation.spec.ts',
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+    },
+
+    // ── Integration tests ───────────────────────────────────────────────────
+    // Real Supabase CRUD operations against the test user's data.
+    {
+      name: 'integration',
+      testMatch: '**/integration/**/*.spec.ts',
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+    },
+
+    // ── AI sanity tests ─────────────────────────────────────────────────────
+    // Validates live Gemini coaching responses. Run manually only.
+    {
+      name: 'ai',
+      testMatch: '**/ai/**/*.spec.ts',
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
     },
   ],
 

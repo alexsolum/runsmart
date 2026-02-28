@@ -7,6 +7,23 @@ function daysAgo(n) {
   return d.toISOString();
 }
 
+// Returns the ISO date of a given weekday (1=Mon…7=Sun) in the CURRENT week.
+// Guarantees dates always fall within the WeeklyPlanPage's current-week grid.
+function weekdayIso(targetDay /* 1=Mon, 2=Tue, …, 7=Sun */) {
+  const d = new Date();
+  const day = d.getUTCDay() || 7; // convert Sun(0) → 7
+  d.setUTCDate(d.getUTCDate() - day + targetDay);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+// Returns the ISO date of tomorrow within the current week.
+// If today is Sunday (last day), returns Sunday again (same day) to stay in-week.
+function tomorrowInWeek() {
+  const todayDay = new Date().getUTCDay() || 7; // 1=Mon … 7=Sun
+  return weekdayIso(todayDay < 7 ? todayDay + 1 : 7);
+}
+
 /**
  * Sample Strava activities stored in Supabase.
  * These represent data synced from Strava into the `activities` table.
@@ -184,7 +201,7 @@ export const SAMPLE_WORKOUT_ENTRIES = [
     id: "we-1",
     plan_id: "plan-1",
     user_id: "user-1",
-    workout_date: new Date().toISOString().split("T")[0],
+    workout_date: new Date().toISOString().split("T")[0], // today (UTC) — same day MobilePage defaults to
     workout_type: "Easy",
     distance_km: 8,
     duration_min: 50,
@@ -195,7 +212,7 @@ export const SAMPLE_WORKOUT_ENTRIES = [
     id: "we-2",
     plan_id: "plan-1",
     user_id: "user-1",
-    workout_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    workout_date: tomorrowInWeek(), // day after today in current week — always after we-1 in Mon-Sun grid
     workout_type: "Tempo",
     distance_km: 10,
     duration_min: 55,

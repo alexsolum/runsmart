@@ -647,6 +647,95 @@
     return days;
   }
 
+  // ---- Weekly progress: cumulative km executed vs planned vs 4-week avg ----
+
+  function computeWeeklyProgress(activities, workoutEntries) {
+    var today = new Date();
+    var todayStr = today.toISOString().split("T")[0];
+
+    // Monday of current week (UTC)
+    var monday = new Date(today);
+    var utcDay = monday.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    var diffToMon = utcDay === 0 ? -6 : 1 - utcDay;
+    monday.setUTCDate(monday.getUTCDate() + diffToMon);
+    monday.setUTCHours(0, 0, 0, 0);
+
+    var DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    // Build 7 day date strings Mon–Sun
+    var weekDates = [];
+    for (var i = 0; i < 7; i++) {
+      var wd = new Date(monday);
+      wd.setUTCDate(wd.getUTCDate() + i);
+      weekDates.push(wd.toISOString().split("T")[0]);
+    }
+
+    // Index Strava km by ISO date
+    var actKmByDay = {};
+    (activities || []).forEach(function(a) {
+      var day = new Date(a.started_at).toISOString().split("T")[0];
+      actKmByDay[day] = (actKmByDay[day] || 0) + (Number(a.distance) || 0) / 1000;
+    });
+
+    // Index plan km by ISO date
+    var planKmByDay = {};
+    (workoutEntries || []).forEach(function(e) {
+      if (e.workout_date) {
+        planKmByDay[e.workout_date] = (planKmByDay[e.workout_date] || 0) + (Number(e.distance_km) || 0);
+      }
+    });
+
+    // 4-week avg: average per-day-of-week km across 4 prior weeks
+    var avgByDow = [0, 0, 0, 0, 0, 0, 0];
+    for (var w = 1; w <= 4; w++) {
+      for (var dow = 0; dow < 7; dow++) {
+        var priorDay = new Date(monday);
+        priorDay.setUTCDate(priorDay.getUTCDate() - w * 7 + dow);
+        var priorStr = priorDay.toISOString().split("T")[0];
+        avgByDow[dow] += actKmByDay[priorStr] || 0;
+      }
+    }
+    for (var ai = 0; ai < 7; ai++) avgByDow[ai] /= 4;
+
+    // Build cumulative day series
+    var execCumul = 0;
+    var planCumul = 0;
+    var avgCumul = 0;
+
+    var days = weekDates.map(function(dateStr, idx) {
+      var isToday = dateStr === todayStr;
+      var isFuture = dateStr > todayStr;
+      var stravaKm = actKmByDay[dateStr] || 0;
+      var planKm = planKmByDay[dateStr] || 0;
+
+      // Executed: cumulative Strava km up to and including today (0 for future)
+      if (!isFuture) execCumul += stravaKm;
+
+      // Planned (additive): future days or today without any Strava activity
+      var addedPlan = 0;
+      if (isFuture || (isToday && stravaKm === 0)) addedPlan = planKm;
+      planCumul += addedPlan;
+
+      avgCumul += avgByDow[idx];
+
+      return {
+        day: DAY_LABELS[idx],
+        date: dateStr,
+        isToday: isToday,
+        isFuture: isFuture,
+        executed: +execCumul.toFixed(1),
+        planned: +planCumul.toFixed(1),
+        avg: +avgCumul.toFixed(1),
+      };
+    });
+
+    return {
+      days: days,
+      totalExecuted: +execCumul.toFixed(1),
+      totalPlanned: +planCumul.toFixed(1),
+    };
+  }
+
 export {
   getWeekStart,
   computeWeeklySummary,
@@ -659,6 +748,7 @@ export {
   computeWeeklyHRZones,
   computeRecentActivityZones,
   generateCoachingInsights,
+  computeWeeklyProgress,
   formatDistance,
   formatDuration,
   formatPace,

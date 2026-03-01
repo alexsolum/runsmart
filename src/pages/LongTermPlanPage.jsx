@@ -316,7 +316,7 @@ export default function LongTermPlanPage() {
   return (
     <PageContainer>
       <div className="mb-5">
-        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Training Plan</h2>
+        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Training Plan</h2>
         <p className="m-0 text-sm text-slate-500">Build your macro plan — phases and training blocks towards your goal race.</p>
       </div>
 
@@ -325,7 +325,7 @@ export default function LongTermPlanPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-4">
           {/* Plan selector */}
           <div>
-            <h3 className="m-0 mb-1 text-sm font-bold">Your plan</h3>
+            <h3 className="m-0 mb-1 text-sm font-bold font-sans">Your plan</h3>
             {plans.plans.length > 0 ? (
               <select
                 className={`${selectClass} mb-2.5`}
@@ -420,7 +420,7 @@ export default function LongTermPlanPage() {
 
         {/* ── Right panel — timeline ── */}
         <div className="ltp-timeline bg-white border border-slate-200 rounded-2xl p-4">
-          <h3 className="m-0 mb-3.5 text-sm font-bold">Training phases</h3>
+          <h3 className="m-0 mb-3.5 text-sm font-bold font-sans">Training phases</h3>
 
           {!selectedPlanId && (
             <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start building phases.</p>

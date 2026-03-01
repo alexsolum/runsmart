@@ -260,7 +260,7 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
                     min="0"
                     max="200"
                     step="0.1"
-                    className="mobile-field-input"
+                    className="h-auto py-3.5 px-4 rounded-xl text-base bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white placeholder:text-slate-400 transition-colors"
                     placeholder="—"
                     value={distanceKm}
                     onChange={(e) => setDistanceKm(e.target.value)}
@@ -273,7 +273,7 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
                     type="number"
                     min="0"
                     max="600"
-                    className="mobile-field-input"
+                    className="h-auto py-3.5 px-4 rounded-xl text-base bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white placeholder:text-slate-400 transition-colors"
                     placeholder="—"
                     value={durationMin}
                     onChange={(e) => setDurationMin(e.target.value)}
@@ -286,7 +286,7 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
                 <Textarea
                   id="mob-desc"
                   rows={3}
-                  className="mobile-field-input"
+                  className="py-3.5 px-4 rounded-xl text-base bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white placeholder:text-slate-400 transition-colors resize-none"
                   placeholder="e.g. 8x400m @ 5K pace"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -295,10 +295,10 @@ function WorkoutModal({ modal, planId, workoutEntries, onClose }) {
             </>
           )}
 
-          <Button type="button" className="mobile-btn-primary" disabled={saving} onClick={handleSave}>
+          <Button type="button" className="w-full h-14 rounded-[14px] text-base font-bold" disabled={saving} onClick={handleSave}>
             {saving ? "Saving…" : isEdit ? "Update" : "Add Workout"}
           </Button>
-          <Button type="button" variant="outline" className="mobile-btn-secondary" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" className="w-full h-12 rounded-[14px] text-[15px] font-semibold text-slate-500" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
         </div>

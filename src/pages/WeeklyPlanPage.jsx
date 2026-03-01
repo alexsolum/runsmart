@@ -313,7 +313,7 @@ export default function WeeklyPlanPage() {
   return (
     <PageContainer>
       <div className="mb-5">
-        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Weekly Plan</h2>
+        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Weekly Plan</h2>
         <p className="m-0 text-sm text-slate-500">Plan your workouts day by day. Check off sessions as you complete them.</p>
       </div>
 

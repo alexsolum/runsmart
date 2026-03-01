@@ -295,7 +295,7 @@ export default function InsightsPage() {
 
       {/* Page header */}
       <div className="mb-6">
-        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">
+        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">
           Training analysis &amp; insights
         </h2>
         <p className="m-0 text-sm text-slate-500">

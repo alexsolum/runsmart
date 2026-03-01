@@ -239,7 +239,7 @@ describe("MobilePage — completion toggle", () => {
     const data = makeAppData();
     useAppData.mockReturnValue(data);
     render(<MobilePage defaultTab="week" />);
-    const checkBtn = screen.getByLabelText("Mark complete");
+    const checkBtn = screen.getAllByLabelText("Mark complete")[0];
     fireEvent.click(checkBtn);
     await waitFor(() => {
       expect(data.workoutEntries.toggleCompleted).toHaveBeenCalledWith("we-1", false);
@@ -253,7 +253,7 @@ describe("MobilePage — delete", () => {
   it("clicking delete button shows confirm row", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<MobilePage defaultTab="week" />);
-    const deleteBtn = screen.getByLabelText("Delete workout");
+    const deleteBtn = screen.getAllByLabelText("Delete workout")[0];
     fireEvent.click(deleteBtn);
     expect(screen.getByText("Delete this workout?")).toBeInTheDocument();
     expect(screen.getByText("Confirm")).toBeInTheDocument();
@@ -263,7 +263,7 @@ describe("MobilePage — delete", () => {
     const data = makeAppData();
     useAppData.mockReturnValue(data);
     render(<MobilePage defaultTab="week" />);
-    fireEvent.click(screen.getByLabelText("Delete workout"));
+    fireEvent.click(screen.getAllByLabelText("Delete workout")[0]);
     fireEvent.click(screen.getByText("Confirm"));
     await waitFor(() => {
       expect(data.workoutEntries.deleteEntry).toHaveBeenCalledWith("we-1");
@@ -273,7 +273,7 @@ describe("MobilePage — delete", () => {
   it("clicking cancel hides the confirm row", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<MobilePage defaultTab="week" />);
-    fireEvent.click(screen.getByLabelText("Delete workout"));
+    fireEvent.click(screen.getAllByLabelText("Delete workout")[0]);
     expect(screen.getByText("Delete this workout?")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Cancel"));
     expect(screen.queryByText("Delete this workout?")).not.toBeInTheDocument();
@@ -326,7 +326,7 @@ describe("MobilePage — modal (edit)", () => {
   it("edit button opens modal with pre-filled values", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<MobilePage defaultTab="week" />);
-    fireEvent.click(screen.getByLabelText("Edit workout"));
+    fireEvent.click(screen.getAllByLabelText("Edit workout")[0]);
     expect(screen.getByRole("dialog", { name: "Edit workout" })).toBeInTheDocument();
     // The Easy pill should be active (pre-filled type)
     const easyPill = screen.getByRole("button", { name: "Easy" });
@@ -337,7 +337,7 @@ describe("MobilePage — modal (edit)", () => {
     const data = makeAppData();
     useAppData.mockReturnValue(data);
     render(<MobilePage defaultTab="week" />);
-    fireEvent.click(screen.getByLabelText("Edit workout"));
+    fireEvent.click(screen.getAllByLabelText("Edit workout")[0]);
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
     await waitFor(() => {
       expect(data.workoutEntries.updateEntry).toHaveBeenCalledWith(

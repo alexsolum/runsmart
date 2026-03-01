@@ -68,16 +68,11 @@
 }
 
 /* ── Typography: Instrument Serif headings, JetBrains Mono data ── */
-/* Applied to semantic headings; UI headings that use Tailwind `font-sans`
-   class override this with higher specificity (class > element selector). */
-h1, h2, h3 {
-  font-family: var(--font-family-serif);
-}
-
-/* shadcn/Tailwind UI headings always use sans-serif */
-h1.font-sans, h2.font-sans, h3.font-sans,
-h1[class*="tracking-tight"], h2[class*="tracking-tight"], h3[class*="tracking-tight"] {
-  font-family: var(--font-family-sans);
+/* In @layer base so Tailwind utilities in @layer utilities (font-sans, etc.) properly override. */
+@layer base {
+  h1, h2, h3 {
+    font-family: var(--font-family-serif);
+  }
 }
 
 .font-serif  { font-family: var(--font-family-serif); }
@@ -404,11 +399,13 @@ progress {
   font-size: var(--font-size-sm);
 }
 
-button:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+@layer base {
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+  }
 }
 
 .is-loading .skeleton {
@@ -507,20 +504,6 @@ select:focus-visible {
   margin-bottom: 6px;
 }
 
-.daily-log-form input,
-.daily-log-form select,
-.daily-log-form textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 10px;
-  font: inherit;
-  background: #fff;
-}
-
-.daily-log-form textarea {
-  resize: vertical;
-}
 
 
 .daily-log-list {
@@ -1054,40 +1037,6 @@ select:focus-visible {
 
 .ltp-panel h3 { margin: 0 0 4px; }
 
-.ltp-panel select,
-.ltp-panel input[type="text"],
-.ltp-panel input[type="date"],
-.ltp-panel input[type="number"],
-.ltp-panel textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 10px;
-  font: inherit;
-  font-size: 13px;
-  background: #fff;
-}
-
-.ltp-panel select:focus,
-.ltp-panel input:focus,
-.ltp-panel textarea:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
-}
-
-.ltp-panel label {
-  display: block;
-  margin-bottom: 10px;
-}
-
-.ltp-panel label span {
-  display: block;
-  font-size: 12px;
-  color: #475569;
-  margin-bottom: 5px;
-  font-weight: 500;
-}
 
 .ltp-panel-actions {
   display: flex;
@@ -1384,25 +1333,6 @@ select:focus-visible {
   color: #475569;
 }
 
-.wpp-add-form select,
-.wpp-add-form input,
-.wpp-add-form textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 6px 8px;
-  font: inherit;
-  font-size: 12px;
-  background: #fff;
-}
-
-.wpp-add-form select:focus,
-.wpp-add-form input:focus,
-.wpp-add-form textarea:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37,99,235,0.12);
-}
 
 .wpp-add-form-actions { display: flex; gap: 6px; }
 
@@ -2266,24 +2196,6 @@ select:focus-visible {
   margin-bottom: 6px;
 }
 
-.mobile-field-input {
-  width: 100%;
-  font-size: 16px;
-  font-family: inherit;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 14px;
-  background: #f8fafc;
-  color: #0f172a;
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.mobile-field-input:focus {
-  border-color: #2563eb;
-  background: #ffffff;
-}
 
 .mobile-type-pills {
   display: flex;
@@ -2310,37 +2222,6 @@ select:focus-visible {
   color: #ffffff;
 }
 
-.mobile-btn-primary {
-  width: 100%;
-  height: 56px;
-  background: #2563eb;
-  color: #ffffff;
-  border: 0;
-  border-radius: 14px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-
-.mobile-btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.mobile-btn-secondary {
-  width: 100%;
-  height: 48px;
-  background: transparent;
-  color: #64748b;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-}
 
 .mobile-two-col {
   display: grid;

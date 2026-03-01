@@ -250,3 +250,66 @@ describe("Training Plan — plan meta display", () => {
     expect(screen.getByText(/Base volume: 50 km\/week/i)).toBeInTheDocument();
   });
 });
+
+// ─── Goal field ───────────────────────────────────────────────────────────────
+
+describe("Training Plan — goal field", () => {
+  it("renders the 'Goal for this plan' textarea", () => {
+    useAppData.mockReturnValue(makeAppData());
+    render(<LongTermPlanPage />);
+    expect(screen.getByPlaceholderText(/Finish my first 100K/i)).toBeInTheDocument();
+  });
+
+  it("pre-fills the textarea with the plan's saved goal", () => {
+    useAppData.mockReturnValue(makeAppData());
+    render(<LongTermPlanPage />);
+    const textarea = screen.getByPlaceholderText(/Finish my first 100K/i);
+    // SAMPLE_PLAN.goal = "Finish under 3:30 and stay injury-free"
+    expect(textarea.value).toBe("Finish under 3:30 and stay injury-free");
+  });
+
+  it("calls updatePlan with { goal } on blur", async () => {
+    const updatePlan = vi.fn().mockResolvedValue({ ...SAMPLE_PLAN, goal: "Sub-3h marathon" });
+    useAppData.mockReturnValue(makeAppData({
+      plans: {
+        plans: [SAMPLE_PLAN],
+        loading: false,
+        createPlan: vi.fn(),
+        updatePlan,
+        deletePlan: vi.fn(),
+      },
+    }));
+
+    const user = userEvent.setup();
+    render(<LongTermPlanPage />);
+
+    const textarea = screen.getByPlaceholderText(/Finish my first 100K/i);
+    await user.clear(textarea);
+    await user.type(textarea, "Sub-3h marathon");
+    await user.tab(); // trigger onBlur → handleSaveGoal
+
+    expect(updatePlan).toHaveBeenCalledWith(SAMPLE_PLAN.id, { goal: "Sub-3h marathon" });
+  });
+
+  it("saves null when the goal textarea is cleared", async () => {
+    const updatePlan = vi.fn().mockResolvedValue({ ...SAMPLE_PLAN, goal: null });
+    useAppData.mockReturnValue(makeAppData({
+      plans: {
+        plans: [SAMPLE_PLAN],
+        loading: false,
+        createPlan: vi.fn(),
+        updatePlan,
+        deletePlan: vi.fn(),
+      },
+    }));
+
+    const user = userEvent.setup();
+    render(<LongTermPlanPage />);
+
+    const textarea = screen.getByPlaceholderText(/Finish my first 100K/i);
+    await user.clear(textarea);
+    await user.tab();
+
+    expect(updatePlan).toHaveBeenCalledWith(SAMPLE_PLAN.id, { goal: null });
+  });
+});

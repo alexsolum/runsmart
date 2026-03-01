@@ -426,7 +426,7 @@ function PlanRevisionMessage({ msg }) {
 
 export default function CoachPage() {
   const { t } = useI18n();
-  const { plans, activities, dailyLogs, checkins, trainingBlocks, runnerProfile, coachConversations, workoutEntries } = useAppData();
+  const { auth, plans, activities, dailyLogs, checkins, trainingBlocks, runnerProfile, coachConversations, workoutEntries } = useAppData();
 
   // ── Chat tab state ───────────────────────────────────────────────────────
   const [localMessages, setLocalMessages] = useState(coachConversations.messages);
@@ -682,6 +682,7 @@ export default function CoachPage() {
         .filter((day) => day.workout_type !== "Rest")
         .map((day) => ({
           plan_id: activePlan.id,
+          user_id: auth.user?.id,
           workout_date: day.date,
           workout_type: day.workout_type,
           distance_km: day.distance_km || null,

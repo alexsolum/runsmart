@@ -1,6 +1,6 @@
-// Supabase Edge Function — Gemini AI coaching insights
+// Supabase Edge Function — Gemini AI coaching insights + weekly plan generation
 // Receives a summary of training data from the frontend, sends it to
-// Google Gemini for analysis, and returns structured coaching insights.
+// Google Gemini for analysis, and returns structured coaching insights or a 7-day plan.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,6 +12,8 @@ const corsHeaders = {
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+// ── System instructions ────────────────────────────────────────────────────────
 
 const SYSTEM_INSTRUCTION =
   `You are Marius AI Bakken, an expert endurance running coach specializing in trail and ultramarathon training. ` +
@@ -31,12 +33,47 @@ const SYSTEM_INSTRUCTION =
   `5) Use metric units (km/min).\n\n` +
   `Respond ONLY with a valid JSON array of insight objects. No markdown fences, no explanation outside the array.`;
 
+const PLAN_SYSTEM_INSTRUCTION =
+  `You are Marius AI Bakken, an elite endurance running coach. ` +
+  `Analyze the athlete's 4-week training history and generate a complete 7-day training plan for the upcoming week. ` +
+  `Your response MUST be a single valid JSON object with exactly two fields:\n` +
+  `1. "coaching_feedback": a string (2-4 sentences) summarizing the last 4 weeks of training — key trends, progress, and any concerns.\n` +
+  `2. "structured_plan": an array of exactly 7 objects, one per day starting from the next Monday, each with:\n` +
+  `   - "date": ISO date string (YYYY-MM-DD)\n` +
+  `   - "workout_type": one of "Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"\n` +
+  `   - "distance_km": number (0 for rest days)\n` +
+  `   - "duration_min": integer (0 for rest days)\n` +
+  `   - "description": string (1-2 sentences describing the workout purpose and execution)\n\n` +
+  `Coaching requirements:\n` +
+  `- Respect the athlete's current phase and target weekly volume from their training plan.\n` +
+  `- Apply 80/20 polarization: most sessions easy, 1-2 quality sessions per week.\n` +
+  `- Include exactly one long run (Sunday preferred, or Saturday if constraints apply).\n` +
+  `- Ensure total weekly distance matches target volume within 10%.\n` +
+  `- Use metric units (km/min).\n\n` +
+  `Respond ONLY with a valid JSON object. No markdown fences, no explanation outside the JSON.`;
+
 const FOLLOWUP_SYSTEM_INSTRUCTION =
   `You are Marius AI Bakken, a personal AI running coach with deep expertise in endurance and ultramarathon training. ` +
   `Your style is conversational, direct, and practical — like a trusted coach who knows the athlete well. ` +
   `The athlete is asking a follow-up question based on your previous coaching insights. ` +
   `Answer concisely in 2-5 sentences. Be specific and reference their actual training data where relevant. ` +
   `Use metric units (km/min). Respond in plain text only — no JSON, no bullet lists, no markdown.`;
+
+const PLAN_REVISION_SYSTEM_INSTRUCTION =
+  `You are Marius AI Bakken, an elite endurance running coach in an ongoing conversation with your athlete. ` +
+  `The athlete has provided feedback or constraints about their upcoming week. ` +
+  `Revise the 7-day training plan accordingly while maintaining athletic integrity. ` +
+  `Your response MUST be a single valid JSON object with exactly two fields:\n` +
+  `1. "coaching_feedback": a string (1-3 sentences) acknowledging the athlete's feedback and explaining the key changes you made.\n` +
+  `2. "structured_plan": an array of exactly 7 objects, one per day, each with:\n` +
+  `   - "date": ISO date string (YYYY-MM-DD)\n` +
+  `   - "workout_type": one of "Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"\n` +
+  `   - "distance_km": number (0 for rest days)\n` +
+  `   - "duration_min": integer (0 for rest days)\n` +
+  `   - "description": string (1-2 sentences describing the workout)\n\n` +
+  `Respond ONLY with a valid JSON object. No markdown fences, no explanation outside the JSON.`;
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDelta(current: number, previous: number): string {
   if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return "n/a";
@@ -46,16 +83,25 @@ function formatDelta(current: number, previous: number): string {
 
 function inferAthleteLevel(weeklySummary: WeeklySummary[]): string {
   if (!weeklySummary.length) return "unknown";
-
   const avgDistance =
     weeklySummary.reduce((sum, week) => sum + week.distance, 0) / weeklySummary.length;
   const avgRuns =
     weeklySummary.reduce((sum, week) => sum + week.runs, 0) / weeklySummary.length;
-
   if (avgDistance >= 90 || avgRuns >= 6) return "advanced";
   if (avgDistance >= 55 || avgRuns >= 4) return "intermediate";
   return "developing";
 }
+
+function getNextMonday(): string {
+  const d = new Date();
+  const day = d.getUTCDay();
+  const daysUntilMonday = day === 0 ? 1 : 8 - day;
+  d.setUTCDate(d.getUTCDate() + daysUntilMonday);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface WeeklySummary {
   weekOf: string;
@@ -77,6 +123,7 @@ interface PlanContext {
   phase: string;
   weekNumber: number;
   targetMileage: number;
+  daysToRace: number;
 }
 
 interface Checkin {
@@ -109,7 +156,7 @@ interface ConversationTurn {
 }
 
 interface RequestBody {
-  mode?: "initial" | "followup";
+  mode?: "initial" | "followup" | "plan" | "plan_revision";
   conversationHistory?: ConversationTurn[];
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
@@ -119,10 +166,11 @@ interface RequestBody {
   runnerProfile?: RunnerProfile | null;
 }
 
+// ── Prompt builder ─────────────────────────────────────────────────────────────
+
 function buildPrompt(data: RequestBody): string {
   const lines: string[] = [];
 
-  // Runner profile (athlete-supplied context)
   if (data.runnerProfile) {
     if (data.runnerProfile.background) {
       lines.push(`Athlete background: ${data.runnerProfile.background}`);
@@ -138,7 +186,6 @@ function buildPrompt(data: RequestBody): string {
   lines.push("Provide recommendations that feel realistic for this athlete's recent training.");
   lines.push("");
 
-  // Weekly summary
   if (data.weeklySummary && data.weeklySummary.length > 0) {
     lines.push("Training summary (last 4 weeks):");
     data.weeklySummary.forEach((w) => {
@@ -146,7 +193,6 @@ function buildPrompt(data: RequestBody): string {
         `- Week of ${w.weekOf}: ${w.distance.toFixed(1)}km, ${w.runs} runs, longest ${w.longestRun.toFixed(1)}km`,
       );
     });
-
     const latestWeek = data.weeklySummary[data.weeklySummary.length - 1];
     const previousWeek = data.weeklySummary[data.weeklySummary.length - 2];
     if (latestWeek && previousWeek) {
@@ -157,20 +203,20 @@ function buildPrompt(data: RequestBody): string {
         `Longest run trend: ${latestWeek.longestRun.toFixed(1)}km vs ${previousWeek.longestRun.toFixed(1)}km (${formatDelta(latestWeek.longestRun, previousWeek.longestRun)} week-over-week)`,
       );
     }
-
     lines.push("");
   }
 
-  // Plan context
   if (data.planContext) {
     const p = data.planContext;
     lines.push(
       `Current plan: ${p.race} on ${p.raceDate}, week ${p.weekNumber}, phase: ${p.phase}, target ${p.targetMileage}km this week`,
     );
+    if (p.daysToRace != null) {
+      lines.push(`Days to race: ${p.daysToRace}`);
+    }
     lines.push("");
   }
 
-  // Latest check-in
   if (data.latestCheckin) {
     const c = data.latestCheckin;
     lines.push(
@@ -180,7 +226,6 @@ function buildPrompt(data: RequestBody): string {
     lines.push("");
   }
 
-  // Daily wellness logs (last 7 days)
   if (data.dailyLogs && data.dailyLogs.length > 0) {
     lines.push("Daily wellness logs (last 7 days):");
     data.dailyLogs.forEach((l) => {
@@ -198,7 +243,6 @@ function buildPrompt(data: RequestBody): string {
     lines.push("");
   }
 
-  // Recent activities
   if (data.recentActivities && data.recentActivities.length > 0) {
     lines.push("Recent activities (last 7 days):");
     data.recentActivities.forEach((a) => {
@@ -211,13 +255,45 @@ function buildPrompt(data: RequestBody): string {
     lines.push("");
   }
 
-  lines.push("Output focus:");
-  lines.push("- Give week-planning guidance (e.g., 2 quality days + long run + recovery)." );
-  lines.push("- Suggest sessions that connect logically to recent training and current phase.");
-  lines.push("- Mention progression/regression alternatives if fatigue or niggles are high.");
-
   return lines.join("\n");
 }
+
+function buildPlanPrompt(data: RequestBody): string {
+  const contextLines = buildPrompt(data);
+  const nextMonday = getNextMonday();
+  return [
+    contextLines,
+    `Generate the 7-day plan starting from Monday ${nextMonday}.`,
+    `The plan MUST cover exactly 7 consecutive days (Monday through Sunday).`,
+    `Output focus:`,
+    `- Total weekly km should target ${data.planContext?.targetMileage ?? "appropriate volume"} km.`,
+    `- Apply progressive overload appropriate for this athlete's recent training.`,
+    `- Include at least one quality session (Tempo or Intervals) and one Long Run.`,
+  ].join("\n");
+}
+
+// ── JSON parsing helpers ───────────────────────────────────────────────────────
+
+function stripMarkdownFences(text: string): string {
+  return text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+}
+
+const VALID_WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
+
+function validateAndSanitizePlan(plan: Record<string, unknown>[]): Record<string, unknown>[] {
+  return plan
+    .filter((day) => day.date && day.workout_type)
+    .map((day) => ({
+      date: String(day.date),
+      workout_type: VALID_WORKOUT_TYPES.includes(String(day.workout_type)) ? day.workout_type : "Easy",
+      distance_km: Number(day.distance_km) || 0,
+      duration_min: Math.round(Number(day.duration_min)) || 0,
+      description: String(day.description || "").slice(0, 300),
+    }))
+    .slice(0, 7);
+}
+
+// ── Main handler ───────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -229,41 +305,103 @@ Deno.serve(async (req) => {
     if (!geminiKey) {
       return new Response(
         JSON.stringify({ error: "Gemini API key not configured" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Authenticate the calling user
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
     const jwt = req.headers.get("Authorization")?.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser(jwt);
-
+    const { data: { user }, error: userErr } = await supabase.auth.getUser(jwt);
     if (userErr || !user) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Parse the training data summary
     const body: RequestBody = await req.json();
-    const isFollowup = body.mode === "followup";
+    const mode = body.mode ?? "initial";
 
-    if (isFollowup) {
-      // ── Follow-up conversational mode ─────────────────────────────────────
+    // ── Plan generation mode ─────────────────────────────────────────────────
+    if (mode === "plan" || mode === "plan_revision") {
+      const isPlanRevision = mode === "plan_revision";
+      const systemInstruction = isPlanRevision ? PLAN_REVISION_SYSTEM_INSTRUCTION : PLAN_SYSTEM_INSTRUCTION;
+
+      let contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+
+      if (isPlanRevision && body.conversationHistory && body.conversationHistory.length > 0) {
+        const contextPrefix = buildPlanPrompt(body);
+        contents = body.conversationHistory.map((turn, idx) => {
+          let text = turn.text;
+          if (idx === 0 && turn.role === "user" && contextPrefix.trim()) {
+            text = `Context about this athlete's training:\n${contextPrefix}\n\n---\n\n${text}`;
+          }
+          return { role: turn.role, parts: [{ text }] };
+        });
+      } else {
+        const userMessage = buildPlanPrompt(body);
+        contents = [{ role: "user", parts: [{ text: userMessage }] }];
+      }
+
+      const geminiRes = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents,
+          generationConfig: { temperature: 0.6, maxOutputTokens: 4096 },
+        }),
+      });
+
+      if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        console.error("Gemini API error (plan):", geminiRes.status, errText);
+        return new Response(
+          JSON.stringify({ error: "Gemini API request failed" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const geminiData = await geminiRes.json();
+      const candidates = geminiData.candidates;
+      if (!candidates?.length) {
+        return new Response(
+          JSON.stringify({ error: "No response from Gemini" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const parts: Array<{ text?: string; thought?: boolean }> = candidates[0]?.content?.parts || [];
+      const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
+      const rawText = (outputPart?.text || "").trim();
+
+      let result: { coaching_feedback?: string; structured_plan?: Record<string, unknown>[] };
+      try {
+        result = JSON.parse(stripMarkdownFences(rawText));
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Failed to parse plan from Gemini", raw: rawText.slice(0, 300) }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const structuredPlan = validateAndSanitizePlan(
+        Array.isArray(result.structured_plan) ? result.structured_plan : [],
+      );
+      const coachingFeedback = String(result.coaching_feedback || "").slice(0, 1000);
+
+      return new Response(
+        JSON.stringify({ coaching_feedback: coachingFeedback, structured_plan: structuredPlan }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Follow-up conversational mode ────────────────────────────────────────
+    if (mode === "followup") {
       const history = body.conversationHistory ?? [];
       if (history.length === 0) {
         return new Response(
@@ -272,11 +410,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Build training context prefix (injected before conversation history)
       const contextPrefix = buildPrompt(body);
-
-      // Build Gemini contents array from conversation history.
-      // Prepend training context to the first user turn.
       const contents = history.map((turn, idx) => {
         let text = turn.text;
         if (idx === 0 && turn.role === "user" && contextPrefix.trim()) {
@@ -323,37 +457,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Initial coaching mode (default) ───────────────────────────────────────
+    // ── Initial coaching mode (default) ──────────────────────────────────────
     const userMessage = buildPrompt(body);
-
     if (!userMessage.trim()) {
       return new Response(
         JSON.stringify({ error: "No training data provided" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Call Gemini API
     const geminiRes = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_INSTRUCTION }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userMessage }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        },
+        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        contents: [{ role: "user", parts: [{ text: userMessage }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       }),
     });
 
@@ -362,45 +481,29 @@ Deno.serve(async (req) => {
       console.error("Gemini API error:", geminiRes.status, errText);
       return new Response(
         JSON.stringify({ error: "Gemini API request failed" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const geminiData = await geminiRes.json();
-
-    // Extract the text content from Gemini's response
     const candidates = geminiData.candidates;
     if (!candidates || !candidates.length) {
       return new Response(
         JSON.stringify({ error: "No response from Gemini" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Gemini 2.5-flash is a thinking model — parts may include thought parts.
-    // Find the first non-thought part that contains the actual output.
     const parts: Array<{ text?: string; thought?: boolean }> = candidates[0]?.content?.parts || [];
     const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
     const rawText = outputPart?.text || "";
 
-    // Parse the JSON array from Gemini's response
     let insights;
     try {
-      // Strip markdown fences if Gemini adds them despite instructions
-      const cleaned = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      const cleaned = stripMarkdownFences(rawText);
       insights = JSON.parse(cleaned);
+      if (!Array.isArray(insights)) insights = [insights];
 
-      if (!Array.isArray(insights)) {
-        insights = [insights];
-      }
-
-      // Validate and sanitize each insight
       const validTypes = ["danger", "warning", "positive", "info"];
       const validIcons = [
         "warning", "alert", "battery", "fatigue", "balance", "trending",
@@ -416,17 +519,11 @@ Deno.serve(async (req) => {
           title: String(i.title).slice(0, 100),
           body: String(i.body).slice(0, 500),
         }))
-        .slice(0, 5); // Max 5 insights
+        .slice(0, 5);
     } catch {
       return new Response(
-        JSON.stringify({
-          error: "Failed to parse Gemini response",
-          raw: rawText.slice(0, 200),
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "Failed to parse Gemini response", raw: rawText.slice(0, 200) }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -437,10 +534,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

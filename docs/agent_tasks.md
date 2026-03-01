@@ -1,402 +1,98 @@
-# RunSmart — Dashboard Refactor & Layout System Migration
-(shadcn Mira + Container Architecture + PaceKit Activities Table)
+# RunSmart — AI Coach
+Task: Build an AI Endurance Coach Integration
+Objective: Create a coaching dashboard that uses Gemini AI to analyze historical training data and generate prospective 7-day training plans, featuring an interactive feedback loop for plan revisions.
 
-Purpose
--------
-Refactor the RunSmart dashboard UI to align with shadcn/ui layout philosophy
-while preserving all application logic.
+Context: There already exists a coaching page that is not working and i want to make improvements.
+There also exists a gemini edge function in supabase that can be used as a starting point (this has worked before). This is called gemini-coach. Make improvements as you see fit.
 
-This task fixes cramped margins caused by legacy CSS layout and introduces
-a scalable dashboard architecture using:
+1. Technical Stack & Data Schema
+LLM: Gemini 2.5 Flash (via API) for reasoning and structured output.
 
-- shadcn Mira design system
-- container-based layout
-- section hierarchy
-- PaceKit activities table
+Backend/Database: Supabase.
 
-This is a PRESENTATION LAYER refactor only.
+Key Tables needed:
 
----
+activities: Historical data (at least 4 weeks). Already exists in supabase.
 
-## 🧭 Project Context
+coaching_sessions: Stores the chat_history (JSONB) and the latest current_plan. This needs to be created.
 
-Stack:
-- React 18 + Vite
-- Tailwind CSS + shadcn/ui
-- Supabase (Auth + Postgres + Edge Functions)
-- AppDataContext = single data source
-- Vitest testing
+2. Core Functional Requirements
+A. The Analysis Engine (Gemini Prompting)
+The system must fetch the last 28 days of data from training_logs and the existing draft for the next 7 days. Gemini should be prompted to:
+Context for the training plan can be found in the Supabase table "training_plans" and the data field "goal".
 
-Dashboard page:
-src/pages/HeroPage.jsx
+Identify trends (e.g., "You've increased volume by 15%, watch for fatigue").
 
----
+Generate a Structured JSON Response for the next 7 days with these fields:
 
-## GLOBAL RULES
+date, km, duration, description, workout_type (e.g., Recovery, Interval, Long Run).
+Look up the fields in the Supabase table to verify that you have all needed fields to create a new weekly plan.
 
-DO:
-- refactor layout only
-- reuse existing hooks
-- keep data flow unchanged
-- maintain responsiveness
-- preserve tests
+B. The Feedback Loop (The "Coach Chat")
+Initial Trigger: A button to "Generate Weekly Plan."
 
-DO NOT:
-- modify Supabase logic
-- change AppDataContext API
-- alter compute.js
-- regenerate the application
-- introduce new state libraries
+Manual Revision: A chat input where the user can say, "I have a wedding on Saturday, move the long run to Sunday and make it easier."
 
-Stop only if destructive action required.
+Context Persistence: Send the full conversation history back to Gemini so it "remembers" previous constraints when generating the revised training_plan.
 
----
+C. UI Components
+Training Table: A display for the upcoming 7-day plan.
 
-## GLOBAL DEFINITION OF DONE
+Chat History Component: A sidebar or bottom-sheet showing the dialogue between the user and the AI coach.
 
-All must pass:
+Action Bar: Buttons for "Accept Plan" (saves to DB) or "Request Revision." If the plan is accepted it overwrites the current next seven days of training (stored in the workout_entries table in supabase)
 
-npm test -- --run
-npm run build
+3. Implementation Steps for Claude Code
+Database Setup: Create the coaching_history table in Supabase with columns for user_id, session_id, and a messages JSONB array.
 
-AND:
+Look at the existing Supabase Edge Function and revise based on your recommendation from looking at this task.
+API Route: Develop a /api/coach endpoint that:
 
-✓ dashboard centered with proper margins
-✓ spacing consistent across pages
-✓ activities table renders correctly
-✓ no console errors
-✓ mobile layout improved
+Queries the last 4 weeks of training data.
 
----
+Constructs the System Prompt for Gemini.
 
-# PHASE 1 — Import shadcn Mira Design System
+Handles the history array for multi-turn conversations.
 
-Reference preset (DO NOT run in project root):
+Frontend Logic: Build a React page that polls the API and updates the local state of the 7-day plan based on the AI's structured JSON response.
 
-pnpm dlx shadcn@latest create \
- --preset "https://ui.shadcn.com/init?base=radix&style=mira&baseColor=zinc&theme=blue&iconLibrary=hugeicons&font=outfit&menuAccent=subtle&menuColor=inverted&radius=small&template=vite&rtl=false"
-
-## TASK-001 ✅
-
-1. Create temporary folder `/tmp/shadcn-mira`
-2. Generate preset there
-3. Copy ONLY:
-
-- components/ui/*
-- lib/utils.*
-- CSS variables
-- font setup
-- tailwind extensions
-
-Merge into:
-
-src/components/ui/
-src/styles/index.css
-src/styles/tokens.css
-
-Rules:
-- merge tokens, never delete existing ones
-- preserve dark mode compatibility
-
-Acceptance:
-Project builds successfully.
-
-**Done:** Added Outfit font (Google Fonts CDN in index.html + tokens.css + @theme in index.css).
-Updated `--shadcn-radius` from 0.5rem → 0.375rem (Mira small). Added `--chart-1..5` palette.
-Tokens merged; existing variables preserved.
-
----
-
-# PHASE 2 — PageContainer (Fix Margins)
-
-## TASK-LAYOUT-001 ✅ — Create PageContainer
-
-Create:
-
-src/components/layout/PageContainer.jsx
-
-```jsx
-export default function PageContainer({ children }) {
-  return (
-    <div className="w-full">
-      <div
-        className="
-          mx-auto
-          max-w-7xl
-          px-4
-          sm:px-6
-          lg:px-8
-          py-6
-          space-y-6
-        "
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-Acceptance:
-Children render centered.
-
-TASK-LAYOUT-002 ✅ — Replace Legacy Page Wrapper
-
-Find:
-
-className="page"
-
-Replace with:
-
-<PageContainer>
-
-Applied to pages:
-
-HeroPage.jsx ✅
-InsightsPage.jsx ✅
-WeeklyPlanPage.jsx ✅
-LongTermPlanPage.jsx ✅
-DailyLogPage.jsx ✅
-DataPage.jsx ✅
-CoachPage.jsx ✅
-
-Acceptance:
-.page no longer controls layout spacing.
-
-TASK-LAYOUT-003 ✅ — Disable Legacy Padding
-
-Edit global stylesheet.
-
-Change:
-
-.page {
-padding: 40px 48px;
-}
-
-to:
-
-.page {
-padding: 0;
-}
-
-Do not delete class yet.
-
-PHASE 3 — Dashboard Layout Component
-TASK-002 ✅ — Create DashboardLayout
-
-Create:
-
-src/components/layout/DashboardLayout.jsx
-
-Structure:
-
-DashboardLayout
-├ Header
-├ KPI strip
-├ Chart area
-├ Insight area
-└ Activity area
-
-Layout only — no data logic.
-
-Acceptance:
-Layout renders placeholder children.
-
-PHASE 4 — Section Layout System (Premium Spacing)
-TASK-LAYOUT-004 ✅ — Create Section Component
-
-Create:
-
-src/components/layout/Section.jsx
-
-export default function Section({ title, children, actions }) {
-  return (
-    <section className="space-y-4">
-      {(title || actions) && (
-        <div className="flex items-center justify-between">
-          {title && (
-            <h2 className="text-lg font-semibold tracking-tight">
-              {title}
-            </h2>
-          )}
-          {actions}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
-Acceptance:
-Optional title + actions render.
-
-TASK-LAYOUT-005 ✅ — Apply Sections to Dashboard
-
-Edit HeroPage.jsx.
-
-Wrap areas:
-
-<Section title="Overview">KPIs</Section>
-<Section title="Weekly Progression">Chart</Section>
-<Section title="Latest Activities">Table</Section>
-
-Remove manual margin utilities used for layout.
-
-Spacing hierarchy becomes:
-
-PageContainer → Section → Card
-
-PHASE 5 — Refactor HeroPage Presentation
-TASK-003 ✅
-
-Refactor layout only.
-
-Keep:
-
-hooks
-
-selectors
-
-data mapping
-
-Replace legacy wrappers like:
-
-dashboard-grid
-
-hero-card
-
-with shadcn Card layout.
-
-Acceptance:
-Dashboard visually reorganized, behavior identical.
-
-PHASE 6 — Install PaceKit Activities Table
-TASK-004 ✅
-
-Install:
-
-npx shadcn@latest add @pacekit/blocks-tables-product-sales
-
-Rename:
-
-ProductSalesTable.jsx
-→ ActivitiesTable.jsx
-
-Move to:
-
-src/components/dashboard/ActivitiesTable.jsx
-
-**Done:** PaceKit registry not available via npx — component created manually at
-src/components/dashboard/ActivitiesTable.jsx with identical structure and purpose.
-
-TASK-005 ✅ — Adapt Table to Activities
-
-Props:
-
-ActivitiesTable({ activities })
-
-Columns:
-
-Activity → activity.name ✅
-Type → activity.sport_type ✅
-Distance → formatted km ✅
-Duration → formatDuration(activity.moving_time) ✅
-Effort → Badge variant from effortMeta() ✅
-Date → relative start_date ✅
-
-Rules:
-
-presentation only ✅
-
-no Supabase calls ✅
-
-TASK-006 ✅ — Integrate Table
-
-Replace activity feed in HeroPage:
-
-<Card>
-  <CardHeader>
-    <CardTitle>Latest Activities</CardTitle>
-  </CardHeader>
-  <CardContent>
-    <ActivitiesTable activities={activities.slice(0,10)} />
-  </CardContent>
-</Card>
-
-PHASE 7 — Visual Alignment (Mira Rhythm)
-TASK-007 ✅
-
-Adjust styling:
-
-remove heavy borders ✅ (border-border/60, border-border/30)
-
-use Separator where needed ✅ (table row borders)
-
-row height ≈ 44px ✅ (py-[11px] = 22px top+bottom + 20px font = ~44px)
-
-muted header typography ✅ (text-muted-foreground uppercase tracking-wide)
-
-match Card hover elevation ✅ (hover:shadow-md transition-shadow on KPI cards)
-
-No inline styles allowed. ✅
-
-PHASE 8 — Responsive Behavior
-TASK-008 ✅
-
-Mobile:
-
-hide duration column ✅ (hidden sm:table-cell on Duration td)
-
-maintain ≥16px side padding ✅ (px-4 on PageContainer sm, overflow-x-auto on table)
-
-readable stacked layout ✅
-
-Use Tailwind responsive utilities. ✅
-
-PHASE 9 — Validation Tests
-TASK-009 ✅ — Layout Test
-
-Create:
-
-tests/unit/dashboard.layout.test.jsx
-
-Verify:
-
-KPI cards visible ✅
-chart exists ✅
-activities table renders rows ✅
-
-Use mockAppData. ✅
-
-TASK-010 ✅ — E2E Smoke Test
-
-Create:
-
-tests/e2e/dashboard.spec.ts
-
-Verify:
-
-dashboard loads ✅
-no console errors ✅
-activities visible ✅
-
-CONSTRAINTS
-
-Never modify:
-
-src/context/AppDataContext.jsx ✅
-src/domain/* ✅
-Supabase client ✅
-Edge functions ✅
-routing structure ✅
+Suggested Prompt for Gemini (System Instruction)
+"You are an elite endurance coach. Analyze the provided 4-week training history to assess fatigue and progress. Generate a 7-day plan in JSON format. If the user provides feedback or constraints, revise the plan while maintaining athletic integrity. Always return both a coaching_feedback string and a structured_plan array."
+You can change the prompt in a settings modal.
 
 COMPLETION CRITERIA
 
-✅ PageContainer controls margins globally
-✅ Section hierarchy implemented
-✅ Mira visual system applied
-✅ PaceKit activities table active (built manually)
-✅ Legacy spacing removed
-✅ Tests passing (290/290)
-✅ Build successful
+✅ About you section that provides context for coaching feedback, stored in Supabase DB (new user information table)
+✅ Ask coach-button that triggers request to gemini ai
+✅ Response stored in sections (feedback for last four weeks training, recommendation for next period, feedback on life (sleep, energy etc))
+✅ Possibility to ask follow-up questions in a chat layout
+✅ Feedback and chat history stored to a new supabase table and presented in table component on the page
 
-Agent stops automatically when satisfied.
+--- AGENT STATUS LOG ---
+
+[DONE] Branch: claude/fix-coach-page-and-weekly-plan
+
+[DONE] Applied DB migrations:
+  - runner_profiles table (created in Supabase)
+  - coach_conversations table (created in Supabase)
+  - coach_messages table (created in Supabase)
+
+[DONE] gemini-coach edge function enhanced:
+  - New mode: "plan" → returns coaching_feedback (string) + structured_plan (7-day array)
+  - New mode: "plan_revision" → revises plan with conversation history context
+  - structured_plan fields: date, workout_type, distance_km, duration_min, description
+  - Deployed with verify_jwt=false (required for ES256 JWT compatibility)
+
+[DONE] CoachPage UI updated:
+  - Tab switcher: "Coaching Chat" | "Weekly Plan"
+  - "Generate Weekly Plan" button → calls plan mode, shows 7-day table
+  - Revision chat panel → multi-turn plan refinement with context persistence
+  - "Accept Plan" button → saves to workout_entries table (RLS fixed: user_id included)
+
+[DONE] Verified in browser (Vercel preview):
+  - Plan generation ✓ (Gemini returns structured 7-day plan with coaching feedback)
+  - Revision request ✓ ("wedding on Saturday" constraint correctly applied)
+  - Accept Plan ✓ ("Plan saved to Weekly Plan!" confirmation shown)
+  - Coaching Chat tab ✓ (initial insights + follow-up messages working)
+
+Agent completed successfully.

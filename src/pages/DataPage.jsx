@@ -44,7 +44,7 @@ export default function DataPage() {
   return (
     <PageContainer>
       <div className="mb-5">
-        <h2 className="m-0 mb-1 text-2xl font-bold text-slate-900">Reliable data ingestion</h2>
+        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Reliable data ingestion</h2>
         <p className="m-0 text-sm text-slate-500">Sync Strava automatically, log workouts manually, and normalize everything for analytics.</p>
       </div>
 

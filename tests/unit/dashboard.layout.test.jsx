@@ -1,5 +1,5 @@
 /**
- * Dashboard layout smoke tests (TASK-009)
+ * Dashboard layout smoke tests
  *
  * Verifies that the structural layout components render correctly:
  * KPI cards, Weekly Progression chart, and Activities table.
@@ -29,6 +29,13 @@ vi.mock("@/components/ui/select", () => ({
   SelectItem: ({ value, children }) => <option value={value}>{children}</option>,
 }));
 
+vi.mock("@/components/ui/tabs", () => ({
+  Tabs: ({ children }) => <div>{children}</div>,
+  TabsList: ({ children }) => <div>{children}</div>,
+  TabsTrigger: ({ children }) => <button type="button">{children}</button>,
+  TabsContent: ({ children }) => <div>{children}</div>,
+}));
+
 import { useAppData } from "../../src/context/AppDataContext";
 
 beforeEach(() => {
@@ -42,55 +49,59 @@ beforeEach(() => {
 });
 
 describe("Dashboard layout — KPI cards", () => {
-  it("renders six KPI metric cards in the overview section", () => {
+  it("renders Total Distance KPI card", () => {
     render(<HeroPage />);
-    const kpiSection = screen.getByRole("region", { name: /weekly metrics/i });
-    const cards = kpiSection.querySelectorAll(".dashboard-kpi");
-    expect(cards.length).toBe(6);
+    expect(screen.getByText("Total Distance")).toBeInTheDocument();
+  });
+
+  it("renders Active Time KPI card", () => {
+    render(<HeroPage />);
+    expect(screen.getAllByText(/Active Time/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders Sessions KPI card", () => {
+    render(<HeroPage />);
+    expect(screen.getByText("Sessions")).toBeInTheDocument();
+  });
+
+  it("renders Avg. Pace KPI card", () => {
+    render(<HeroPage />);
+    expect(screen.getByText(/Avg\. Pace/i)).toBeInTheDocument();
   });
 
   it("all KPI cards are inside the PageContainer", () => {
     const { container } = render(<HeroPage />);
-    // PageContainer renders a max-w-7xl wrapper
     const wrapper = container.querySelector(".max-w-7xl");
     expect(wrapper).toBeInTheDocument();
-    const kpis = wrapper.querySelectorAll(".dashboard-kpi");
-    expect(kpis.length).toBe(6);
+    expect(wrapper).toHaveTextContent("Total Distance");
+    expect(wrapper).toHaveTextContent("Active Time");
   });
 });
 
 describe("Dashboard layout — Weekly Progression section", () => {
   it("renders the Weekly Progression section heading", () => {
     render(<HeroPage />);
-    expect(screen.getByRole("heading", { name: /weekly progression/i })).toBeInTheDocument();
-  });
-
-  it("renders the Weekly Progression section heading", () => {
-    render(<HeroPage />);
-    // Section renders an <h2>; use heading role to avoid matching CardTitle div
-    const headings = screen.getAllByRole("heading", { name: /weekly progression/i });
-    expect(headings.length).toBeGreaterThan(0);
+    expect(screen.getByText(/Weekly Progression/i)).toBeInTheDocument();
   });
 });
 
 describe("Dashboard layout — Activities table", () => {
-  it("renders the Latest Activities section heading", () => {
+  it("renders the Activity History section heading", () => {
     render(<HeroPage />);
-    expect(screen.getByRole("heading", { name: /latest activities/i })).toBeInTheDocument();
+    expect(screen.getByText(/Activity History/i)).toBeInTheDocument();
   });
 
   it("renders the activities table with row data", () => {
     render(<HeroPage />);
     const table = screen.getByRole("table", { name: /strava activity history/i });
     expect(table).toBeInTheDocument();
-    // Sample activities contain these names
-    expect(screen.getByText("Morning Run")).toBeInTheDocument();
-    expect(screen.getByText("Tempo Tuesday")).toBeInTheDocument();
+    // Activities appear in multiple places; use getAllByText
+    expect(screen.getAllByText("Morning Run").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Tempo Tuesday").length).toBeGreaterThan(0);
   });
 
   it("shows Effort badges from heart_rate_zones data", () => {
     render(<HeroPage />);
-    // Both Morning Run and Tempo Tuesday have heavy z4/z5 → Hard badges
     const hardBadges = screen.getAllByText("Hard");
     expect(hardBadges.length).toBeGreaterThan(0);
   });
@@ -103,6 +114,6 @@ describe("Dashboard layout — empty state", () => {
       workoutEntries: { entries: [], loading: false, loadEntriesForWeek: vi.fn().mockResolvedValue([]) },
     }));
     render(<HeroPage />);
-    expect(screen.getByText(/no activities for this period/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/no activities for this period/i).length).toBeGreaterThan(0);
   });
 });

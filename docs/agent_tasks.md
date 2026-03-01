@@ -70,22 +70,29 @@ COMPLETION CRITERIA
 
 --- AGENT STATUS LOG ---
 
-[IN PROGRESS] Branch: claude/fix-coach-page-and-weekly-plan
+[DONE] Branch: claude/fix-coach-page-and-weekly-plan
 
 [DONE] Applied DB migrations:
   - runner_profiles table (created in Supabase)
   - coach_conversations table (created in Supabase)
   - coach_messages table (created in Supabase)
 
-[IN PROGRESS] Add 7-day plan generation mode to gemini-coach edge function
+[DONE] gemini-coach edge function enhanced:
   - New mode: "plan" → returns coaching_feedback (string) + structured_plan (7-day array)
+  - New mode: "plan_revision" → revises plan with conversation history context
   - structured_plan fields: date, workout_type, distance_km, duration_min, description
+  - Deployed with verify_jwt=false (required for ES256 JWT compatibility)
 
-[TODO] Update CoachPage UI:
-  - "Generate Weekly Plan" button → calls plan mode
-  - 7-day training table display
-  - "Accept Plan" button → saves to workout_entries table
+[DONE] CoachPage UI updated:
+  - Tab switcher: "Coaching Chat" | "Weekly Plan"
+  - "Generate Weekly Plan" button → calls plan mode, shows 7-day table
+  - Revision chat panel → multi-turn plan refinement with context persistence
+  - "Accept Plan" button → saves to workout_entries table (RLS fixed: user_id included)
 
-[TODO] Verify in browser
+[DONE] Verified in browser (Vercel preview):
+  - Plan generation ✓ (Gemini returns structured 7-day plan with coaching feedback)
+  - Revision request ✓ ("wedding on Saturday" constraint correctly applied)
+  - Accept Plan ✓ ("Plan saved to Weekly Plan!" confirmation shown)
+  - Coaching Chat tab ✓ (initial insights + follow-up messages working)
 
-Agent stops automatically when satisfied.
+Agent completed successfully.

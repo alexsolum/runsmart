@@ -173,11 +173,11 @@ describe("Section — heading uses tracking-tight (activates sans-serif override
   });
 });
 
-describe("HeroPage — dashboard h1 heading is sans-serif UI heading", () => {
-  it("Training Dashboard h1 has tracking-tight class for sans-serif override", () => {
+describe("HeroPage — dashboard h2 heading is sans-serif UI heading", () => {
+  it("Dashboard h2 has tracking-tight class for sans-serif override", () => {
     render(<HeroPage />);
-    const h1 = screen.getByRole("heading", { name: /Training Dashboard/i });
-    expect(h1.className).toContain("tracking-tight");
+    const h2 = screen.getByRole("heading", { name: /^Dashboard$/i });
+    expect(h2.className).toContain("tracking-tight");
   });
 });
 

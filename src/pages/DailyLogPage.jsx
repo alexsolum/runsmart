@@ -1,12 +1,39 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+} from "@/components/ui/form";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// ─── Schema ───────────────────────────────────────────────────────────────────
+
+const dailyLogSchema = z.object({
+  log_date: z.string().min(1, "Date is required"),
+  training_quality: z.number().min(1).max(5).nullable().optional(),
+  workout_notes: z.string().optional(),
+  sleep_hours: z.string().optional(),
+  sleep_quality: z.number().min(1).max(5).nullable().optional(),
+  resting_hr: z.string().optional(),
+  alcohol_units: z.number().min(0).max(30),
+  stress: z.number().min(1).max(5).nullable().optional(),
+  mood: z.number().min(1).max(5).nullable().optional(),
+  fatigue: z.number().min(1).max(5).nullable().optional(),
+  notes: z.string().optional(),
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function todayIso() {
   return new Date().toISOString().split("T")[0];
@@ -26,7 +53,21 @@ const MOOD_LABELS    = { 1: "Low", 2: "Meh", 3: "Okay", 4: "Good", 5: "High" };
 const STRESS_LABELS  = { 1: "None", 2: "Low", 3: "Moderate", 4: "High", 5: "Very high" };
 const SLEEP_LABELS   = { 1: "Terrible", 2: "Poor", 3: "Okay", 4: "Good", 5: "Great" };
 
-// ─── sub-components ─────────────────────────────────────────────────────────
+const DEFAULT_FORM = {
+  log_date: todayIso(),
+  training_quality: null,
+  workout_notes: "",
+  sleep_hours: "",
+  sleep_quality: null,
+  resting_hr: "",
+  alcohol_units: 0,
+  stress: null,
+  mood: null,
+  fatigue: null,
+  notes: "",
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function RatingInput({ name, value, onChange, labels }) {
   return (
@@ -48,7 +89,6 @@ function RatingInput({ name, value, onChange, labels }) {
   );
 }
 
-
 function MetricChip({ icon, label, value }) {
   if (value == null) return null;
   return (
@@ -59,7 +99,6 @@ function MetricChip({ icon, label, value }) {
   );
 }
 
-// ── Training quality pill colors ──────────────────────────────────────────────
 const PILL_STYLES = {
   great: "bg-green-100 text-green-800",
   good:  "bg-blue-100 text-blue-800",
@@ -84,7 +123,6 @@ function LogCard({ log }) {
           <QualityPill quality={log.training_quality} />
         </div>
       </header>
-
       <div className="flex flex-wrap gap-1.5">
         <MetricChip icon="😴" label="Sleep" value={log.sleep_hours != null ? `${log.sleep_hours}h` : null} />
         <MetricChip icon="🌙" label="Sleep quality" value={log.sleep_quality != null ? `${log.sleep_quality}/5` : null} />
@@ -94,18 +132,15 @@ function LogCard({ log }) {
         <MetricChip icon="⚡" label="Stress" value={log.stress != null ? `${log.stress}/5` : null} />
         <MetricChip icon="🍺" label="Alcohol" value={log.alcohol_units != null && log.alcohol_units > 0 ? `${log.alcohol_units} units` : null} />
       </div>
-
       {log.workout_notes && (
-        <p className="m-0 text-xs text-slate-600">
-          <strong>Workout:</strong> {log.workout_notes}
-        </p>
+        <p className="m-0 text-xs text-slate-600"><strong>Workout:</strong> {log.workout_notes}</p>
       )}
       {log.notes && <p className="m-0 text-xs text-slate-500 italic">{log.notes}</p>}
     </article>
   );
 }
 
-// ─── charts ─────────────────────────────────────────────────────────────────
+// ─── Charts ───────────────────────────────────────────────────────────────────
 
 function WellnessTimeline({ logs }) {
   const points = useMemo(
@@ -193,18 +228,11 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
       const bkt = buckets.find((b) => (Array.isArray(b) ? l[metricKey] >= b[0] && l[metricKey] <= b[1] : l[metricKey] === b));
       if (!bkt) return;
       const entry = sums.get(bkt);
-      if (entry) {
-        entry.sum += l.training_quality;
-        entry.count += 1;
-      }
+      if (entry) { entry.sum += l.training_quality; entry.count += 1; }
     });
     return buckets.map((b, i) => {
       const entry = sums.get(b);
-      return {
-        label: bucketLabels[i],
-        avg: entry && entry.count > 0 ? entry.sum / entry.count : null,
-        count: entry?.count ?? 0,
-      };
+      return { label: bucketLabels[i], avg: entry && entry.count > 0 ? entry.sum / entry.count : null, count: entry?.count ?? 0 };
     });
   }, [logs, metricKey, buckets]);
 
@@ -217,8 +245,7 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
   const iH = H - mg.top - mg.bottom;
   const band = iW / data.length;
   const barW = Math.min(36, band * 0.6);
-  const maxVal = 5;
-  const y = (v) => mg.top + (1 - v / maxVal) * iH;
+  const y = (v) => mg.top + (1 - v / 5) * iH;
   const x = (i) => mg.left + i * band + (band - barW) / 2;
 
   return (
@@ -234,11 +261,7 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
         {data.map((d, i) => (
           <g key={d.label}>
             {d.avg != null && (
-              <rect
-                x={x(i)} y={y(d.avg)}
-                width={barW} height={H - mg.bottom - y(d.avg)}
-                rx="6" fill={color} opacity="0.85"
-              >
+              <rect x={x(i)} y={y(d.avg)} width={barW} height={H - mg.bottom - y(d.avg)} rx="6" fill={color} opacity="0.85">
                 <title>{d.label}: avg {d.avg.toFixed(1)}/5 ({d.count} entries)</title>
               </rect>
             )}
@@ -247,13 +270,9 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
                 {d.avg.toFixed(1)}
               </text>
             )}
-            <text x={x(i) + barW / 2} y={H - 26} textAnchor="middle" fill="#64748b" fontSize="11">
-              {d.label}
-            </text>
+            <text x={x(i) + barW / 2} y={H - 26} textAnchor="middle" fill="#64748b" fontSize="11">{d.label}</text>
             {d.count > 0 && (
-              <text x={x(i) + barW / 2} y={H - 13} textAnchor="middle" fill="#94a3b8" fontSize="10">
-                n={d.count}
-              </text>
+              <text x={x(i) + barW / 2} y={H - 13} textAnchor="middle" fill="#94a3b8" fontSize="10">n={d.count}</text>
             )}
           </g>
         ))}
@@ -262,32 +281,24 @@ function CorrelationChart({ logs, metricKey, metricLabel, buckets, bucketLabels,
   );
 }
 
-// ─── page ────────────────────────────────────────────────────────────────────
-
-const DEFAULT_FORM = {
-  log_date: todayIso(),
-  training_quality: null,
-  workout_notes: "",
-  sleep_hours: "",
-  sleep_quality: null,
-  resting_hr: "",
-  alcohol_units: 0,
-  stress: null,
-  mood: null,
-  fatigue: null,
-  notes: "",
-};
+// ─── Layout constants ─────────────────────────────────────────────────────────
 
 const fieldsetClass = "border border-slate-200 rounded-xl px-4 py-3.5 m-0 mb-1";
 const legendClass = "text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-1.5";
-const fieldClass = "grid gap-1.5 mb-3.5 last:mb-0";
-const labelTextClass = "text-[13px] text-slate-500";
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DailyLogPage() {
   const { dailyLogs, auth } = useAppData();
-  const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
+  const form = useForm({
+    resolver: zodResolver(dailyLogSchema),
+    defaultValues: DEFAULT_FORM,
+  });
+
+  const logDate = form.watch("log_date");
 
   useEffect(() => {
     if (auth.user) {
@@ -295,16 +306,17 @@ export default function DailyLogPage() {
     }
   }, [auth.user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Populate form when date changes or logs load
   useEffect(() => {
-    const existing = dailyLogs.logs.find((l) => l.log_date === form.log_date);
+    const existing = dailyLogs.logs.find((l) => l.log_date === logDate);
     if (existing) {
-      setForm({
+      form.reset({
         log_date: existing.log_date,
         training_quality: existing.training_quality ?? null,
         workout_notes: existing.workout_notes ?? "",
-        sleep_hours: existing.sleep_hours ?? "",
+        sleep_hours: existing.sleep_hours != null ? String(existing.sleep_hours) : "",
         sleep_quality: existing.sleep_quality ?? null,
-        resting_hr: existing.resting_hr ?? "",
+        resting_hr: existing.resting_hr != null ? String(existing.resting_hr) : "",
         alcohol_units: existing.alcohol_units ?? 0,
         stress: existing.stress ?? null,
         mood: existing.mood ?? null,
@@ -312,195 +324,318 @@ export default function DailyLogPage() {
         notes: existing.notes ?? "",
       });
     } else {
-      setForm((prev) => ({ ...DEFAULT_FORM, log_date: prev.log_date }));
+      form.reset({ ...DEFAULT_FORM, log_date: logDate });
     }
-  }, [form.log_date, dailyLogs.logs]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [logDate, dailyLogs.logs]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }, []);
+  const onSubmit = async (values) => {
+    setSaving(true);
+    setMessage("");
+    try {
+      const payload = {
+        log_date: values.log_date,
+        training_quality: values.training_quality ?? null,
+        workout_notes: values.workout_notes?.trim() || null,
+        sleep_hours: values.sleep_hours !== "" ? Number(values.sleep_hours) : null,
+        sleep_quality: values.sleep_quality ?? null,
+        resting_hr: values.resting_hr !== "" ? Number(values.resting_hr) : null,
+        alcohol_units: Number(values.alcohol_units) || 0,
+        stress: values.stress ?? null,
+        mood: values.mood ?? null,
+        fatigue: values.fatigue ?? null,
+        notes: values.notes?.trim() || null,
+      };
+      await dailyLogs.saveLog(payload);
+      setMessage("Log saved.");
+      setTimeout(() => setMessage(""), 3000);
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const onRating = useCallback((name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }, []);
-
-  const onSubmit = useCallback(
-    async (e) => {
-      e.preventDefault();
-      setSaving(true);
-      setMessage("");
-      try {
-        const payload = {
-          log_date: form.log_date,
-          training_quality: form.training_quality ?? null,
-          workout_notes: form.workout_notes.trim() || null,
-          sleep_hours: form.sleep_hours !== "" ? Number(form.sleep_hours) : null,
-          sleep_quality: form.sleep_quality ?? null,
-          resting_hr: form.resting_hr !== "" ? Number(form.resting_hr) : null,
-          alcohol_units: Number(form.alcohol_units) || 0,
-          stress: form.stress ?? null,
-          mood: form.mood ?? null,
-          fatigue: form.fatigue ?? null,
-          notes: form.notes.trim() || null,
-        };
-        await dailyLogs.saveLog(payload);
-        setMessage("Log saved.");
-        setTimeout(() => setMessage(""), 3000);
-      } catch (err) {
-        setMessage(`Error: ${err.message}`);
-      } finally {
-        setSaving(false);
-      }
-    },
-    [form, dailyLogs],
-  );
-
-  const isExistingEntry = dailyLogs.logs.some((l) => l.log_date === form.log_date);
+  const isExistingEntry = dailyLogs.logs.some((l) => l.log_date === logDate);
 
   return (
     <PageContainer id="daily-log">
       <div className="mb-5">
         <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Daily log</h2>
-        <p className="m-0 text-sm text-slate-500">Track sleep, lifestyle, and training quality to spot what helps you perform.</p>
+        <p className="m-0 text-sm text-slate-500">
+          Track sleep, lifestyle, and training quality to spot what helps you perform.
+        </p>
       </div>
 
-      {/* ── top grid: form + recent activity ── */}
+      {/* ── top grid: form + recent entries ── */}
       <div className="grid gap-6 grid-cols-[minmax(280px,420px)_minmax(0,1fr)] items-start max-[960px]:grid-cols-1">
 
-        {/* ── form ── */}
-        <form className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-3" onSubmit={onSubmit} noValidate>
-          <h3 className="m-0 text-sm font-bold font-sans">{isExistingEntry ? "Edit entry" : "Add today's log"}</h3>
+        {/* ── Form ── */}
+        <Form {...form}>
+          <form
+            className="bg-white border border-slate-200 rounded-2xl p-4 grid gap-3"
+            onSubmit={form.handleSubmit(onSubmit)}
+            noValidate
+          >
+            <h3 className="m-0 text-sm font-bold font-sans">
+              {isExistingEntry ? "Edit entry" : "Add today's log"}
+            </h3>
 
-          <div className={fieldClass}>
-            <Label htmlFor="log-date" className={labelTextClass}>Date</Label>
-            <Input
-              id="log-date"
-              type="date"
+            {/* Date */}
+            <FormField
+              control={form.control}
               name="log_date"
-              value={form.log_date}
-              max={todayIso()}
-              onChange={onChange}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="date" max={todayIso()} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          {/* Training */}
-          <fieldset className={fieldsetClass}>
-            <legend className={legendClass}>Training</legend>
-            <div className={fieldClass}>
-              <span className={labelTextClass}>Training quality <span className="text-slate-400">(skip on rest days)</span></span>
-              <RatingInput name="training_quality" value={form.training_quality} onChange={onRating} labels={QUALITY_LABELS} />
-            </div>
-            <div className={fieldClass}>
-              <Label htmlFor="workout-notes" className={labelTextClass}>Workout notes</Label>
-              <Input
-                id="workout-notes"
-                type="text"
+            {/* ── Training ── */}
+            <fieldset className={fieldsetClass}>
+              <legend className={legendClass}>Training</legend>
+
+              <FormField
+                control={form.control}
+                name="training_quality"
+                render={({ field }) => (
+                  <FormItem className="mb-3">
+                    <FormLabel>Training quality</FormLabel>
+                    <FormDescription>Skip on rest days</FormDescription>
+                    <FormControl>
+                      <div>
+                        <RatingInput
+                          name="training_quality"
+                          value={field.value}
+                          onChange={(_, val) => field.onChange(val)}
+                          labels={QUALITY_LABELS}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="workout_notes"
-                value={form.workout_notes}
-                onChange={onChange}
-                placeholder="e.g. 12km easy, avg HR 142"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Workout notes</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="text" placeholder="e.g. 12km easy, avg HR 142" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </fieldset>
+            </fieldset>
 
-          {/* Recovery */}
-          <fieldset className={fieldsetClass}>
-            <legend className={legendClass}>Recovery</legend>
-            <div className={fieldClass}>
-              <Label htmlFor="sleep-hours" className={labelTextClass}>Sleep hours</Label>
-              <Input
-                id="sleep-hours"
-                type="number"
+            {/* ── Recovery ── */}
+            <fieldset className={fieldsetClass}>
+              <legend className={legendClass}>Recovery</legend>
+
+              <FormField
+                control={form.control}
                 name="sleep_hours"
-                value={form.sleep_hours}
-                onChange={onChange}
-                min="0" max="24" step="0.5"
-                placeholder="e.g. 7.5"
-                className="max-w-[120px]"
+                render={({ field }) => (
+                  <FormItem className="mb-3">
+                    <FormLabel>Sleep hours</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="0" max="24" step="0.5"
+                        placeholder="e.g. 7.5"
+                        className="max-w-[120px]"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className={fieldClass}>
-              <span className={labelTextClass}>Sleep quality</span>
-              <RatingInput name="sleep_quality" value={form.sleep_quality} onChange={onRating} labels={SLEEP_LABELS} />
-            </div>
-            <div className={fieldClass}>
-              <Label htmlFor="resting-hr" className={labelTextClass}>Resting HR <span className="text-slate-400">(bpm, optional)</span></Label>
-              <Input
-                id="resting-hr"
-                type="number"
+
+              <FormField
+                control={form.control}
+                name="sleep_quality"
+                render={({ field }) => (
+                  <FormItem className="mb-3">
+                    <FormLabel>Sleep quality</FormLabel>
+                    <FormControl>
+                      <div>
+                        <RatingInput
+                          name="sleep_quality"
+                          value={field.value}
+                          onChange={(_, val) => field.onChange(val)}
+                          labels={SLEEP_LABELS}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="resting_hr"
-                value={form.resting_hr}
-                onChange={onChange}
-                min="30" max="120"
-                placeholder="e.g. 52"
-                className="max-w-[120px]"
+                render={({ field }) => (
+                  <FormItem className="mb-3">
+                    <FormLabel>Resting HR</FormLabel>
+                    <FormDescription>bpm, optional</FormDescription>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        min="30" max="120"
+                        placeholder="e.g. 52"
+                        className="max-w-[120px]"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className={fieldClass}>
-              <span className={labelTextClass}>Muscle fatigue / soreness</span>
-              <RatingInput name="fatigue" value={form.fatigue} onChange={onRating} labels={FATIGUE_LABELS} />
-            </div>
-          </fieldset>
 
-          {/* Lifestyle */}
-          <fieldset className={fieldsetClass}>
-            <legend className={legendClass}>Lifestyle</legend>
-            <div className={fieldClass}>
-              <span className={labelTextClass}>Alcohol units</span>
-              <div className="inline-flex items-center border border-border rounded-lg overflow-hidden">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-none border-r border-border h-9 w-9 text-lg"
-                  onClick={() => setForm((p) => ({ ...p, alcohol_units: Math.max(0, (Number(p.alcohol_units) || 0) - 1) }))}
-                >−</Button>
-                <span className="w-10 text-center font-semibold text-sm h-9 flex items-center justify-center">{form.alcohol_units}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-none border-l border-border h-9 w-9 text-lg"
-                  onClick={() => setForm((p) => ({ ...p, alcohol_units: Math.min(30, (Number(p.alcohol_units) || 0) + 1) }))}
-                >+</Button>
-              </div>
-            </div>
-            <div className={fieldClass}>
-              <span className={labelTextClass}>Mood / energy</span>
-              <RatingInput name="mood" value={form.mood} onChange={onRating} labels={MOOD_LABELS} />
-            </div>
-            <div className={fieldClass}>
-              <span className={labelTextClass}>Stress level</span>
-              <RatingInput name="stress" value={form.stress} onChange={onRating} labels={STRESS_LABELS} />
-            </div>
-          </fieldset>
+              <FormField
+                control={form.control}
+                name="fatigue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Muscle fatigue / soreness</FormLabel>
+                    <FormControl>
+                      <div>
+                        <RatingInput
+                          name="fatigue"
+                          value={field.value}
+                          onChange={(_, val) => field.onChange(val)}
+                          labels={FATIGUE_LABELS}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </fieldset>
 
-          <div className={fieldClass}>
-            <span className={labelTextClass}>Notes</span>
-            <Textarea
+            {/* ── Lifestyle ── */}
+            <fieldset className={fieldsetClass}>
+              <legend className={legendClass}>Lifestyle</legend>
+
+              <FormField
+                control={form.control}
+                name="alcohol_units"
+                render={({ field }) => (
+                  <FormItem className="mb-3">
+                    <FormLabel>Alcohol units</FormLabel>
+                    <FormControl>
+                      <div className="inline-flex items-center border border-border rounded-lg overflow-hidden">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-none border-r border-border h-9 w-9 text-lg"
+                          onClick={() => field.onChange(Math.max(0, (Number(field.value) || 0) - 1))}
+                        >
+                          −
+                        </Button>
+                        <span className="w-10 text-center font-semibold text-sm h-9 flex items-center justify-center">
+                          {field.value}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-none border-l border-border h-9 w-9 text-lg"
+                          onClick={() => field.onChange(Math.min(30, (Number(field.value) || 0) + 1))}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="mood"
+                render={({ field }) => (
+                  <FormItem className="mb-3">
+                    <FormLabel>Mood / energy</FormLabel>
+                    <FormControl>
+                      <div>
+                        <RatingInput
+                          name="mood"
+                          value={field.value}
+                          onChange={(_, val) => field.onChange(val)}
+                          labels={MOOD_LABELS}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="stress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stress level</FormLabel>
+                    <FormControl>
+                      <div>
+                        <RatingInput
+                          name="stress"
+                          value={field.value}
+                          onChange={(_, val) => field.onChange(val)}
+                          labels={STRESS_LABELS}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </fieldset>
+
+            {/* Notes */}
+            <FormField
+              control={form.control}
               name="notes"
-              value={form.notes}
-              onChange={onChange}
-              rows="3"
-              placeholder="Anything else worth noting…"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} rows="3" placeholder="Anything else worth noting…" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <Button type="submit" disabled={saving}>
-            {saving ? "Saving…" : isExistingEntry ? "Update log" : "Save log"}
-          </Button>
-          {message && (
-            <p className="text-sm text-slate-600 m-0" role="status">{message}</p>
-          )}
-          {dailyLogs.error && (
-            <p className="text-sm text-red-600 m-0" role="alert">
-              {dailyLogs.error.message}
-            </p>
-          )}
-        </form>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : isExistingEntry ? "Update log" : "Save log"}
+            </Button>
 
-        {/* ── recent history ── */}
+            {message && (
+              <p className="text-sm text-slate-600 m-0" role="status">{message}</p>
+            )}
+            {dailyLogs.error && (
+              <p className="text-sm text-red-600 m-0" role="alert">{dailyLogs.error.message}</p>
+            )}
+          </form>
+        </Form>
+
+        {/* ── Recent history ── */}
         <section className="bg-white border border-slate-200 rounded-2xl p-4" aria-label="Recent daily logs">
           <h3 className="m-0 mb-3 text-sm font-bold font-sans">Recent entries</h3>
           {dailyLogs.loading && <p className="text-sm text-slate-500 m-0">Loading…</p>}
@@ -518,56 +653,29 @@ export default function DailyLogPage() {
         </section>
       </div>
 
-      {/* ── charts ── */}
+      {/* ── Charts ── */}
       {dailyLogs.logs.length >= 3 && (
         <>
           <div className="mt-8 mb-3">
             <h3 className="m-0 mb-1 text-base font-bold font-sans text-slate-900">Wellness trends</h3>
-            <p className="m-0 text-sm text-slate-500">Last 14 logged days — compare how your sleep, mood, fatigue, and training quality track together.</p>
+            <p className="m-0 text-sm text-slate-500">
+              Last 14 logged days — compare how your sleep, mood, fatigue, and training quality track together.
+            </p>
           </div>
-
           <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
             <WellnessTimeline logs={dailyLogs.logs} />
           </div>
-
           <div className="mt-2 mb-3">
             <h3 className="m-0 mb-1 text-base font-bold font-sans text-slate-900">Correlations</h3>
-            <p className="m-0 text-sm text-slate-500">Average training quality grouped by lifestyle and recovery factors. More entries = more reliable signal.</p>
+            <p className="m-0 text-sm text-slate-500">
+              Average training quality grouped by lifestyle and recovery factors.
+            </p>
           </div>
-
           <div className="grid grid-cols-2 gap-4 mb-6 max-[960px]:grid-cols-1">
-            <CorrelationChart
-              logs={dailyLogs.logs}
-              metricKey="sleep_quality"
-              metricLabel="Sleep quality"
-              buckets={[1, 2, 3, 4, 5]}
-              bucketLabels={["1", "2", "3", "4", "5"]}
-              color="#7c3aed"
-            />
-            <CorrelationChart
-              logs={dailyLogs.logs}
-              metricKey="alcohol_units"
-              metricLabel="Alcohol"
-              buckets={[0, [1, 2], [3, 99]]}
-              bucketLabels={["None", "1–2", "3+"]}
-              color="#f59e0b"
-            />
-            <CorrelationChart
-              logs={dailyLogs.logs}
-              metricKey="fatigue"
-              metricLabel="Fatigue"
-              buckets={[1, 2, 3, 4, 5]}
-              bucketLabels={["1", "2", "3", "4", "5"]}
-              color="#ef4444"
-            />
-            <CorrelationChart
-              logs={dailyLogs.logs}
-              metricKey="mood"
-              metricLabel="Mood"
-              buckets={[1, 2, 3, 4, 5]}
-              bucketLabels={["1", "2", "3", "4", "5"]}
-              color="#16a34a"
-            />
+            <CorrelationChart logs={dailyLogs.logs} metricKey="sleep_quality" metricLabel="Sleep quality" buckets={[1, 2, 3, 4, 5]} bucketLabels={["1", "2", "3", "4", "5"]} color="#7c3aed" />
+            <CorrelationChart logs={dailyLogs.logs} metricKey="alcohol_units" metricLabel="Alcohol" buckets={[0, [1, 2], [3, 99]]} bucketLabels={["None", "1–2", "3+"]} color="#f59e0b" />
+            <CorrelationChart logs={dailyLogs.logs} metricKey="fatigue" metricLabel="Fatigue" buckets={[1, 2, 3, 4, 5]} bucketLabels={["1", "2", "3", "4", "5"]} color="#ef4444" />
+            <CorrelationChart logs={dailyLogs.logs} metricKey="mood" metricLabel="Mood" buckets={[1, 2, 3, 4, 5]} bucketLabels={["1", "2", "3", "4", "5"]} color="#16a34a" />
           </div>
         </>
       )}

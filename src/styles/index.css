@@ -1,6 +1,6 @@
+@import "tailwindcss";
 @import './tokens.css';
 @import '../../styles.css';
-@import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -77,14 +77,7 @@
   --color-sidebar: var(--sidebar);
 }
 
-/* ── Typography: Instrument Serif headings, JetBrains Mono data ── */
-/* In @layer base so Tailwind utilities in @layer utilities (font-sans, etc.) properly override. */
-@layer base {
-  h1, h2, h3 {
-    font-family: var(--font-family-serif);
-  }
-}
-
+/* ── Typography utilities ── */
 .font-serif  { font-family: var(--font-family-serif); }
 .font-mono   { font-family: var(--font-family-mono); }
 

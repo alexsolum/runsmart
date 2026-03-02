@@ -1,98 +1,296 @@
-# RunSmart — AI Coach
-Task: Build an AI Endurance Coach Integration
-Objective: Create a coaching dashboard that uses Gemini AI to analyze historical training data and generate prospective 7-day training plans, featuring an interactive feedback loop for plan revisions.
+# RunSmart — Weekly Plan Refactor
 
-Context: There already exists a coaching page that is not working and i want to make improvements.
-There also exists a gemini edge function in supabase that can be used as a starting point (this has worked before). This is called gemini-coach. Make improvements as you see fit.
+**STATUS: COMPLETE — All tasks implemented on branch `feature/weekly-plan-rolling-4week` (2026-03-02)**
 
-1. Technical Stack & Data Schema
-LLM: Gemini 2.5 Flash (via API) for reasoning and structured output.
+Purpose
+-------
+Improve WeeklyPlanPage so it:
 
-Backend/Database: Supabase.
+1. Works correctly on web and mobile (no horizontal overflow).
+2. Shows a rolling FOUR-WEEK planning cycle:
+   - current week
+   - next three weeks
+3. Allows navigation forward/backward in 4-week blocks.
+4. Keeps all existing training logic intact.
 
-Key Tables needed:
+This is a UI + presentation evolution with minimal logic extension.
 
-activities: Historical data (at least 4 weeks). Already exists in supabase.
+Do NOT change backend schema unless explicitly required.
 
-coaching_sessions: Stores the chat_history (JSONB) and the latest current_plan. This needs to be created.
+---
 
-2. Core Functional Requirements
-A. The Analysis Engine (Gemini Prompting)
-The system must fetch the last 28 days of data from training_logs and the existing draft for the next 7 days. Gemini should be prompted to:
-Context for the training plan can be found in the Supabase table "training_plans" and the data field "goal".
+## GLOBAL RULES
 
-Identify trends (e.g., "You've increased volume by 15%, watch for fatigue").
+DO:
+- reuse existing hooks (usePlans, useWorkoutEntries, useAppData)
+- keep Supabase interactions unchanged
+- refactor presentation layer safely
+- extend date logic only where necessary
 
-Generate a Structured JSON Response for the next 7 days with these fields:
+DO NOT:
+- rewrite compute.js logic
+- change database tables
+- introduce new state libraries
+- break existing tests
 
-date, km, duration, description, workout_type (e.g., Recovery, Interval, Long Run).
-Look up the fields in the Supabase table to verify that you have all needed fields to create a new weekly plan.
+---
 
-B. The Feedback Loop (The "Coach Chat")
-Initial Trigger: A button to "Generate Weekly Plan."
+## GLOBAL DEFINITION OF DONE
 
-Manual Revision: A chat input where the user can say, "I have a wedding on Saturday, move the long run to Sunday and make it easier."
+All must pass:
 
-Context Persistence: Send the full conversation history back to Gemini so it "remembers" previous constraints when generating the revised training_plan.
+npm test -- --run
+npm run build
 
-C. UI Components
-Training Table: A display for the upcoming 7-day plan.
+AND:
 
-Chat History Component: A sidebar or bottom-sheet showing the dialogue between the user and the AI coach.
+- No horizontal scrolling on mobile.
+- Weekly plan looks balanced on desktop.
+- Four weeks visible simultaneously.
+- Navigation loads next 4-week block correctly.
 
-Action Bar: Buttons for "Accept Plan" (saves to DB) or "Request Revision." If the plan is accepted it overwrites the current next seven days of training (stored in the workout_entries table in supabase)
+---
 
-3. Implementation Steps for Claude Code
-Database Setup: Create the coaching_history table in Supabase with columns for user_id, session_id, and a messages JSONB array.
+# PHASE 1 — Responsive Layout Fix
 
-Look at the existing Supabase Edge Function and revise based on your recommendation from looking at this task.
-API Route: Develop a /api/coach endpoint that:
+## TASK-001: Constrain Page Width
 
-Queries the last 4 weeks of training data.
+Ensure WeeklyPlanPage root container uses:
 
-Constructs the System Prompt for Gemini.
+w-full max-w-screen-xl mx-auto px-4 sm:px-6 overflow-x-hidden
 
-Handles the history array for multi-turn conversations.
+Page must be centered on desktop and clamped on mobile.
 
-Frontend Logic: Build a React page that polls the API and updates the local state of the 7-day plan based on the AI's structured JSON response.
+---
 
-Suggested Prompt for Gemini (System Instruction)
-"You are an elite endurance coach. Analyze the provided 4-week training history to assess fatigue and progress. Generate a 7-day plan in JSON format. If the user provides feedback or constraints, revise the plan while maintaining athletic integrity. Always return both a coaching_feedback string and a structured_plan array."
-You can change the prompt in a settings modal.
+## TASK-002: Fix Weekly Grid Responsiveness
 
-COMPLETION CRITERIA
+Replace fixed layout with responsive grid:
 
-✅ About you section that provides context for coaching feedback, stored in Supabase DB (new user information table)
-✅ Ask coach-button that triggers request to gemini ai
-✅ Response stored in sections (feedback for last four weeks training, recommendation for next period, feedback on life (sleep, energy etc))
-✅ Possibility to ask follow-up questions in a chat layout
-✅ Feedback and chat history stored to a new supabase table and presented in table component on the page
+Desktop:
+grid-cols-7
 
---- AGENT STATUS LOG ---
+Tablet:
+md:grid-cols-2
 
-[DONE] Branch: claude/fix-coach-page-and-weekly-plan
+Mobile:
+sm:grid-cols-1
 
-[DONE] Applied DB migrations:
-  - runner_profiles table (created in Supabase)
-  - coach_conversations table (created in Supabase)
-  - coach_messages table (created in Supabase)
+No fixed column widths allowed.
 
-[DONE] gemini-coach edge function enhanced:
-  - New mode: "plan" → returns coaching_feedback (string) + structured_plan (7-day array)
-  - New mode: "plan_revision" → revises plan with conversation history context
-  - structured_plan fields: date, workout_type, distance_km, duration_min, description
-  - Deployed with verify_jwt=false (required for ES256 JWT compatibility)
+---
 
-[DONE] CoachPage UI updated:
-  - Tab switcher: "Coaching Chat" | "Weekly Plan"
-  - "Generate Weekly Plan" button → calls plan mode, shows 7-day table
-  - Revision chat panel → multi-turn plan refinement with context persistence
-  - "Accept Plan" button → saves to workout_entries table (RLS fixed: user_id included)
+## TASK-003: Allow Layout Shrinking
 
-[DONE] Verified in browser (Vercel preview):
-  - Plan generation ✓ (Gemini returns structured 7-day plan with coaching feedback)
-  - Revision request ✓ ("wedding on Saturday" constraint correctly applied)
-  - Accept Plan ✓ ("Plan saved to Weekly Plan!" confirmation shown)
-  - Coaching Chat tab ✓ (initial insights + follow-up messages working)
+Add `min-w-0` to:
 
-Agent completed successfully.
+- DayColumn root container
+- Card containers
+- flex/grid children
+
+This prevents overflow.
+
+---
+
+## TASK-004: Fix Text Overflow
+
+Replace:
+
+whitespace-nowrap overflow-hidden text-ellipsis
+
+with:
+
+break-words line-clamp-2
+
+Workout descriptions must wrap.
+
+---
+
+## TASK-005: Header Layout Refactor
+
+Header must behave:
+
+Desktop:
+- controls aligned horizontally
+
+Mobile:
+- stacked vertically
+
+Use:
+
+flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between
+
+Remove all min-width constraints.
+
+---
+
+# PHASE 2 — Introduce Rolling 4-Week Planning Model
+
+## Concept
+
+WeeklyPlanPage should display:
+
+Week 0  → Current week  
+Week +1 → Next week  
+Week +2 → Two weeks ahead  
+Week +3 → Three weeks ahead  
+
+Total visible horizon = 4 weeks.
+
+Navigation shifts the window by 4 weeks.
+
+---
+
+## TASK-006: Create Planning Window State
+
+Add state:
+
+
+planningStartDate
+
+
+Rules:
+
+- defaults to start of current week
+- represents FIRST week in 4-week window
+
+---
+
+## TASK-007: Generate Visible Weeks
+
+Create derived array:
+
+
+visibleWeeks = [
+planningStartDate,
++1 week,
++2 weeks,
++3 weeks
+]
+
+
+Use existing UTC date helpers.
+
+---
+
+## TASK-008: Update Navigation Controls
+
+Change arrows behavior:
+
+Previous:
+← subtract 4 weeks
+
+Next:
+→ add 4 weeks
+
+Today:
+reset to current week start.
+
+---
+
+## TASK-009: Render Four Week Sections
+
+Replace single week rendering with:
+
+
+visibleWeeks.map(weekStart => (
+<WeekSection />
+))
+
+
+Each section contains:
+
+- week header
+- totals summary
+- 7-day grid
+
+Reuse existing DayColumn component.
+
+---
+
+## TASK-010: Layout for Multi-Week View
+
+Desktop:
+- weeks stacked vertically
+- each week full width
+
+Mobile:
+- same stacked layout
+- reduced spacing
+
+Use:
+
+space-y-6
+
+between weeks.
+
+---
+
+# PHASE 3 — Visual Improvements (Web Balance)
+
+## TASK-011: Equal Card Behavior
+
+Day cards must use:
+
+flex flex-col min-w-0 h-full
+
+Ensure equal visual rhythm.
+
+---
+
+## TASK-012: Week Section Card
+
+Wrap each week in:
+
+<Card>
+  <CardHeader>
+  <CardContent>
+</Card>
+
+Improves visual grouping.
+
+---
+
+# PHASE 4 — Tests
+
+## TASK-013: Component Test
+
+Create:
+
+tests/weeklyplan.rolling.test.jsx
+
+Verify:
+
+- four week headers render
+- navigation shifts window
+- current week resets correctly
+
+---
+
+## TASK-014: Mobile Safety Test
+
+Add viewport test:
+
+confirm no horizontal overflow.
+
+---
+
+# ACCEPTANCE CRITERIA
+
+Mobile:
+✓ No sideways scrolling (overflow-x-hidden + min-w-0 on all day columns)
+✓ Weeks stack cleanly (space-y-6 between WeekSection cards)
+✓ Controls readable (flex-col on mobile, flex-row on desktop)
+
+Desktop:
+✓ Four-week planning visible (4 WeekSection components)
+✓ Balanced layout (Card wrapper per week, 7-col grid per week)
+✓ Navigation intuitive (← / → / Today buttons in header)
+
+Behavior:
+✓ Next/Previous moves 4 weeks (±28 days)
+✓ Today resets window (resets planningStartDate to current Monday)
+✓ Existing plan data unchanged (loadEntriesForRange added to hook, no schema changes)
+
+All 322 tests pass (45 in weeklyplan.* files). Build succeeds.
+Agent stops when all criteria satisfied. ✅

@@ -315,6 +315,7 @@ export function makeAppData(overrides = {}) {
       entries: SAMPLE_WORKOUT_ENTRIES,
       loading: false,
       loadEntriesForWeek: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES),
+      loadEntriesForRange: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES),
       createEntry: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES[0]),
       updateEntry: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES[0]),
       deleteEntry: vi.fn().mockResolvedValue(undefined),

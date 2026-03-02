@@ -76,6 +76,27 @@ export function useWorkoutEntries(userId) {
     [client],
   );
 
+  const loadEntriesForRange = useCallback(
+    async (planId, startIso, endIso) => {
+      if (!client || !planId || !startIso || !endIso) return [];
+      dispatch({ type: "pending" });
+      const { data, error } = await client
+        .from("workout_entries")
+        .select("*")
+        .eq("plan_id", planId)
+        .gte("workout_date", startIso)
+        .lte("workout_date", endIso)
+        .order("workout_date", { ascending: true });
+      if (error) {
+        dispatch({ type: "error", payload: error });
+        throw error;
+      }
+      dispatch({ type: "loaded", payload: data ?? [] });
+      return data ?? [];
+    },
+    [client],
+  );
+
   const createEntry = useCallback(
     async (entry) => {
       if (!client) throw new Error("Supabase is not configured");
@@ -142,6 +163,7 @@ export function useWorkoutEntries(userId) {
     error: state.error,
     success: state.success,
     loadEntriesForWeek,
+    loadEntriesForRange,
     createEntry,
     updateEntry,
     deleteEntry,

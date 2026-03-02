@@ -68,10 +68,10 @@ describe("Weekly Plan — 7-day grid", () => {
     expect(labelTexts).toContain("Sun");
   });
 
-  it("each day has an Add (+) button", () => {
+  it("each visible week has 7 Add (+) buttons (4 weeks × 7 days = 28 total)", () => {
     render(<WeeklyPlanPage />);
     const addButtons = screen.getAllByTitle("Add workout");
-    expect(addButtons.length).toBe(7);
+    expect(addButtons.length).toBe(28);
   });
 });
 
@@ -115,23 +115,27 @@ describe("Weekly Plan — displaying existing workouts", () => {
 });
 
 describe("Weekly Plan — summary bar", () => {
-  it("shows total km from all entries", () => {
+  it("shows total km from all entries (current week section)", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
-    // SAMPLE_WORKOUT_ENTRIES: 8 + 10 = 18 km
-    expect(screen.getByText(/Total:/i).closest(".wpp-summary-stat")).toHaveTextContent("18.0 km");
+    // SAMPLE_WORKOUT_ENTRIES: 8 + 10 = 18 km (in current week)
+    // With 4 week sections, the first one shows current week totals
+    const totalStats = screen.getAllByText(/Total:/i);
+    expect(totalStats[0].closest(".wpp-summary-stat")).toHaveTextContent("18.0 km");
   });
 
-  it("shows session count (non-Rest entries)", () => {
+  it("shows session count (non-Rest entries) in current week section", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
-    expect(screen.getByText(/Sessions:/i).closest(".wpp-summary-stat")).toHaveTextContent("2");
+    const sessionStats = screen.getAllByText(/Sessions:/i);
+    expect(sessionStats[0].closest(".wpp-summary-stat")).toHaveTextContent("2");
   });
 
   it("shows 0% completion when no entries are marked done", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
-    expect(screen.getByText(/Completed:/i).closest(".wpp-summary-stat")).toHaveTextContent("0%");
+    const completedStats = screen.getAllByText(/Completed:/i);
+    expect(completedStats[0].closest(".wpp-summary-stat")).toHaveTextContent("0%");
   });
 });
 
@@ -177,6 +181,7 @@ describe("Weekly Plan — adding a workout", () => {
         entries: [],
         loading: false,
         loadEntriesForWeek: vi.fn().mockResolvedValue([]),
+        loadEntriesForRange: vi.fn().mockResolvedValue([]),
         createEntry,
         updateEntry: vi.fn(),
         deleteEntry: vi.fn(),
@@ -216,6 +221,7 @@ describe("Weekly Plan — removing a workout", () => {
         entries: SAMPLE_WORKOUT_ENTRIES,
         loading: false,
         loadEntriesForWeek: vi.fn().mockResolvedValue([]),
+        loadEntriesForRange: vi.fn().mockResolvedValue([]),
         createEntry: vi.fn(),
         updateEntry: vi.fn(),
         deleteEntry,
@@ -240,6 +246,7 @@ describe("Weekly Plan — removing a workout", () => {
         entries: SAMPLE_WORKOUT_ENTRIES,
         loading: false,
         loadEntriesForWeek: vi.fn().mockResolvedValue([]),
+        loadEntriesForRange: vi.fn().mockResolvedValue([]),
         createEntry: vi.fn(),
         updateEntry: vi.fn(),
         deleteEntry,
@@ -263,6 +270,7 @@ describe("Weekly Plan — toggling completion", () => {
         entries: SAMPLE_WORKOUT_ENTRIES,
         loading: false,
         loadEntriesForWeek: vi.fn().mockResolvedValue([]),
+        loadEntriesForRange: vi.fn().mockResolvedValue([]),
         createEntry: vi.fn(),
         updateEntry: vi.fn(),
         deleteEntry: vi.fn(),

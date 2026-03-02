@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -150,7 +151,7 @@ function WorkoutEntry({ entry, onEdit, onDelete, onToggle, loading }) {
         </p>
       )}
       {entry.description && (
-        <p className="m-0 text-[11px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{entry.description}</p>
+        <p className="m-0 text-[11px] text-slate-500 break-words line-clamp-2">{entry.description}</p>
       )}
     </div>
   );
@@ -166,7 +167,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
   const dayNum = new Date(`${date}T00:00:00Z`).getUTCDate();
 
   return (
-    <div className={`wpp-day bg-white border rounded-xl p-2.5 min-h-[130px] flex flex-col gap-2${isToday(date) ? " is-today border-blue-600 shadow-[0_0_0_1px_#2563eb]" : " border-slate-200"}`}>
+    <div className={`wpp-day min-w-0 flex flex-col bg-white border rounded-xl p-2.5 min-h-[130px] gap-2${isToday(date) ? " is-today border-blue-600 shadow-[0_0_0_1px_#2563eb]" : " border-slate-200"}`}>
       <div className="flex justify-between items-center">
         <span className="wpp-day-label text-xs font-bold text-slate-900">{dayName} {dayNum}</span>
         {!isAddingHere && (
@@ -184,7 +185,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
         )}
       </div>
 
-      <div className="grid gap-1.5">
+      <div className="grid gap-1.5 flex-1">
         {dayEntries.map((entry) =>
           editingHere && editingEntry.id === entry.id ? (
             <WorkoutForm
@@ -222,13 +223,75 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
   );
 }
 
+// ── Week section ──────────────────────────────────────────────────────────────
+
+function WeekSection({ weekStart, allEntries, addingTo, editingEntry, onAdd, onCancelAdd, onSave, onEdit, onDelete, onToggle, loading, pageError }) {
+  const weekEnd = isoDateOffset(weekStart, 6);
+  const days = weekDays(weekStart);
+
+  const weekEntries = allEntries.filter(
+    (e) => e.workout_date >= weekStart && e.workout_date <= weekEnd,
+  );
+
+  const summary = useMemo(() => {
+    const nonRest = weekEntries.filter((e) => e.workout_type !== "Rest");
+    const completed = nonRest.filter((e) => e.completed).length;
+    const totalKm = weekEntries.reduce((acc, e) => acc + (Number(e.distance_km) || 0), 0);
+    const restCount = weekEntries.filter((e) => e.workout_type === "Rest").length;
+    return {
+      totalKm: totalKm.toFixed(1),
+      sessions: nonRest.length,
+      restDays: restCount,
+      completionPct: nonRest.length ? Math.round((completed / nonRest.length) * 100) : 0,
+    };
+  }, [weekEntries]);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-2 px-4 pt-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span className="wpp-week-label font-semibold text-sm text-slate-900">{formatWeekLabel(weekStart)}</span>
+          <div className="flex gap-4 flex-wrap items-center">
+            <span className="wpp-summary-stat text-[13px] text-slate-500">Total: <strong className="font-mono text-slate-900 font-bold">{summary.totalKm} km</strong></span>
+            <span className="wpp-summary-stat text-[13px] text-slate-500">Sessions: <strong className="font-mono text-slate-900 font-bold">{summary.sessions}</strong></span>
+            <span className="wpp-summary-stat text-[13px] text-slate-500">Rest: <strong className="font-mono text-slate-900 font-bold">{summary.restDays}</strong></span>
+            <span className="wpp-summary-stat text-[13px] text-slate-500">Completed: <strong className="font-mono text-slate-900 font-bold">{summary.completionPct}%</strong></span>
+            {pageError && <p className="text-sm text-red-600 m-0">{pageError}</p>}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">
+        <div className="wpp-day-grid grid grid-cols-7 gap-2.5 items-start max-[960px]:grid-cols-2 max-[480px]:grid-cols-1">
+          {days.map((date, i) => (
+            <DayColumn
+              key={date}
+              date={date}
+              dayName={DAY_NAMES[i]}
+              entries={weekEntries}
+              addingTo={addingTo}
+              editingEntry={editingEntry}
+              onAdd={onAdd}
+              onCancelAdd={onCancelAdd}
+              onSave={onSave}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onToggle={onToggle}
+              loading={loading}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function WeeklyPlanPage() {
   const { plans, workoutEntries } = useAppData();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
-  const [weekStart, setWeekStart] = useState(currentMondayIso);
+  const [planningStartDate, setPlanningStartDate] = useState(currentMondayIso);
   const [addingTo, setAddingTo] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [pageError, setPageError] = useState(null);
@@ -240,27 +303,39 @@ export default function WeeklyPlanPage() {
     }
   }, [plans.plans, selectedPlanId]);
 
-  // Load entries when plan or week changes
+  // 4-week visible window
+  const visibleWeeks = useMemo(() => [
+    planningStartDate,
+    isoDateOffset(planningStartDate, 7),
+    isoDateOffset(planningStartDate, 14),
+    isoDateOffset(planningStartDate, 21),
+  ], [planningStartDate]);
+
+  // Load entries for entire 4-week range
   useEffect(() => {
-    if (selectedPlanId && weekStart) {
-      workoutEntries.loadEntriesForWeek(selectedPlanId, weekStart).catch(() => {});
+    if (selectedPlanId && planningStartDate) {
+      const rangeEnd = isoDateOffset(planningStartDate, 27);
+      workoutEntries.loadEntriesForRange(selectedPlanId, planningStartDate, rangeEnd).catch(() => {});
     }
-  }, [selectedPlanId, weekStart, workoutEntries.loadEntriesForWeek]);
+  }, [selectedPlanId, planningStartDate, workoutEntries.loadEntriesForRange]);
 
-  const days = useMemo(() => weekDays(weekStart), [weekStart]);
+  const resetToToday = useCallback(() => {
+    setPlanningStartDate(currentMondayIso());
+    setAddingTo(null);
+    setEditingEntry(null);
+  }, []);
 
-  const summary = useMemo(() => {
-    const nonRest = workoutEntries.entries.filter((e) => e.workout_type !== "Rest");
-    const completed = nonRest.filter((e) => e.completed).length;
-    const totalKm = workoutEntries.entries.reduce((acc, e) => acc + (Number(e.distance_km) || 0), 0);
-    const restCount = workoutEntries.entries.filter((e) => e.workout_type === "Rest").length;
-    return {
-      totalKm: totalKm.toFixed(1),
-      sessions: nonRest.length,
-      restDays: restCount,
-      completionPct: nonRest.length ? Math.round((completed / nonRest.length) * 100) : 0,
-    };
-  }, [workoutEntries.entries]);
+  const navigateBack = useCallback(() => {
+    setPlanningStartDate((d) => isoDateOffset(d, -28));
+    setAddingTo(null);
+    setEditingEntry(null);
+  }, []);
+
+  const navigateForward = useCallback(() => {
+    setPlanningStartDate((d) => isoDateOffset(d, 28));
+    setAddingTo(null);
+    setEditingEntry(null);
+  }, []);
 
   const handleAdd = useCallback((date) => {
     setAddingTo(date);
@@ -312,74 +387,66 @@ export default function WeeklyPlanPage() {
 
   return (
     <PageContainer>
-      <div className="mb-5">
-        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Weekly Plan</h2>
-        <p className="m-0 text-sm text-slate-500">Plan your workouts day by day. Check off sessions as you complete them.</p>
+      <div className="w-full max-w-screen-xl mx-auto overflow-x-hidden">
+        <div className="mb-5">
+          <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Weekly Plan</h2>
+          <p className="m-0 text-sm text-slate-500">Plan your workouts day by day across the next four weeks.</p>
+        </div>
+
+        {/* Header: plan select + 4-week nav */}
+        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 mb-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Label className="text-[13px] font-semibold m-0 flex items-center gap-1.5 min-w-0">
+                Plan:
+                <select
+                  className={`ml-1.5 ${selectClass}`}
+                  value={selectedPlanId ?? ""}
+                  onChange={(e) => { setSelectedPlanId(e.target.value); setAddingTo(null); setEditingEntry(null); }}
+                >
+                  {plans.plans.length === 0 && <option value="">No plans — create one in Training Plan</option>}
+                  {plans.plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.race} · {new Date(p.race_date).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
+                    </option>
+                  ))}
+                </select>
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5" onClick={navigateBack}>←</Button>
+              <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5" onClick={navigateForward}>→</Button>
+              <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5 text-xs" onClick={resetToToday}>Today</Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Four-week rolling view */}
+        {!selectedPlanId ? (
+          <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start planning your week.</p>
+        ) : (
+          <div className="space-y-6">
+            {visibleWeeks.map((weekStart) => (
+              <WeekSection
+                key={weekStart}
+                weekStart={weekStart}
+                allEntries={workoutEntries.entries}
+                addingTo={addingTo}
+                editingEntry={editingEntry}
+                onAdd={handleAdd}
+                onCancelAdd={() => setAddingTo(null)}
+                onSave={handleSave}
+                onEdit={setEditingEntry}
+                onDelete={handleDelete}
+                onToggle={handleToggle}
+                loading={workoutEntries.loading}
+                pageError={pageError}
+              />
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Header: plan select + week nav */}
-      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 flex items-center gap-4 flex-wrap mb-5 max-[960px]:flex-col max-[960px]:items-start">
-        <div className="flex items-center gap-2.5">
-          <Label className="text-[13px] font-semibold m-0">
-            Plan:{" "}
-            <select
-              className={`ml-1.5 ${selectClass}`}
-              value={selectedPlanId ?? ""}
-              onChange={(e) => { setSelectedPlanId(e.target.value); setAddingTo(null); setEditingEntry(null); }}
-            >
-              {plans.plans.length === 0 && <option value="">No plans — create one in Training Plan</option>}
-              {plans.plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.race} · {new Date(p.race_date).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
-                </option>
-              ))}
-            </select>
-          </Label>
-        </div>
-
-        <div className="flex items-center gap-2 ml-auto max-[960px]:ml-0 max-[960px]:w-full max-[960px]:justify-between">
-          <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5" onClick={() => { setWeekStart((w) => isoDateOffset(w, -7)); setAddingTo(null); setEditingEntry(null); }}>←</Button>
-          <span className="wpp-week-label font-semibold text-sm min-w-[220px] text-center max-[960px]:min-w-0 max-[960px]:text-left">{formatWeekLabel(weekStart)}</span>
-          <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5" onClick={() => { setWeekStart((w) => isoDateOffset(w, 7)); setAddingTo(null); setEditingEntry(null); }}>→</Button>
-          <Button type="button" variant="outline" size="sm" className="h-auto px-3 py-1.5 text-xs" onClick={() => { setWeekStart(currentMondayIso()); setAddingTo(null); setEditingEntry(null); }}>Today</Button>
-        </div>
-      </div>
-
-      {/* Summary bar */}
-      {selectedPlanId && (
-        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex gap-5 items-center flex-wrap mb-3.5">
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Total: <strong className="font-mono text-slate-900 font-bold">{summary.totalKm} km</strong></div>
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Sessions: <strong className="font-mono text-slate-900 font-bold">{summary.sessions}</strong></div>
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Rest days: <strong className="font-mono text-slate-900 font-bold">{summary.restDays}</strong></div>
-          <div className="wpp-summary-stat text-[13px] text-slate-500">Completed: <strong className="font-mono text-slate-900 font-bold">{summary.completionPct}%</strong></div>
-          {pageError && <p className="text-sm text-red-600 m-0 ml-auto">{pageError}</p>}
-        </div>
-      )}
-
-      {/* 7-day grid */}
-      {!selectedPlanId ? (
-        <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start planning your week.</p>
-      ) : (
-        <div className="wpp-day-grid grid grid-cols-7 gap-2.5 items-start max-[960px]:grid-cols-2 max-[480px]:grid-cols-1">
-          {days.map((date, i) => (
-            <DayColumn
-              key={date}
-              date={date}
-              dayName={DAY_NAMES[i]}
-              entries={workoutEntries.entries}
-              addingTo={addingTo}
-              editingEntry={editingEntry}
-              onAdd={handleAdd}
-              onCancelAdd={() => setAddingTo(null)}
-              onSave={handleSave}
-              onEdit={setEditingEntry}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
-              loading={workoutEntries.loading}
-            />
-          ))}
-        </div>
-      )}
     </PageContainer>
   );
 }

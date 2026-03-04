@@ -164,9 +164,16 @@ interface RequestBody {
   planContext: PlanContext | null;
   dailyLogs: DailyLog[];
   runnerProfile?: RunnerProfile | null;
+  lang?: string;
 }
 
 // ── Prompt builder ─────────────────────────────────────────────────────────────
+
+function getLanguageInstruction(lang: string | undefined): string {
+  return (lang === "no")
+    ? "Respond entirely in Norwegian (bokmål)."
+    : "Respond in English.";
+}
 
 function buildPrompt(data: RequestBody): string {
   const lines: string[] = [];
@@ -254,6 +261,8 @@ function buildPrompt(data: RequestBody): string {
     });
     lines.push("");
   }
+
+  lines.push(getLanguageInstruction(data.lang));
 
   return lines.join("\n");
 }

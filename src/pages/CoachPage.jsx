@@ -425,7 +425,7 @@ function PlanRevisionMessage({ msg }) {
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default function CoachPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { auth, plans, activities, dailyLogs, checkins, trainingBlocks, runnerProfile, coachConversations, workoutEntries } = useAppData();
 
   // ── Chat tab state ───────────────────────────────────────────────────────
@@ -486,8 +486,9 @@ export default function CoachPage() {
       planContext: buildPlanContext(activePlan, trainingBlocks.blocks),
       dailyLogs: getRecentDailyLogs(freshLogs ?? []),
       runnerProfile: runnerProfilePayload,
+      lang,
     };
-  }, [activities.activities, checkins.checkins, dailyLogs, activePlan, trainingBlocks.blocks, runnerProfile]);
+  }, [activities.activities, checkins.checkins, dailyLogs, activePlan, trainingBlocks.blocks, runnerProfile, lang]);
 
   // ── Chat tab handlers ────────────────────────────────────────────────────
 

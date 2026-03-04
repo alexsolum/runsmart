@@ -170,7 +170,7 @@ describe("AvatarButton", () => {
 
 ---
 
-## Task 3 — Jason Koop-Style Training Block Visualization
+## Task 3 — Jason Koop-Style Training Block Visualization ✅ DONE
 
 **Goal:** Replace the current `PhaseSummaryBar` in the Long Term Plan page with a horizontal week-grid timeline visualization inspired by Jason Koop's periodization charts.
 

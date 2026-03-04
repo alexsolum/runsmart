@@ -58,12 +58,27 @@ const SAMPLE_INSIGHTS = [
   },
 ];
 
+const SAMPLE_PLAN_DATA = {
+  coaching_feedback:
+    "Your training over the last 4 weeks shows solid aerobic consistency. Keep total volume in range this week and prioritize recovery after the long run.",
+  structured_plan: [
+    { date: "2026-03-09", workout_type: "Easy", distance_km: 8, duration_min: 50, description: "Easy aerobic run at comfortable conversational pace." },
+    { date: "2026-03-10", workout_type: "Rest", distance_km: 0, duration_min: 0, description: "Full rest day. Focus on sleep and nutrition." },
+    { date: "2026-03-11", workout_type: "Tempo", distance_km: 10, duration_min: 60, description: "Tempo run at threshold effort, 3x10min blocks." },
+    { date: "2026-03-12", workout_type: "Easy", distance_km: 6, duration_min: 40, description: "Easy recovery run to flush out fatigue." },
+    { date: "2026-03-13", workout_type: "Rest", distance_km: 0, duration_min: 0, description: "Rest or gentle stretching." },
+    { date: "2026-03-14", workout_type: "Easy", distance_km: 8, duration_min: 50, description: "Easy aerobic run with strides at the end." },
+    { date: "2026-03-15", workout_type: "Long Run", distance_km: 20, duration_min: 130, description: "Long run at easy effort, negative split." },
+  ],
+};
+
 // ── mock builders ─────────────────────────────────────────────────────────────
 
 function makeMockClient({
   session = { access_token: "test-token-abc" },
   insights = SAMPLE_INSIGHTS,
   followupText = "Here is my tailored coaching advice based on your training.",
+  planData = SAMPLE_PLAN_DATA,
   invokeError = null,
   invokePending = false,
 } = {}) {
@@ -75,6 +90,9 @@ function makeMockClient({
         }
         if (body?.mode === "followup") {
           return Promise.resolve({ data: { text: followupText }, error: null });
+        }
+        if (body?.mode === "plan" || body?.mode === "plan_revision") {
+          return Promise.resolve({ data: planData, error: null });
         }
         return Promise.resolve({ data: { insights }, error: null });
       });
@@ -816,6 +834,50 @@ describe("Coach page — follow-up messages", () => {
     // The InsightCard renders an h4 with the title
     expect(document.querySelector(".coach-insight-card")).toBeInTheDocument();
   });
+
+  it("forwards lang in followup payload", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeAppDataWithMessages());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.type(screen.getByPlaceholderText(/Ask a follow-up question/i), "What pace should I run?");
+    await user.click(screen.getByRole("button", { name: /Send/i }));
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ lang: expect.stringMatching(/^(en|no)$/) }),
+        })
+      );
+    });
+  });
+
+  it("forwards lang=no in followup payload when language is Norwegian", async () => {
+    setLanguage("no");
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeAppDataWithMessages());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    // Norwegian placeholder: "Still et oppfølgingsspørsmål…"
+    await user.type(screen.getByPlaceholderText(/Still|Ask/i), "Hva er riktig tempo?");
+    await user.click(screen.getByRole("button", { name: /Send/i }));
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ lang: "no" }),
+        })
+      );
+    });
+  });
 });
 
 // ── Error state ───────────────────────────────────────────────────────────────
@@ -1009,6 +1071,161 @@ describe("Coach page — runner profile", () => {
           body: expect.objectContaining({ runnerProfile: null }),
         })
       );
+    });
+  });
+});
+
+// ── Plan tab ──────────────────────────────────────────────────────────────────
+
+describe("Coach page — plan tab", () => {
+  it("renders Weekly Plan tab button", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    expect(screen.getByRole("button", { name: /Weekly Plan/i })).toBeInTheDocument();
+  });
+
+  it("shows Generate Weekly Plan button when plan tab is active", async () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+
+    expect(screen.getAllByRole("button", { name: /Generate Weekly Plan/i }).length).toBeGreaterThan(0);
+  });
+
+  it("calls edge function with mode=plan when Generate Weekly Plan is clicked", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ mode: "plan" }),
+        })
+      );
+    });
+  });
+
+  it("forwards lang in plan generation payload", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ lang: expect.stringMatching(/^(en|no)$/) }),
+        })
+      );
+    });
+  });
+
+  it("forwards lang=no in plan generation payload when language is Norwegian", async () => {
+    setLanguage("no");
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ lang: "no" }),
+        })
+      );
+    });
+  });
+
+  it("shows coaching feedback after successful plan generation", async () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    // Coaching feedback appears in both the plan view and the revision history sidebar
+    await waitFor(() => {
+      const matches = screen.getAllByText(SAMPLE_PLAN_DATA.coaching_feedback);
+      expect(matches.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows Accept Plan button after successful plan generation", async () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Accept Plan/i })).toBeInTheDocument();
+    });
+  });
+
+  it("shows loading state while generating plan", async () => {
+    getSupabaseClient.mockReturnValue(makeMockClient({ invokePending: true }));
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Analyzing your training data/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows error when plan generation fails with non-2xx status", async () => {
+    getSupabaseClient.mockReturnValue(
+      makeMockClient({ invokeError: { message: "Edge Function returned a non-2xx status code" } })
+    );
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByText(/Plan generation failed/i)).toBeInTheDocument();
+      expect(screen.getByText(/Edge Function returned a non-2xx status code/i)).toBeInTheDocument();
     });
   });
 });

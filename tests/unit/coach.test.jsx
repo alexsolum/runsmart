@@ -11,7 +11,7 @@
  * - Runner profile section
  * - Error state
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CoachPage from "../../src/pages/CoachPage";
@@ -23,6 +23,11 @@ import {
   SAMPLE_CONVERSATIONS,
   SAMPLE_MESSAGES,
 } from "./mockAppData";
+import { setLanguage } from "../../src/i18n/translations";
+
+// Reset language to English for consistent test output; Norwegian is default in app
+beforeEach(() => { setLanguage("en"); });
+afterEach(() => { setLanguage("no"); });
 
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
@@ -637,6 +642,47 @@ describe("Coach page — initial coaching", () => {
           body: expect.objectContaining({
             planContext: expect.objectContaining({ race: SAMPLE_PLAN.race }),
           }),
+        })
+      );
+    });
+  });
+
+  it("forwards lang in edge function payload", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeAppDataWithNewConv());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ lang: expect.stringMatching(/^(en|no)$/) }),
+        })
+      );
+    });
+  });
+
+  it("forwards lang=no to edge function when language is Norwegian", async () => {
+    setLanguage("no");
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeAppDataWithNewConv());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Oppdater coaching/i }));
+
+    await waitFor(() => {
+      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
+        "gemini-coach",
+        expect.objectContaining({
+          body: expect.objectContaining({ lang: "no" }),
         })
       );
     });

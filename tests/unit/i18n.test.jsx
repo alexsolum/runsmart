@@ -5,21 +5,22 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { t, setLanguage, getCurrentLanguage, useI18n } from "../../src/i18n/translations";
 import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
-// Reset language to English after every test to avoid cross-test pollution
+// Reset language to Norwegian (the app default) after every test to avoid cross-test pollution
 afterEach(() => {
   act(() => {
-    setLanguage("en");
+    setLanguage("no");
   });
 });
 
 // ── t() function ─────────────────────────────────────────────────────────────
 
 describe("t() – translation function", () => {
-  it("returns English string by default", () => {
-    expect(t("nav.planning")).toBe("Planning");
+  it("returns Norwegian string by default", () => {
+    expect(t("nav.planning")).toBe("Planlegging");
   });
 
-  it("returns the correct English value for a coach key", () => {
+  it("returns the correct English value for a coach key when language is English", () => {
+    setLanguage("en");
     expect(t("coach.refreshCoaching")).toBe("Refresh coaching");
     expect(t("coach.send")).toBe("Send");
     expect(t("coach.newConversation")).toBe("+ New conversation");
@@ -113,8 +114,8 @@ describe("t() – translation function", () => {
 // ── getCurrentLanguage ────────────────────────────────────────────────────────
 
 describe("getCurrentLanguage()", () => {
-  it("returns 'en' by default", () => {
-    expect(getCurrentLanguage()).toBe("en");
+  it("returns 'no' by default", () => {
+    expect(getCurrentLanguage()).toBe("no");
   });
 
   it("returns 'no' after setLanguage('no')", () => {
@@ -122,8 +123,7 @@ describe("getCurrentLanguage()", () => {
     expect(getCurrentLanguage()).toBe("no");
   });
 
-  it("returns 'en' after switching back", () => {
-    setLanguage("no");
+  it("returns 'en' after switching to English", () => {
     setLanguage("en");
     expect(getCurrentLanguage()).toBe("en");
   });
@@ -142,37 +142,37 @@ function TestComponent({ tKey }) {
 }
 
 describe("useI18n() hook", () => {
-  it("returns English string initially", () => {
+  it("returns Norwegian string initially (default lang is no)", () => {
     render(<TestComponent tKey="nav.planning" />);
-    expect(screen.getByTestId("text")).toHaveTextContent("Planning");
-    expect(screen.getByTestId("lang")).toHaveTextContent("en");
-  });
-
-  it("exposes t() that translates keys", () => {
-    render(<TestComponent tKey="coach.refreshCoaching" />);
-    expect(screen.getByTestId("text")).toHaveTextContent("Refresh coaching");
-  });
-
-  it("triggers re-render when language changes", async () => {
-    render(<TestComponent tKey="nav.planning" />);
-    expect(screen.getByTestId("text")).toHaveTextContent("Planning");
-
-    act(() => {
-      setLanguage("no");
-    });
-
     expect(screen.getByTestId("text")).toHaveTextContent("Planlegging");
     expect(screen.getByTestId("lang")).toHaveTextContent("no");
   });
 
-  it("reverts on language switch back", async () => {
-    render(<TestComponent tKey="nav.planning" />);
+  it("exposes t() that translates keys in current language", () => {
+    render(<TestComponent tKey="coach.refreshCoaching" />);
+    expect(screen.getByTestId("text")).toHaveTextContent("Oppdater coaching");
+  });
 
-    act(() => { setLanguage("no"); });
+  it("triggers re-render when language changes to English", async () => {
+    render(<TestComponent tKey="nav.planning" />);
     expect(screen.getByTestId("text")).toHaveTextContent("Planlegging");
+
+    act(() => {
+      setLanguage("en");
+    });
+
+    expect(screen.getByTestId("text")).toHaveTextContent("Planning");
+    expect(screen.getByTestId("lang")).toHaveTextContent("en");
+  });
+
+  it("reverts on language switch back to Norwegian", async () => {
+    render(<TestComponent tKey="nav.planning" />);
 
     act(() => { setLanguage("en"); });
     expect(screen.getByTestId("text")).toHaveTextContent("Planning");
+
+    act(() => { setLanguage("no"); });
+    expect(screen.getByTestId("text")).toHaveTextContent("Planlegging");
   });
 });
 
@@ -185,10 +185,10 @@ describe("LanguageSwitcher", () => {
     expect(screen.getByRole("button", { name: "Norsk" })).toBeInTheDocument();
   });
 
-  it("marks EN as active (aria-pressed=true) by default", () => {
+  it("marks NO as active (aria-pressed=true) by default", () => {
     render(<LanguageSwitcher />);
-    expect(screen.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Norsk" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Norsk" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("switches to Norwegian when NO button is clicked", async () => {
@@ -204,7 +204,6 @@ describe("LanguageSwitcher", () => {
 
   it("switches back to English when EN button is clicked", async () => {
     const user = userEvent.setup();
-    act(() => { setLanguage("no"); });
     render(<LanguageSwitcher />);
 
     expect(screen.getByRole("button", { name: "Norsk" })).toHaveAttribute("aria-pressed", "true");
@@ -230,10 +229,27 @@ describe("LanguageSwitcher", () => {
       </div>
     );
 
-    expect(screen.getByTestId("text")).toHaveTextContent("Planning");
-
-    await user.click(screen.getByRole("button", { name: "Norsk" }));
-
     expect(screen.getByTestId("text")).toHaveTextContent("Planlegging");
+
+    await user.click(screen.getByRole("button", { name: "English" }));
+
+    expect(screen.getByTestId("text")).toHaveTextContent("Planning");
+  });
+});
+
+// ── Norwegian default language (Task 1) ───────────────────────────────────────
+
+describe("i18n default language", () => {
+  it("defaults to Norwegian when no localStorage override is set", () => {
+    // After afterEach cleanup, currentLang is "no" — the app default
+    expect(getCurrentLanguage()).toBe("no");
+  });
+
+  it("t() returns Norwegian string for nav.planning by default", () => {
+    expect(t("nav.planning")).toBe("Planlegging");
+  });
+
+  it("t() falls back gracefully for missing key", () => {
+    expect(t("nonexistent.key.xyz")).toBe("nonexistent.key.xyz");
   });
 });

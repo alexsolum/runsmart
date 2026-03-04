@@ -695,7 +695,7 @@ export const TRANSLATIONS = {
   },
 };
 
-let currentLang = localStorage.getItem("runsmart-lang") || "en";
+let currentLang = localStorage.getItem("runsmart-lang") || "no";
 
 const i18nSubscribers = new Set();
 
@@ -732,7 +732,7 @@ export function useI18n() {
       return () => i18nSubscribers.delete(callback);
     },
     () => currentLang,
-    () => "en",
+    () => "no",
   );
   return { t, lang: currentLang, setLanguage };
 }

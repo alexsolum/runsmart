@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
+import KoopTimeline from "../components/KoopTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -256,6 +257,15 @@ export default function LongTermPlanPage() {
 
   const selectedPlan = plans.plans.find((p) => p.id === selectedPlanId) ?? null;
 
+  const { planStartDate, planEndDate } = useMemo(() => {
+    const bs = trainingBlocks.blocks;
+    if (!bs.length) return { planStartDate: null, planEndDate: null };
+    return {
+      planStartDate: bs.reduce((min, b) => (b.start_date < min ? b.start_date : min), bs[0].start_date),
+      planEndDate: bs.reduce((max, b) => (b.end_date > max ? b.end_date : max), bs[0].end_date),
+    };
+  }, [trainingBlocks.blocks]);
+
   const handleCreatePlan = useCallback(
     async (planData) => {
       setFormError(null);
@@ -438,7 +448,11 @@ export default function LongTermPlanPage() {
 
           {trainingBlocks.blocks.length > 0 && (
             <>
-              <PhaseSummaryBar blocks={trainingBlocks.blocks} />
+              <KoopTimeline
+                blocks={trainingBlocks.blocks}
+                planStartDate={planStartDate}
+                planEndDate={planEndDate}
+              />
               <div className="grid gap-2.5">
                 {trainingBlocks.blocks.map((block) => (
                   <div key={block.id} className="border border-slate-200 rounded-xl px-3.5 py-3 bg-slate-50">

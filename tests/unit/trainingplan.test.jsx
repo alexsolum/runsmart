@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
+import KoopTimeline from "../../src/components/KoopTimeline";
 import { makeAppData, SAMPLE_BLOCKS, SAMPLE_PLAN } from "./mockAppData";
 
 vi.mock("../../src/context/AppDataContext", () => ({
@@ -116,17 +117,16 @@ describe("Training Plan — training blocks timeline", () => {
     useAppData.mockReturnValue(makeAppData());
   });
 
-  it("renders phase summary bar when blocks exist", () => {
+  it("renders the KoopTimeline when blocks exist", () => {
     render(<LongTermPlanPage />);
-    expect(document.querySelector(".ltp-phase-bar")).toBeInTheDocument();
+    expect(document.querySelector(".koop-timeline")).toBeInTheDocument();
   });
 
   it("displays each block phase name", () => {
     render(<LongTermPlanPage />);
-    // SAMPLE_BLOCKS has Base and Build phases
-    const timeline = document.querySelector(".ltp-timeline");
-    expect(within(timeline).getByText("Base")).toBeInTheDocument();
-    expect(within(timeline).getByText("Build")).toBeInTheDocument();
+    // SAMPLE_BLOCKS has Base and Build phases; names appear in both bands and legend
+    expect(screen.getAllByText("Base").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Build").length).toBeGreaterThan(0);
   });
 
   it("displays each block label", () => {
@@ -248,5 +248,77 @@ describe("Training Plan — plan meta display", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<LongTermPlanPage />);
     expect(screen.getByText(/Base volume: 50 km\/week/i)).toBeInTheDocument();
+  });
+});
+
+// ── KoopTimeline component (Task 3) ───────────────────────────────────────────
+
+const KOOP_BLOCKS = [
+  { id: "1", phase: "Base", label: "Base 1", start_date: "2025-01-06", end_date: "2025-02-09", target_km_week: 50 },
+  { id: "2", phase: "Build", label: "Build 1", start_date: "2025-02-10", end_date: "2025-03-09", target_km_week: 65 },
+];
+
+describe("KoopTimeline", () => {
+  it("renders a column for each week in the plan", () => {
+    render(
+      <KoopTimeline
+        blocks={KOOP_BLOCKS}
+        planStartDate="2025-01-06"
+        planEndDate="2025-03-09"
+        today={new Date("2025-01-13T00:00:00Z")}
+      />
+    );
+    // Weeks from Jan 6 to Mar 9: ~9 weeks
+    const weekCells = document.querySelectorAll("[data-week]");
+    expect(weekCells.length).toBeGreaterThanOrEqual(9);
+  });
+
+  it("shows phase label text inside each block band", () => {
+    render(
+      <KoopTimeline
+        blocks={KOOP_BLOCKS}
+        planStartDate="2025-01-06"
+        planEndDate="2025-03-09"
+        today={new Date("2025-01-13T00:00:00Z")}
+      />
+    );
+    expect(screen.getByText(/Base 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Build 1/)).toBeInTheDocument();
+  });
+
+  it("highlights the current week column", () => {
+    render(
+      <KoopTimeline
+        blocks={KOOP_BLOCKS}
+        planStartDate="2025-01-06"
+        planEndDate="2025-03-09"
+        today={new Date("2025-01-13T00:00:00Z")}
+      />
+    );
+    const todayCell = document.querySelector("[data-today]");
+    expect(todayCell).toBeInTheDocument();
+  });
+
+  it("shows target km/week inside block when set", () => {
+    render(
+      <KoopTimeline
+        blocks={KOOP_BLOCKS}
+        planStartDate="2025-01-06"
+        planEndDate="2025-03-09"
+        today={new Date("2025-01-13T00:00:00Z")}
+      />
+    );
+    expect(screen.getByText(/50 km\/w/)).toBeInTheDocument();
+  });
+
+  it("renders gracefully with empty blocks array", () => {
+    render(
+      <KoopTimeline
+        blocks={[]}
+        planStartDate="2025-01-06"
+        planEndDate="2025-03-09"
+      />
+    );
+    expect(screen.getByText(/No training blocks yet/)).toBeInTheDocument();
   });
 });

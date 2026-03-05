@@ -3,7 +3,7 @@
 // Google Gemini for analysis, and returns structured coaching insights or a 7-day plan.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { COACHING_PLAYBOOK } from "./playbook.ts";
+import { COACHING_PLAYBOOK, buildStaticPlaybookFallback } from "./playbook.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,6 +81,25 @@ const PLAN_REVISION_SYSTEM_INSTRUCTION =
   `   - "description": string (1-2 sentences describing the workout)\n\n` +
   `Respond ONLY with a valid JSON object. No markdown fences, no explanation outside the JSON.`;
 
+const LONG_TERM_REPLAN_SYSTEM_INSTRUCTION =
+  `You are Marius AI Bakken, an elite endurance running coach. ` +
+  `Generate a long-term weekly structure from the current planning week through the goal race week. ` +
+  `Your response MUST be a single valid JSON object with exactly two fields:\n` +
+  `1. "coaching_feedback": a string (2-5 sentences) summarizing the replan strategy and key progression logic.\n` +
+  `2. "weekly_structure": an array of week objects with one entry per target week, each including:\n` +
+  `   - "week_start": ISO date string (YYYY-MM-DD, Monday)\n` +
+  `   - "week_end": ISO date string (YYYY-MM-DD, Sunday)\n` +
+  `   - "phase_focus": short string (5-15 words) describing weekly focus\n` +
+  `   - "target_km": number (non-negative)\n` +
+  `   - "key_workouts": array of 2-4 short strings describing key sessions\n` +
+  `   - "notes": short string with risk management or recovery emphasis\n\n` +
+  `Coaching requirements:\n` +
+  `- Respect progression and recovery balance week-to-week.\n` +
+  `- Prioritize long-run centric development with realistic quality distribution.\n` +
+  `- Do not prescribe abrupt load spikes.\n` +
+  `- Keep recommendations practical and metric.\n\n` +
+  `Respond ONLY with a valid JSON object. No markdown fences, no explanation outside the JSON.`;
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDelta(current: number, previous: number): string {
@@ -107,6 +126,51 @@ function getNextMonday(): string {
   d.setUTCDate(d.getUTCDate() + daysUntilMonday);
   d.setUTCHours(0, 0, 0, 0);
   return d.toISOString().split("T")[0];
+}
+
+function toIsoDate(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function parseIsoDate(value: string | undefined): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [yearStr, monthStr, dayStr] = value.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return parsed;
+}
+
+function addDaysUtc(base: Date, days: number): Date {
+  const next = new Date(base.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  next.setUTCHours(0, 0, 0, 0);
+  return next;
+}
+
+function addWeeksUtc(base: Date, weeks: number): Date {
+  return addDaysUtc(base, weeks * 7);
+}
+
+function getMondayOfWeekUtc(date: Date): Date {
+  const normalized = new Date(date.getTime());
+  normalized.setUTCHours(0, 0, 0, 0);
+  const day = normalized.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  return addDaysUtc(normalized, offset);
+}
+
+function getCurrentPlanningMondayUtc(): Date {
+  return getMondayOfWeekUtc(new Date());
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -164,7 +228,7 @@ interface ConversationTurn {
 }
 
 interface RequestBody {
-  mode?: "initial" | "followup" | "plan" | "plan_revision";
+  mode?: "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan";
   conversationHistory?: ConversationTurn[];
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
@@ -175,7 +239,25 @@ interface RequestBody {
   lang?: string;
 }
 
-type CoachMode = "initial" | "followup" | "plan" | "plan_revision";
+type CoachMode = "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan";
+
+interface LongTermWeek {
+  week_start: string;
+  week_end: string;
+  phase_focus: string;
+  target_km: number;
+  key_workouts: string[];
+  notes: string;
+}
+
+interface LongTermHorizon {
+  startMonday: Date;
+  endSunday: Date;
+  goalRaceDate: string | null;
+  weekCount: number;
+  usedFallback: boolean;
+  reason: string;
+}
 
 interface PlaybookEntry {
   source: string;
@@ -190,6 +272,16 @@ interface PlaybookEntry {
   anti_patterns: string | null;
   example_workout: string | null;
   tags: string[] | null;
+}
+
+interface PhilosophyDocument {
+  principles: string;
+  dos: string;
+  donts: string;
+  workout_examples: string;
+  phase_notes: string;
+  koop_weight: number;
+  bakken_weight: number;
 }
 
 function normalizePhase(phase: string | undefined): "base" | "build" | "peak" | "taper" | "any" {
@@ -273,7 +365,39 @@ async function fetchDynamicPlaybookAddendum(
   return lines.join("\n");
 }
 
-function buildSystemInstruction(
+async function fetchActivePhilosophyDocument(
+  supabase: ReturnType<typeof createClient>,
+): Promise<PhilosophyDocument | null> {
+  const { data, error } = await supabase
+    .from("coach_philosophy_documents")
+    .select("principles, dos, donts, workout_examples, phase_notes, koop_weight, bakken_weight")
+    .eq("scope", "global")
+    .eq("status", "published")
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as PhilosophyDocument;
+}
+
+function buildActivePhilosophyAddendum(document: PhilosophyDocument | null): string {
+  if (!document) {
+    return "No active published philosophy document found; use fallback playbook guidance.";
+  }
+
+  const chunks = [
+    `Koop/Bakken blend weighting: ${Math.round(Number(document.koop_weight) || 0)}/${Math.round(Number(document.bakken_weight) || 0)}`,
+    document.principles ? `Principles: ${document.principles}` : "",
+    document.dos ? `Do: ${document.dos}` : "",
+    document.donts ? `Do not: ${document.donts}` : "",
+    document.workout_examples ? `Workout examples: ${document.workout_examples}` : "",
+    document.phase_notes ? `Phase notes: ${document.phase_notes}` : "",
+  ].filter(Boolean);
+
+  return chunks.join("\n").slice(0, 2200);
+}
+
+function buildDefaultSystemInstruction(
   baseInstruction: string,
   lang: string | undefined,
   dynamicAddendum: string,
@@ -285,21 +409,105 @@ function buildSystemInstruction(
   return [
     baseInstruction.trim(),
     "",
-    "Methodology precedence policy:",
+    "Instruction precedence policy:",
     "- Follow output format contract first.",
-    "- Enforce safety/progression guardrails before methodology style choices.",
-    "- Use the coaching playbook as the primary coaching policy unless it conflicts with guardrails.",
+    "- Enforce safety/progression guardrails before methodology choices.",
+    "- Use runtime playbook entries and fallback playbook context for coaching style only.",
     "",
     COACH_GUARDRAILS,
     "",
+    dynamicAddendum ? `Runtime playbook snippets:\n${dynamicAddendum}` : "",
+    "",
     "Coaching playbook (authoritative context):",
     COACHING_PLAYBOOK.trim(),
-    dynamicAddendum ? `\nAdditional runtime playbook snippets:\n${dynamicAddendum}` : "",
     "",
     languageLine,
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildReplanSystemInstruction(
+  baseInstruction: string,
+  lang: string | undefined,
+  philosophyAddendum: string,
+  dynamicAddendum: string,
+): string {
+  const languageLine = lang === "no"
+    ? "Primary response language: Norwegian (bokmal)."
+    : "Primary response language: English.";
+
+  return [
+    baseInstruction.trim(),
+    "",
+    "Instruction precedence policy (highest to lowest):",
+    "1) Output format and schema contract in this instruction.",
+    "2) Safety and progression guardrails.",
+    "3) Active published coaching philosophy (runtime document).",
+    "4) Runtime playbook snippets.",
+    "5) Static playbook fallback context.",
+    "",
+    COACH_GUARDRAILS,
+    "",
+    "Active published philosophy (runtime):",
+    philosophyAddendum,
+    "",
+    dynamicAddendum ? `Runtime playbook snippets:\n${dynamicAddendum}` : "",
+    "",
+    "Static playbook fallback context:",
+    buildStaticPlaybookFallback(),
+    "",
+    languageLine,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+const DEFAULT_LONG_TERM_WEEKS = 12;
+const MAX_LONG_TERM_WEEKS = 78;
+const MIN_LONG_TERM_WEEKS = 1;
+
+function computeLongTermHorizon(planContext: PlanContext | null): LongTermHorizon {
+  const startMonday = getCurrentPlanningMondayUtc();
+  const fallbackEnd = addDaysUtc(addWeeksUtc(startMonday, DEFAULT_LONG_TERM_WEEKS - 1), 6);
+  const raceDate = parseIsoDate(planContext?.raceDate);
+
+  if (!raceDate) {
+    return {
+      startMonday,
+      endSunday: fallbackEnd,
+      goalRaceDate: null,
+      weekCount: DEFAULT_LONG_TERM_WEEKS,
+      usedFallback: true,
+      reason: "missing_or_invalid_race_date",
+    };
+  }
+
+  const raceWeekMonday = getMondayOfWeekUtc(raceDate);
+  const diffDays = Math.floor((raceWeekMonday.getTime() - startMonday.getTime()) / (1000 * 60 * 60 * 24));
+  let weekCount = Math.floor(diffDays / 7) + 1;
+  let usedFallback = false;
+  let reason = "goal_race_horizon";
+
+  if (!Number.isFinite(weekCount) || weekCount < MIN_LONG_TERM_WEEKS) {
+    weekCount = MIN_LONG_TERM_WEEKS;
+    usedFallback = true;
+    reason = "goal_race_in_past_or_same_week";
+  } else if (weekCount > MAX_LONG_TERM_WEEKS) {
+    weekCount = MAX_LONG_TERM_WEEKS;
+    usedFallback = true;
+    reason = "goal_race_horizon_capped";
+  }
+
+  const endSunday = addDaysUtc(addWeeksUtc(startMonday, weekCount - 1), 6);
+  return {
+    startMonday,
+    endSunday,
+    goalRaceDate: toIsoDate(raceDate),
+    weekCount,
+    usedFallback,
+    reason,
+  };
 }
 
 // ── Prompt builder ─────────────────────────────────────────────────────────────
@@ -416,6 +624,23 @@ function buildPlanPrompt(data: RequestBody): string {
   ].join("\n");
 }
 
+function buildLongTermReplanPrompt(data: RequestBody, horizon: LongTermHorizon): string {
+  const contextLines = buildPrompt(data);
+  return [
+    contextLines,
+    `Generate a long-term weekly structure from week starting ${toIsoDate(horizon.startMonday)} to week ending ${toIsoDate(horizon.endSunday)}.`,
+    `You MUST return exactly ${horizon.weekCount} week objects in "weekly_structure".`,
+    `Each week_start must be Monday and week_end must be Sunday.`,
+    horizon.goalRaceDate
+      ? `Goal race date is ${horizon.goalRaceDate}; include the race week in the returned horizon.`
+      : "Goal race date is unavailable; use a conservative fallback progression horizon.",
+    "Output focus:",
+    `- Base target volume around ${data.planContext?.targetMileage ?? "appropriate weekly volume"} km and progress conservatively.`,
+    "- Keep load progression smooth and include recovery weeks where needed.",
+    "- Keep weekly key sessions practical and specific.",
+  ].join("\n");
+}
+
 // ── JSON parsing helpers ───────────────────────────────────────────────────────
 
 function stripMarkdownFences(text: string): string {
@@ -435,6 +660,88 @@ function validateAndSanitizePlan(plan: Record<string, unknown>[]): Record<string
       description: String(day.description || "").slice(0, 300),
     }))
     .slice(0, 7);
+}
+
+function getNumericWithinBounds(
+  value: unknown,
+  fallback: number,
+  minValue: number,
+  maxValue: number,
+): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  if (parsed < minValue) return minValue;
+  if (parsed > maxValue) return maxValue;
+  return parsed;
+}
+
+function sanitizeKeyWorkouts(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((item) => item.slice(0, 160));
+}
+
+function buildFallbackLongTermWeek(
+  index: number,
+  startMonday: Date,
+  targetMileage: number | undefined,
+): LongTermWeek {
+  const weekStart = addWeeksUtc(startMonday, index);
+  const weekEnd = addDaysUtc(weekStart, 6);
+  const fallbackKm = getNumericWithinBounds(targetMileage, 45, 0, 250);
+  return {
+    week_start: toIsoDate(weekStart),
+    week_end: toIsoDate(weekEnd),
+    phase_focus: "Progressive aerobic development with controlled load",
+    target_km: fallbackKm,
+    key_workouts: [
+      "Easy aerobic volume with strides",
+      "One quality session at controlled threshold effort",
+      "Long run with conservative finish progression",
+    ],
+    notes: "Prioritize recovery signals and avoid abrupt intensity or volume jumps.",
+  };
+}
+
+function validateAndSanitizeLongTermWeeks(
+  plan: Record<string, unknown>[],
+  horizon: LongTermHorizon,
+  targetMileage: number | undefined,
+): LongTermWeek[] {
+  const sanitized: LongTermWeek[] = [];
+  for (let i = 0; i < horizon.weekCount; i += 1) {
+    const raw = plan[i] ?? {};
+    const fallback = buildFallbackLongTermWeek(i, horizon.startMonday, targetMileage);
+    const weekStart = addWeeksUtc(horizon.startMonday, i);
+    const weekEnd = addDaysUtc(weekStart, 6);
+
+    const phaseFocus = String(raw.phase_focus ?? raw.focus ?? fallback.phase_focus)
+      .trim()
+      .slice(0, 180) || fallback.phase_focus;
+
+    const targetKm = getNumericWithinBounds(
+      raw.target_km ?? raw.weekly_km,
+      fallback.target_km,
+      0,
+      250,
+    );
+
+    const keyWorkouts = sanitizeKeyWorkouts(raw.key_workouts ?? raw.key_sessions);
+    const notes = String(raw.notes ?? raw.risk_notes ?? fallback.notes).trim().slice(0, 280) || fallback.notes;
+
+    sanitized.push({
+      week_start: toIsoDate(weekStart),
+      week_end: toIsoDate(weekEnd),
+      phase_focus: phaseFocus,
+      target_km: targetKm,
+      key_workouts: keyWorkouts.length ? keyWorkouts : fallback.key_workouts,
+      notes,
+    });
+  }
+  return sanitized;
 }
 
 // ── Main handler ───────────────────────────────────────────────────────────────
@@ -480,11 +787,80 @@ Deno.serve(async (req) => {
     const mode: CoachMode = body.mode ?? "initial";
     const dynamicPlaybookAddendum = await fetchDynamicPlaybookAddendum(supabase, body, mode);
 
+    if (mode === "long_term_replan") {
+      const activePhilosophy = await fetchActivePhilosophyDocument(supabase);
+      const philosophyAddendum = buildActivePhilosophyAddendum(activePhilosophy);
+      const systemInstruction = buildReplanSystemInstruction(
+        LONG_TERM_REPLAN_SYSTEM_INSTRUCTION,
+        body.lang,
+        philosophyAddendum,
+        dynamicPlaybookAddendum,
+      );
+      const horizon = computeLongTermHorizon(body.planContext);
+      const userMessage = buildLongTermReplanPrompt(body, horizon);
+
+      const geminiRes = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ role: "user", parts: [{ text: userMessage }] }],
+          generationConfig: { temperature: 0.5, maxOutputTokens: 4096 },
+        }),
+      });
+
+      let parsedResult: { coaching_feedback?: string; weekly_structure?: Record<string, unknown>[] } = {};
+      if (geminiRes.ok) {
+        const geminiData = await geminiRes.json();
+        const candidates = geminiData.candidates;
+        if (candidates?.length) {
+          const parts: Array<{ text?: string; thought?: boolean }> = candidates[0]?.content?.parts || [];
+          const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
+          const rawText = (outputPart?.text || "").trim();
+          try {
+            parsedResult = JSON.parse(stripMarkdownFences(rawText));
+          } catch {
+            parsedResult = {};
+          }
+        }
+      }
+
+      const weeklyStructure = validateAndSanitizeLongTermWeeks(
+        Array.isArray(parsedResult.weekly_structure) ? parsedResult.weekly_structure : [],
+        horizon,
+        body.planContext?.targetMileage,
+      );
+      const defaultFeedback = horizon.usedFallback
+        ? "Long-term replan generated with fallback horizon due to unavailable or out-of-range race date context. Keep progression conservative and update race context when available."
+        : "Long-term replan generated through goal-race week with progressive load and recovery balance.";
+      const coachingFeedback = String(parsedResult.coaching_feedback || defaultFeedback).slice(0, 1000);
+
+      return new Response(
+        JSON.stringify({
+          coaching_feedback: coachingFeedback,
+          weekly_structure: weeklyStructure,
+          horizon_start: toIsoDate(horizon.startMonday),
+          horizon_end: toIsoDate(horizon.endSunday),
+          goal_race_date: horizon.goalRaceDate,
+          used_fallback_horizon: horizon.usedFallback,
+          horizon_reason: horizon.reason,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ── Plan generation mode ─────────────────────────────────────────────────
     if (mode === "plan" || mode === "plan_revision") {
       const isPlanRevision = mode === "plan_revision";
       const baseInstruction = isPlanRevision ? PLAN_REVISION_SYSTEM_INSTRUCTION : PLAN_SYSTEM_INSTRUCTION;
-      const systemInstruction = buildSystemInstruction(baseInstruction, body.lang, dynamicPlaybookAddendum);
+      const activePhilosophy = await fetchActivePhilosophyDocument(supabase);
+      const philosophyAddendum = buildActivePhilosophyAddendum(activePhilosophy);
+      const systemInstruction = buildReplanSystemInstruction(
+        baseInstruction,
+        body.lang,
+        philosophyAddendum,
+        dynamicPlaybookAddendum,
+      );
 
       let contents: Array<{ role: string; parts: Array<{ text: string }> }>;
 
@@ -579,7 +955,7 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: buildSystemInstruction(FOLLOWUP_SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
+            parts: [{ text: buildDefaultSystemInstruction(FOLLOWUP_SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
           },
           contents,
           generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
@@ -628,7 +1004,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: {
-          parts: [{ text: buildSystemInstruction(SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
+          parts: [{ text: buildDefaultSystemInstruction(SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
         },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },

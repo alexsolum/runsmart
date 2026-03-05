@@ -1,0 +1,68 @@
+# Roadmap: RunSmart
+
+**Created:** 2026-03-05
+**Project:** Coach Integration + Philosophy Tailoring
+**Total v1 Requirements:** 10
+**Coverage:** 10/10 mapped
+
+## Phase Overview
+
+| # | Phase | Goal | Requirements | Success Criteria |
+|---|-------|------|--------------|------------------|
+| 1 | Philosophy Platform | Add structured, admin-editable coaching philosophy source of truth | PHIL-01, PHIL-02 | 4 |
+| 2 | Replan Coach Context | Inject active philosophy and latest training context into manual replanning | RPLN-01, RPLN-02, PHIL-03 | 4 |
+| 3 | Feedback Loop Integration | Tighten check-in/daily-log coaching loop with clear adaptation rationale | RPLN-03, FDBK-01, FDBK-02 | 4 |
+| 4 | Insights Coach Layer | Add coach overlays and global synthesis to analytics surfaces | INSG-01, INSG-02 | 4 |
+
+## Phase 1: Philosophy Platform
+
+**Status:** Completed on 2026-03-05
+
+**Goal:** Add a structured and editable philosophy layer that only owner/admin can modify.
+
+**Requirements:** PHIL-01, PHIL-02
+
+**Success Criteria:**
+1. Philosophy content persists in Supabase with structured sections and metadata.
+2. Owner/admin can edit philosophy in-app from a dedicated admin surface.
+3. Unauthorized users cannot update philosophy (policy and API checks enforced).
+4. Philosophy history/version metadata supports iterative updates over time.
+
+## Phase 2: Replan Coach Context
+
+**Goal:** Make manual replanning use active philosophy + latest training context for long-term and weekly plan outputs.
+
+**Requirements:** RPLN-01, RPLN-02, PHIL-03
+
+**Success Criteria:**
+1. Manual replanning trigger exists in long-term planning flow.
+2. Replan request payload includes latest activities, daily logs, and check-ins.
+3. `gemini-coach` uses active philosophy at runtime for plan/revision modes.
+4. Replan output returns valid structured weekly plan data for downstream UI rendering.
+
+## Phase 3: Feedback Loop Integration
+
+**Goal:** Improve coach adaptation quality by strengthening check-in/log interpretation and explicit reasoning.
+
+**Requirements:** RPLN-03, FDBK-01, FDBK-02
+
+**Success Criteria:**
+1. Coach feedback references check-in and daily-log inputs where present.
+2. Coach output includes explicit “what changed and why” adaptation summary.
+3. Recommendations align with long-run centric strategy and specific intensity distribution.
+4. Replan and coaching flows keep schema-safe responses with fallback behavior on parse errors.
+
+## Phase 4: Insights Coach Layer
+
+**Goal:** Integrate coach interpretation directly into analytics surfaces starting with Training Load Trend and Insights overview.
+
+**Requirements:** INSG-01, INSG-02
+
+**Success Criteria:**
+1. Training Load Trend displays coach overlay states tied to computed load/form windows.
+2. Insights page renders one overall coach synthesis comment derived from current data.
+3. Overlay/comment text stays consistent with latest coach response context.
+4. UI remains readable on desktop and mobile without chart clutter or blocking interactions.
+
+---
+*Last updated: 2026-03-05 after phase 1 execution*

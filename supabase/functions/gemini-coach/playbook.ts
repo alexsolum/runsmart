@@ -74,3 +74,8 @@ Bruk Roche for å bygge fart og "Mountain Legs" (spesielt på tredemølle):
 * Bruk alltid metriske enheter (km, meter, min/km).
 * Referer til playboken: *"Basert på Roche-prinsipper legger vi inn strides for å holde farten oppe..."*
 `;
+
+export function buildStaticPlaybookFallback(maxChars = 2200): string {
+  const normalized = COACHING_PLAYBOOK.replace(/\s+\n/g, "\n").trim();
+  return normalized.length <= maxChars ? normalized : `${normalized.slice(0, maxChars)}...`;
+}

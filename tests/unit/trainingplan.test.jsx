@@ -14,11 +14,148 @@ import { makeAppData, SAMPLE_BLOCKS, SAMPLE_PLAN } from "./mockAppData";
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
+vi.mock("../../src/lib/coachPayload", () => ({
+  buildCoachPayload: vi.fn(),
+}));
+vi.mock("../../src/lib/supabaseClient", () => ({
+  getSupabaseClient: vi.fn(),
+}));
 
 import { useAppData } from "../../src/context/AppDataContext";
+import { buildCoachPayload } from "../../src/lib/coachPayload";
+import { getSupabaseClient } from "../../src/lib/supabaseClient";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("Training Plan - manual replan", () => {
+  it("shows the manual replan trigger when a plan is selected", () => {
+    useAppData.mockReturnValue(makeAppData());
+    render(<LongTermPlanPage />);
+    expect(screen.getByRole("button", { name: /Replan with AI Coach/i })).toBeInTheDocument();
+  });
+
+  it("invokes gemini-coach long_term_replan using shared payload builder", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        coaching_feedback: "Adjusted for your current fatigue.",
+        weekly_structure: [
+          {
+            week_start: "2026-04-06",
+            week_end: "2026-04-12",
+            phase_focus: "Aerobic support",
+            target_km: 58,
+            key_workouts: ["Long run progression", "Tempo support"],
+            notes: "Keep fatigue manageable",
+          },
+        ],
+        horizon_start: "2026-04-06",
+        horizon_end: "2026-06-28",
+        goal_race_date: "2026-06-29",
+      },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      planContext: { phase: "Build" },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+
+    useAppData.mockReturnValue(makeAppData());
+    render(<LongTermPlanPage />);
+
+    await user.click(screen.getByRole("button", { name: /Replan with AI Coach/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          mode: "long_term_replan",
+          conversationHistory: expect.any(Array),
+          planContext: expect.any(Object),
+        }),
+      }),
+    );
+    expect(screen.getByText(/Manual Replan Preview/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 week horizon/i)).toBeInTheDocument();
+    expect(screen.getByText(/Horizon: 2026-04-06 to 2026-06-28/i)).toBeInTheDocument();
+  });
+
+  it("applies only selected horizon weeks after explicit confirmation", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        coaching_feedback: "Replanned around your constraints.",
+        weekly_structure: [
+          {
+            week_start: "2026-04-06",
+            week_end: "2026-04-12",
+            phase_focus: "Aerobic support",
+            target_km: 56,
+            key_workouts: ["Long run progression"],
+            notes: "Absorb load",
+          },
+          {
+            week_start: "2026-04-13",
+            week_end: "2026-04-19",
+            phase_focus: "Build support",
+            target_km: 60,
+            key_workouts: ["Tempo support"],
+            notes: "Controlled intensity",
+          },
+        ],
+        horizon_start: "2026-04-06",
+        horizon_end: "2026-04-19",
+        goal_race_date: "2026-06-29",
+      },
+      error: null,
+    });
+    const applyLongTermWeeklyStructure = vi.fn().mockResolvedValue([]);
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      planContext: { phase: "Build" },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        applyLongTermWeeklyStructure,
+      },
+    }));
+
+    render(<LongTermPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Replan with AI Coach/i }));
+    const applyToggles = screen.getAllByRole("checkbox", { name: /Apply/i });
+    await user.click(applyToggles[1]);
+    await user.click(screen.getByRole("button", { name: /Apply 1 Selected Week/i }));
+
+    expect(globalThis.confirm).toHaveBeenCalled();
+    expect(applyLongTermWeeklyStructure).toHaveBeenCalledWith(
+      SAMPLE_PLAN.id,
+      [
+        expect.objectContaining({
+          week_start: "2026-04-06",
+          week_end: "2026-04-12",
+        }),
+      ],
+    );
+    expect(screen.getByText(/Selected long-term weeks applied/i)).toBeInTheDocument();
+  });
 });
 
 describe("Training Plan — page structure", () => {

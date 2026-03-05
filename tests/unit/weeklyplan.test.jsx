@@ -112,6 +112,73 @@ describe("Weekly Plan — displaying existing workouts", () => {
     const checkboxes = screen.getAllByTitle("Mark completed");
     expect(checkboxes.length).toBe(SAMPLE_WORKOUT_ENTRIES.length);
   });
+
+  it("renders entries that use coach-style date field with string metrics", () => {
+    const coachStyledEntry = {
+      id: "we-coach-1",
+      plan_id: SAMPLE_PLAN.id,
+      user_id: "user-1",
+      date: new Date().toISOString().split("T")[0],
+      workout_type: "Easy",
+      distance_km: "12",
+      duration_min: "70",
+      description: "Applied from replan preview",
+      completed: false,
+    };
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [coachStyledEntry],
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Easy")).toBeInTheDocument();
+    expect(screen.getByText(/12 km/i)).toBeInTheDocument();
+    expect(screen.getByText(/Applied from replan preview/i)).toBeInTheDocument();
+  });
+
+  it("renders long-horizon applied entries with synthesized descriptions safely", () => {
+    const tomorrowIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const longHorizonEntries = [
+      {
+        id: "we-long-1",
+        plan_id: SAMPLE_PLAN.id,
+        user_id: "user-1",
+        workout_date: new Date().toISOString().split("T")[0],
+        workout_type: "Long Run",
+        distance_km: 18.5,
+        duration_min: null,
+        description: "Build endurance | Long run progression | Keep recovery strong",
+        completed: false,
+      },
+      {
+        id: "we-long-2",
+        plan_id: SAMPLE_PLAN.id,
+        user_id: "user-1",
+        workout_date: tomorrowIso,
+        workout_type: "Tempo",
+        distance_km: 9.5,
+        duration_min: null,
+        description: "Build endurance | Tempo support | Keep recovery strong",
+        completed: false,
+      },
+    ];
+
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: longHorizonEntries,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Long Run")).toBeInTheDocument();
+    expect(screen.getByText("Tempo")).toBeInTheDocument();
+    expect(screen.getByText(/Build endurance \| Long run progression/i)).toBeInTheDocument();
+  });
 });
 
 describe("Weekly Plan — summary bar", () => {

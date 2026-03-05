@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CoachPage from "../../src/pages/CoachPage";
+import AdminPhilosophyPage from "../../src/pages/AdminPhilosophyPage";
 import {
   makeAppData,
   SAMPLE_DAILY_LOGS,
@@ -1227,5 +1228,99 @@ describe("Coach page — plan tab", () => {
       expect(screen.getByText(/Plan generation failed/i)).toBeInTheDocument();
       expect(screen.getByText(/Edge Function returned a non-2xx status code/i)).toBeInTheDocument();
     });
+  });
+});
+
+// —— Admin philosophy workflow —— 
+describe("Admin philosophy page — workflow guards", () => {
+  function makeCoachPhilosophy(overrides = {}) {
+    return {
+      isAdmin: true,
+      document: {
+        status: "draft",
+        version: 1,
+        principles: "",
+        dos: "",
+        donts: "",
+        workout_examples: "",
+        phase_notes: "",
+        koop_weight: 50,
+        bakken_weight: 50,
+      },
+      versions: [],
+      loading: false,
+      saving: false,
+      publishing: false,
+      load: vi.fn().mockResolvedValue(undefined),
+      saveDraft: vi.fn().mockResolvedValue({}),
+      publish: vi.fn().mockResolvedValue({}),
+      rollback: vi.fn().mockResolvedValue({}),
+      exportPayload: vi.fn().mockResolvedValue({ version: 1 }),
+      ...overrides,
+    };
+  }
+
+  it("shows not authorized message when user is not admin", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachPhilosophy: makeCoachPhilosophy({ isAdmin: false }),
+      }),
+    );
+
+    render(<AdminPhilosophyPage />);
+    expect(screen.getByText(/not authorized/i)).toBeInTheDocument();
+  });
+
+  it("keeps save draft disabled until required sections are completed", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachPhilosophy: makeCoachPhilosophy(),
+      }),
+    );
+
+    render(<AdminPhilosophyPage />);
+    expect(screen.getByRole("button", { name: /Save Draft/i })).toBeDisabled();
+  });
+
+  it("requires changelog note before publish button is enabled", async () => {
+    const user = userEvent.setup();
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachPhilosophy: makeCoachPhilosophy(),
+      }),
+    );
+
+    render(<AdminPhilosophyPage />);
+
+    await user.type(screen.getByLabelText(/Principles \(Required\)/i), "Principles");
+    await user.type(screen.getByLabelText(/Dos \(Required\)/i), "Do this");
+    await user.type(screen.getByLabelText(/Donts \(Required\)/i), "Avoid this");
+    await user.type(screen.getByLabelText(/Workout Examples \(Required\)/i), "Example session");
+    await user.type(screen.getByLabelText(/Phase Notes \(Required\)/i), "Phase guidance");
+
+    expect(screen.getByRole("button", { name: /Publish/i })).toBeDisabled();
+    await user.type(screen.getByLabelText(/Changelog Note \(Required\)/i), "Initial publish");
+    expect(screen.getByRole("button", { name: /Publish/i })).toBeEnabled();
+  });
+
+  it("calls rollback when clicking rollback on a version item", async () => {
+    const user = userEvent.setup();
+    const rollback = vi.fn().mockResolvedValue({});
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachPhilosophy: makeCoachPhilosophy({
+          versions: [{ id: "v1", version: 1, source: "publish", changelog_note: "First publish" }],
+          rollback,
+        }),
+      }),
+    );
+
+    render(<AdminPhilosophyPage />);
+    await user.click(screen.getByRole("button", { name: /Rollback/i }));
+    expect(rollback).toHaveBeenCalledWith("v1");
   });
 });

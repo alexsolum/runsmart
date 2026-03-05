@@ -313,6 +313,7 @@ export const TRANSLATIONS = {
     "nav.pages": "Pages",
     "nav.search": "Search",
     "nav.mobile": "Mobile",
+    "nav.admin": "Admin",
 
     // Coach page — new conversational UI
     "coach.aiCoachSubtitle": "Your AI running coach",
@@ -659,6 +660,7 @@ export const TRANSLATIONS = {
     "nav.pages": "Sider",
     "nav.search": "S\u00f8k",
     "nav.mobile": "Mobil",
+    "nav.admin": "Admin",
 
     // Coach page — new conversational UI
     "coach.aiCoachSubtitle": "Din AI-l\u00f8petrener",

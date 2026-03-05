@@ -141,3 +141,18 @@ curl -i \
 - `401 + Missing bearer token`: Authorization-header mangler/er feil format.
 - `401 + JWT validation failed`: frontend-token hører ikke til samme Supabase-prosjekt eller er utløpt.
 - `500 + missing required Edge Function secrets`: secrets mangler i Supabase.
+
+## Feilsøking: `{"code":401,"message":"Invalid JWT"}` i `gemini-coach`
+
+Hvis AI Coach feiler med akkurat denne responsen, blir requesten avvist av Supabase Edge-gatewayen *før* funksjonskoden kjører.
+
+Løsning:
+
+1. Sett `verify_jwt = false` i `supabase/functions/gemini-coach/config.toml`.
+2. Deploy funksjonen på nytt:
+
+```bash
+supabase functions deploy gemini-coach
+```
+
+`gemini-coach` verifiserer fortsatt bruker-token i funksjonskoden via `supabase.auth.getUser(...)`, så autentisering er fortsatt påkrevd.

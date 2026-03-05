@@ -11,6 +11,7 @@ import DataPage from "./pages/DataPage";
 import InsightsPage from "./pages/InsightsPage";
 import DailyLogPage from "./pages/DailyLogPage";
 import MobilePage from "./pages/MobilePage";
+import AdminPhilosophyPage from "./pages/AdminPhilosophyPage";
 import MobileNavBar from "./components/MobileNavBar";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import {
@@ -26,6 +27,7 @@ import {
   Search,
   Bell,
   Smartphone,
+  Shield,
 } from "lucide-react";
 
 // Static nav structure — labels are i18n keys, translated at render time
@@ -51,14 +53,26 @@ const NAV_GROUPS = [
   },
 ];
 
-const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
-
 function Shell() {
-  const { auth, plans, activities, checkins } = useAppData();
+  const { auth, plans, activities, checkins, coachPhilosophy } = useAppData();
   const { t } = useI18n();
-  const [activePage, setActivePage] = useState(ALL_NAV_ITEMS[0].key);
+  const [activePage, setActivePage] = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState("analytics");
+
+  const navGroups = useMemo(() => {
+    const groups = NAV_GROUPS.map((group) => ({ ...group, items: [...group.items] }));
+    if (coachPhilosophy.isAdmin) {
+      groups[1].items.push({
+        key: "admin",
+        labelKey: "nav.admin",
+        icon: Shield,
+        component: AdminPhilosophyPage,
+      });
+    }
+    return groups;
+  }, [coachPhilosophy.isAdmin]);
+  const allNavItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
 
   useEffect(() => {
     if (!auth.user?.id) return;
@@ -79,8 +93,8 @@ function Shell() {
   }, [auth.user?.id, plans.loadPlans, activities.loadActivities, checkins.loadCheckins]);
 
   const activeNavItem = useMemo(
-    () => ALL_NAV_ITEMS.find((item) => item.key === activePage) ?? ALL_NAV_ITEMS[0],
-    [activePage],
+    () => allNavItems.find((item) => item.key === activePage) ?? allNavItems[0],
+    [activePage, allNavItems],
   );
   const ActiveComponent = activeNavItem.component;
 
@@ -95,7 +109,7 @@ function Shell() {
 
         {/* Grouped navigation */}
         <nav className="flex flex-col gap-6 flex-1" aria-label="Main navigation">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div key={group.labelKey}>
               <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 {t(group.labelKey)}

@@ -9,6 +9,7 @@ import { useTrainingBlocks } from "../hooks/useTrainingBlocks";
 import { useWorkoutEntries } from "../hooks/useWorkoutEntries";
 import { useRunnerProfile } from "../hooks/useRunnerProfile";
 import { useCoachConversations } from "../hooks/useCoachConversations";
+import { useCoachPhilosophy } from "../hooks/useCoachPhilosophy";
 
 const AppDataContext = createContext(null);
 
@@ -26,6 +27,7 @@ export function AppDataProvider({ children }) {
   const workoutEntries = useWorkoutEntries(userId);
   const runnerProfile = useRunnerProfile(userId);
   const coachConversations = useCoachConversations(userId);
+  const coachPhilosophy = useCoachPhilosophy(userId);
 
   const value = useMemo(
     () => ({
@@ -39,8 +41,9 @@ export function AppDataProvider({ children }) {
       workoutEntries,
       runnerProfile,
       coachConversations,
+      coachPhilosophy,
     }),
-    [auth, plans, activities, checkins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations],
+    [auth, plans, activities, checkins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, coachPhilosophy],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

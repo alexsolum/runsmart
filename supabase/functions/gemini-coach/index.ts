@@ -3,6 +3,7 @@
 // Google Gemini for analysis, and returns structured coaching insights or a 7-day plan.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { COACHING_PLAYBOOK } from "./playbook.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,13 @@ const corsHeaders = {
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const COACH_GUARDRAILS =
+  `Safety and progression guardrails (non-negotiable):\n` +
+  `- Never prescribe sudden mileage/load spikes beyond the athlete's recent tolerance.\n` +
+  `- If fatigue/injury risk signals are present, reduce intensity first and prioritize recovery.\n` +
+  `- Long-term consistency and injury prevention outrank short-term performance gains.\n` +
+  `- Use metric units only (km, min, min/km, bpm).`;
 
 // ── System instructions ────────────────────────────────────────────────────────
 
@@ -165,6 +173,133 @@ interface RequestBody {
   dailyLogs: DailyLog[];
   runnerProfile?: RunnerProfile | null;
   lang?: string;
+}
+
+type CoachMode = "initial" | "followup" | "plan" | "plan_revision";
+
+interface PlaybookEntry {
+  source: string;
+  mode: string[] | null;
+  lang: string[] | null;
+  phase: string[] | null;
+  athlete_level: string[] | null;
+  priority: number | null;
+  title: string;
+  principle: string;
+  application: string | null;
+  anti_patterns: string | null;
+  example_workout: string | null;
+  tags: string[] | null;
+}
+
+function normalizePhase(phase: string | undefined): "base" | "build" | "peak" | "taper" | "any" {
+  if (!phase) return "any";
+  const p = phase.toLowerCase();
+  if (p.includes("base")) return "base";
+  if (p.includes("build")) return "build";
+  if (p.includes("peak")) return "peak";
+  if (p.includes("taper")) return "taper";
+  return "any";
+}
+
+function includesOrAny(values: string[] | null, target: string): boolean {
+  if (!values || values.length === 0) return true;
+  const normalized = values.map((v) => String(v).toLowerCase());
+  return normalized.includes("any") || normalized.includes(target.toLowerCase());
+}
+
+function scorePlaybookEntry(
+  entry: PlaybookEntry,
+  mode: CoachMode,
+  lang: string | undefined,
+  phase: string,
+  athleteLevel: string,
+): number {
+  let score = Number(entry.priority || 0);
+  if (includesOrAny(entry.mode, mode)) score += 3;
+  if (includesOrAny(entry.lang, lang === "no" ? "no" : "en")) score += 2;
+  if (includesOrAny(entry.phase, phase)) score += 3;
+  if (includesOrAny(entry.athlete_level, athleteLevel)) score += 2;
+  return score;
+}
+
+async function fetchDynamicPlaybookAddendum(
+  supabase: ReturnType<typeof createClient>,
+  body: RequestBody,
+  mode: CoachMode,
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("coach_playbook_entries")
+    .select("source, mode, lang, phase, athlete_level, priority, title, principle, application, anti_patterns, example_workout, tags")
+    .eq("enabled", true)
+    .limit(200);
+
+  if (error || !Array.isArray(data) || data.length === 0) return "";
+
+  const phase = normalizePhase(body.planContext?.phase);
+  const athleteLevel = inferAthleteLevel(body.weeklySummary || []);
+  const targetLang = body.lang === "no" ? "no" : "en";
+
+  const filtered = (data as PlaybookEntry[]).filter((entry) =>
+    includesOrAny(entry.mode, mode) &&
+    includesOrAny(entry.lang, targetLang) &&
+    includesOrAny(entry.phase, phase) &&
+    includesOrAny(entry.athlete_level, athleteLevel)
+  );
+
+  const ranked = filtered
+    .sort((a, b) =>
+      scorePlaybookEntry(b, mode, targetLang, phase, athleteLevel) -
+      scorePlaybookEntry(a, mode, targetLang, phase, athleteLevel)
+    )
+    .slice(0, 8);
+
+  const lines: string[] = [];
+  let budget = 1800;
+  for (const entry of ranked) {
+    const chunk = [
+      `- [${entry.source}] ${entry.title}`,
+      `  Principle: ${entry.principle}`,
+      entry.application ? `  Apply: ${entry.application}` : "",
+      entry.anti_patterns ? `  Avoid: ${entry.anti_patterns}` : "",
+      entry.example_workout ? `  Workout template: ${entry.example_workout}` : "",
+    ].filter(Boolean).join("\n");
+
+    if (chunk.length > budget) break;
+    lines.push(chunk);
+    budget -= chunk.length;
+  }
+
+  return lines.join("\n");
+}
+
+function buildSystemInstruction(
+  baseInstruction: string,
+  lang: string | undefined,
+  dynamicAddendum: string,
+): string {
+  const languageLine = lang === "no"
+    ? "Primary response language: Norwegian (bokmal)."
+    : "Primary response language: English.";
+
+  return [
+    baseInstruction.trim(),
+    "",
+    "Methodology precedence policy:",
+    "- Follow output format contract first.",
+    "- Enforce safety/progression guardrails before methodology style choices.",
+    "- Use the coaching playbook as the primary coaching policy unless it conflicts with guardrails.",
+    "",
+    COACH_GUARDRAILS,
+    "",
+    "Coaching playbook (authoritative context):",
+    COACHING_PLAYBOOK.trim(),
+    dynamicAddendum ? `\nAdditional runtime playbook snippets:\n${dynamicAddendum}` : "",
+    "",
+    languageLine,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 // ── Prompt builder ─────────────────────────────────────────────────────────────
@@ -342,12 +477,14 @@ Deno.serve(async (req) => {
     }
 
     const body: RequestBody = await req.json();
-    const mode = body.mode ?? "initial";
+    const mode: CoachMode = body.mode ?? "initial";
+    const dynamicPlaybookAddendum = await fetchDynamicPlaybookAddendum(supabase, body, mode);
 
     // ── Plan generation mode ─────────────────────────────────────────────────
     if (mode === "plan" || mode === "plan_revision") {
       const isPlanRevision = mode === "plan_revision";
-      const systemInstruction = isPlanRevision ? PLAN_REVISION_SYSTEM_INSTRUCTION : PLAN_SYSTEM_INSTRUCTION;
+      const baseInstruction = isPlanRevision ? PLAN_REVISION_SYSTEM_INSTRUCTION : PLAN_SYSTEM_INSTRUCTION;
+      const systemInstruction = buildSystemInstruction(baseInstruction, body.lang, dynamicPlaybookAddendum);
 
       let contents: Array<{ role: string; parts: Array<{ text: string }> }>;
 
@@ -441,7 +578,9 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: FOLLOWUP_SYSTEM_INSTRUCTION }] },
+          system_instruction: {
+            parts: [{ text: buildSystemInstruction(FOLLOWUP_SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
+          },
           contents,
           generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
         }),
@@ -488,7 +627,9 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        system_instruction: {
+          parts: [{ text: buildSystemInstruction(SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
+        },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       }),

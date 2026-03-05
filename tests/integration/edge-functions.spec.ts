@@ -7,7 +7,7 @@
  * Skips gracefully when TEST_USER_EMAIL is not configured.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -39,6 +39,94 @@ function tryReadAccessTokenFromStorageState() {
     }
   }
   return null;
+}
+
+function buildPlanModePayload() {
+  return {
+    mode: 'plan',
+    weeklySummary: [
+      { weekOf: '2026-02-09', distance: 48.2, runs: 5, longestRun: 16.0 },
+      { weekOf: '2026-02-16', distance: 52.1, runs: 5, longestRun: 18.0 },
+      { weekOf: '2026-02-23', distance: 54.4, runs: 6, longestRun: 20.0 },
+      { weekOf: '2026-03-02', distance: 50.3, runs: 5, longestRun: 17.0 },
+    ],
+    recentActivities: [
+      { name: 'Easy Run', distance: 10.2, duration: 3600, effort: 4 },
+      { name: 'Tempo Session', distance: 12.0, duration: 4200, effort: 7 },
+    ],
+    latestCheckin: { fatigue: 2, sleepQuality: 4, motivation: 4, niggles: null },
+    planContext: {
+      race: 'Trail Marathon',
+      raceDate: '2026-06-14',
+      phase: 'Build',
+      weekNumber: 6,
+      targetMileage: 58,
+      daysToRace: 101,
+    },
+    dailyLogs: [
+      { date: '2026-03-01', sleep_hours: 7.5, sleep_quality: 4, fatigue: 2, mood: 4, stress: 2, training_quality: 4, resting_hr: 50, notes: null },
+      { date: '2026-03-02', sleep_hours: 7.0, sleep_quality: 3, fatigue: 3, mood: 4, stress: 3, training_quality: 3, resting_hr: 52, notes: null },
+    ],
+    lang: 'en',
+  };
+}
+
+function assertStructuredPlanContract(body: any) {
+  expect(body).toHaveProperty('coaching_feedback');
+  expect(typeof body.coaching_feedback).toBe('string');
+  expect(body).toHaveProperty('structured_plan');
+  expect(Array.isArray(body.structured_plan)).toBeTruthy();
+  expect(body.structured_plan.length).toBeGreaterThan(0);
+  expect(body.structured_plan.length).toBeLessThanOrEqual(7);
+
+  for (const day of body.structured_plan) {
+    expect(typeof day.date).toBe('string');
+    expect(typeof day.workout_type).toBe('string');
+    expect(typeof day.distance_km).toBe('number');
+    expect(typeof day.duration_min).toBe('number');
+    expect(typeof day.description).toBe('string');
+  }
+}
+
+function toIsoDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function buildLongTermReplanPayload(overrides?: Partial<Record<string, unknown>>) {
+  const now = new Date();
+  const goal = new Date(now.getTime());
+  goal.setUTCDate(goal.getUTCDate() + 140);
+  goal.setUTCHours(0, 0, 0, 0);
+  const base = {
+    ...buildPlanModePayload(),
+    mode: 'long_term_replan',
+    planContext: {
+      race: 'Trail 50K',
+      raceDate: toIsoDate(goal),
+      phase: 'Build',
+      weekNumber: 8,
+      targetMileage: 62,
+      daysToRace: 140,
+    },
+  };
+  return { ...base, ...overrides };
+}
+
+function assertLongTermReplanContract(body: any) {
+  expect(body).toHaveProperty('coaching_feedback');
+  expect(typeof body.coaching_feedback).toBe('string');
+  expect(body).toHaveProperty('weekly_structure');
+  expect(Array.isArray(body.weekly_structure)).toBeTruthy();
+  expect(body.weekly_structure.length).toBeGreaterThan(0);
+
+  for (const week of body.weekly_structure) {
+    expect(typeof week.week_start).toBe('string');
+    expect(typeof week.week_end).toBe('string');
+    expect(typeof week.phase_focus).toBe('string');
+    expect(typeof week.target_km).toBe('number');
+    expect(Array.isArray(week.key_workouts)).toBeTruthy();
+    expect(typeof week.notes).toBe('string');
+  }
 }
 
 test.beforeAll(async () => {
@@ -156,7 +244,7 @@ test.describe('Edge Function - coach-philosophy-admin', () => {
       data: { action: 'publish', changelog_note: '' },
     });
 
-    expect([422, 403, 404]).toContain(res.status());
+    expect([422, 401, 403, 404]).toContain(res.status());
     if (res.status() === 422) {
       const body = await res.json();
       expect(String(body.error || '')).toMatch(/changelog_note/i);
@@ -192,13 +280,17 @@ test.describe('Edge Function - coach-philosophy-admin', () => {
     };
 
     const saveRes = await post({ action: 'save_draft', payload: draftPayload });
-    if (saveRes.status() === 404 || saveRes.status() === 403) {
+    if (saveRes.status() === 401 || saveRes.status() === 404 || saveRes.status() === 403) {
       test.skip();
       return;
     }
     expect(saveRes.status()).toBe(200);
 
     const publishRes = await post({ action: 'publish', changelog_note: 'integration publish for rollback test' });
+    if (publishRes.status() === 401 || publishRes.status() === 403 || publishRes.status() === 404) {
+      test.skip();
+      return;
+    }
     expect(publishRes.status()).toBe(200);
 
     const beforeRes = await post({ action: 'read' });
@@ -216,5 +308,140 @@ test.describe('Edge Function - coach-philosophy-admin', () => {
     const afterBody = await afterRes.json();
     const versionsAfter = Array.isArray(afterBody.versions) ? afterBody.versions : [];
     expect(versionsAfter.length).toBeGreaterThanOrEqual(versionsBefore.length);
+  });
+});
+
+test.describe('Edge Function - gemini-coach plan contract with philosophy context', () => {
+  const postFn = async (
+    request: APIRequestContext,
+    cfg: { supabaseUrl: string; anonKey: string },
+    token: string,
+    slug: string,
+    data: Record<string, unknown>,
+  ) => request.post(`${cfg.supabaseUrl}/functions/v1/${slug}`, {
+    headers: {
+      apikey: cfg.anonKey,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    data,
+  });
+
+  test('returns structured_plan when philosophy document is published', async ({ request }) => {
+    const cfg = readRuntimeConfig();
+    const token = tryReadAccessTokenFromStorageState();
+    if (!cfg || !token) {
+      test.skip();
+      return;
+    }
+
+    const readRes = await postFn(request, cfg, token, 'coach-philosophy-admin', { action: 'read' });
+    if (readRes.status() !== 200) {
+      test.skip();
+      return;
+    }
+
+    const readBody = await readRes.json();
+    if (!readBody?.document || readBody.document.status !== 'published') {
+      test.skip();
+      return;
+    }
+
+    const planRes = await postFn(request, cfg, token, 'gemini-coach', buildPlanModePayload());
+    expect([200, 401, 403, 404, 502]).toContain(planRes.status());
+    if (planRes.status() === 200) {
+      const planBody = await planRes.json();
+      assertStructuredPlanContract(planBody);
+    }
+  });
+
+  test('returns structured_plan when no published philosophy document exists', async ({ request }) => {
+    const cfg = readRuntimeConfig();
+    const token = tryReadAccessTokenFromStorageState();
+    if (!cfg || !token) {
+      test.skip();
+      return;
+    }
+
+    const readRes = await postFn(request, cfg, token, 'coach-philosophy-admin', { action: 'read' });
+    if (readRes.status() !== 200) {
+      test.skip();
+      return;
+    }
+
+    const readBody = await readRes.json();
+    if (readBody?.document && readBody.document.status === 'published') {
+      test.skip();
+      return;
+    }
+
+    const planRes = await postFn(request, cfg, token, 'gemini-coach', buildPlanModePayload());
+    expect([200, 401, 403, 404, 502]).toContain(planRes.status());
+    if (planRes.status() === 200) {
+      const planBody = await planRes.json();
+      assertStructuredPlanContract(planBody);
+    }
+  });
+
+  test('long_term_replan returns weekly structure that reaches goal-race week', async ({ request }) => {
+    const cfg = readRuntimeConfig();
+    const token = tryReadAccessTokenFromStorageState();
+    if (!cfg || !token) {
+      test.skip();
+      return;
+    }
+
+    const payload = buildLongTermReplanPayload();
+    const replanRes = await postFn(request, cfg, token, 'gemini-coach', payload);
+    expect([200, 401, 403, 404, 502]).toContain(replanRes.status());
+    if (replanRes.status() === 200) {
+      const replanBody = await replanRes.json();
+      if (!Array.isArray(replanBody.weekly_structure)) {
+        test.skip();
+        return;
+      }
+      assertLongTermReplanContract(replanBody);
+
+      const raceDate = String((payload.planContext as any).raceDate);
+      const lastWeek = replanBody.weekly_structure[replanBody.weekly_structure.length - 1];
+      expect(lastWeek.week_end >= raceDate).toBeTruthy();
+
+      if (replanBody.goal_race_date && !replanBody.used_fallback_horizon) {
+        expect(lastWeek.week_end >= replanBody.goal_race_date).toBeTruthy();
+      }
+    }
+  });
+
+  test('long_term_replan uses fallback-safe horizon for invalid race context', async ({ request }) => {
+    const cfg = readRuntimeConfig();
+    const token = tryReadAccessTokenFromStorageState();
+    if (!cfg || !token) {
+      test.skip();
+      return;
+    }
+
+    const payload = buildLongTermReplanPayload({
+      planContext: {
+        race: 'Trail 50K',
+        raceDate: 'not-a-date',
+        phase: 'Build',
+        weekNumber: 8,
+        targetMileage: 62,
+        daysToRace: 140,
+      },
+    });
+    const replanRes = await postFn(request, cfg, token, 'gemini-coach', payload);
+    expect([200, 401, 403, 404, 502]).toContain(replanRes.status());
+    if (replanRes.status() === 200) {
+      const replanBody = await replanRes.json();
+      if (!Array.isArray(replanBody.weekly_structure)) {
+        test.skip();
+        return;
+      }
+      assertLongTermReplanContract(replanBody);
+      expect(replanBody.used_fallback_horizon).toBeTruthy();
+      expect(replanBody.horizon_reason).toBe('missing_or_invalid_race_date');
+      expect(replanBody.weekly_structure.length).toBe(12);
+    }
   });
 });

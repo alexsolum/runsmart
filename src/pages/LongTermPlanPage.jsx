@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
 import KoopTimeline from "../components/KoopTimeline";
+import { getSupabaseClient } from "../lib/supabaseClient";
+import { buildCoachPayload } from "../lib/coachPayload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +25,38 @@ function formatDateRange(start, end) {
 
 function todayIso() {
   return new Date().toISOString().split("T")[0];
+}
+
+function formatPlanDate(isoDate) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${dayNames[d.getUTCDay()]} ${d.getUTCDate()} ${monthNames[d.getUTCMonth()]}`;
+}
+
+function normalizeWeeklyStructureWeek(week) {
+  const startRaw = String(week?.week_start ?? "").trim();
+  const endRaw = String(week?.week_end ?? "").trim();
+  if (!startRaw || !endRaw) return null;
+  const weekStart = /^\d{4}-\d{2}-\d{2}$/.test(startRaw)
+    ? startRaw
+    : new Date(startRaw).toISOString().split("T")[0];
+  const weekEnd = /^\d{4}-\d{2}-\d{2}$/.test(endRaw)
+    ? endRaw
+    : new Date(endRaw).toISOString().split("T")[0];
+  if (!weekStart || !weekEnd) return null;
+  const targetKm = Number(week?.target_km);
+  const keyWorkouts = Array.isArray(week?.key_workouts)
+    ? week.key_workouts.map((item) => String(item ?? "").trim()).filter(Boolean)
+    : [];
+  return {
+    week_start: weekStart,
+    week_end: weekEnd,
+    phase_focus: String(week?.phase_focus ?? "").trim(),
+    target_km: Number.isFinite(targetKm) ? targetKm : null,
+    key_workouts: keyWorkouts,
+    notes: String(week?.notes ?? "").trim(),
+  };
 }
 
 const BLANK_BLOCK = {
@@ -59,6 +93,8 @@ const PHASE_BADGE_COLORS = {
   Taper:    "bg-amber-600 text-white",
   Recovery: "bg-green-600 text-white",
 };
+
+const PREVIEW_WORKOUT_BADGE = "bg-blue-100 text-blue-800";
 
 function PhaseSummaryBar({ blocks }) {
   if (!blocks.length) return null;
@@ -227,13 +263,19 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
 }
 
 export default function LongTermPlanPage() {
-  const { plans, trainingBlocks } = useAppData();
+  const { plans, trainingBlocks, workoutEntries, activities, dailyLogs, checkins, runnerProfile } = useAppData();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [editingBlock, setEditingBlock] = useState(null);   // null | {} (new) | block obj (edit)
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [formError, setFormError] = useState(null);
   const [goalDraft, setGoalDraft] = useState("");
+  const [replanLoading, setReplanLoading] = useState(false);
+  const [replanApplying, setReplanApplying] = useState(false);
+  const [replanError, setReplanError] = useState(null);
+  const [replanSuccess, setReplanSuccess] = useState(null);
+  const [replanData, setReplanData] = useState(null);
+  const [selectedReplanWeeks, setSelectedReplanWeeks] = useState({});
 
   // Auto-select first plan
   useEffect(() => {
@@ -254,6 +296,13 @@ export default function LongTermPlanPage() {
     const plan = plans.plans.find((p) => p.id === selectedPlanId);
     setGoalDraft(plan?.goal ?? "");
   }, [selectedPlanId, plans.plans]);
+
+  useEffect(() => {
+    setReplanData(null);
+    setReplanError(null);
+    setReplanSuccess(null);
+    setSelectedReplanWeeks({});
+  }, [selectedPlanId]);
 
   const selectedPlan = plans.plans.find((p) => p.id === selectedPlanId) ?? null;
 
@@ -318,6 +367,94 @@ export default function LongTermPlanPage() {
       setFormError(err.message);
     }
   }, [selectedPlanId, goalDraft, plans]);
+
+  const buildBasePayload = useCallback(async () => {
+    return buildCoachPayload({
+      activities,
+      dailyLogs,
+      checkins,
+      activePlan: selectedPlan,
+      trainingBlocks,
+      runnerProfile,
+      lang: "en",
+    });
+  }, [activities, checkins, dailyLogs, selectedPlan, trainingBlocks, runnerProfile]);
+
+  const handleManualReplan = useCallback(async () => {
+    if (!selectedPlan?.id) return;
+    const client = getSupabaseClient();
+    if (!client) {
+      setReplanError("Supabase is not configured.");
+      return;
+    }
+    setReplanLoading(true);
+    setReplanError(null);
+    setReplanSuccess(null);
+    try {
+      const basePayload = await buildBasePayload();
+      const payload = {
+        mode: "long_term_replan",
+        conversationHistory: [
+          {
+            role: "user",
+            text: "Replan my long-term training structure from current week through my goal race based on my latest context.",
+          },
+        ],
+        ...basePayload,
+      };
+      const { data, error: invokeError } = await client.functions.invoke("gemini-coach", { body: payload });
+      if (invokeError) throw new Error(`Replan failed: ${invokeError.message}`);
+      if (data?.error) throw new Error(data.error);
+      const weeklyStructure = Array.isArray(data?.weekly_structure)
+        ? data.weekly_structure.map(normalizeWeeklyStructureWeek).filter(Boolean)
+        : [];
+      if (weeklyStructure.length === 0) throw new Error("No long-term weekly structure returned.");
+      const initialSelection = Object.fromEntries(
+        weeklyStructure.map((week) => [week.week_start, true]),
+      );
+      setReplanData({
+        coaching_feedback: data?.coaching_feedback ?? "",
+        weekly_structure: weeklyStructure,
+        horizon_start: data?.horizon_start ?? weeklyStructure[0]?.week_start ?? null,
+        horizon_end: data?.horizon_end ?? weeklyStructure[weeklyStructure.length - 1]?.week_end ?? null,
+        goal_race_date: data?.goal_race_date ?? selectedPlan?.race_date ?? null,
+      });
+      setSelectedReplanWeeks(initialSelection);
+      setReplanSuccess("Horizon preview updated. Select weeks and apply when ready.");
+    } catch (err) {
+      setReplanError(err.message || "Manual replan failed.");
+    } finally {
+      setReplanLoading(false);
+    }
+  }, [selectedPlan, buildBasePayload]);
+
+  const handleApplyReplan = useCallback(async () => {
+    if (!selectedPlan?.id || !replanData?.weekly_structure?.length) return;
+    const selectedWeeks = replanData.weekly_structure.filter((week) => selectedReplanWeeks[week.week_start]);
+    if (selectedWeeks.length === 0) {
+      setReplanError("Select at least one week before applying.");
+      return;
+    }
+    const firstWeek = selectedWeeks[0];
+    const lastWeek = selectedWeeks[selectedWeeks.length - 1];
+    const confirmed = window.confirm(
+      `Apply ${selectedWeeks.length} selected week${selectedWeeks.length === 1 ? "" : "s"} and replace workout entries from ${firstWeek.week_start} to ${lastWeek.week_end}?`,
+    );
+    if (!confirmed) return;
+    setReplanApplying(true);
+    setReplanError(null);
+    setReplanSuccess(null);
+    try {
+      await workoutEntries.applyLongTermWeeklyStructure(selectedPlan.id, selectedWeeks);
+      setReplanSuccess("Selected long-term weeks applied. Open Weekly Plan to review and adjust.");
+    } catch (err) {
+      setReplanError(err.message || "Failed to apply long-term weeks.");
+    } finally {
+      setReplanApplying(false);
+    }
+  }, [selectedPlan, replanData, selectedReplanWeeks, workoutEntries]);
+
+  const selectedWeekCount = replanData?.weekly_structure?.filter((week) => selectedReplanWeeks[week.week_start]).length ?? 0;
 
   const daysToRace = selectedPlan
     ? Math.max(0, Math.round((new Date(selectedPlan.race_date) - new Date()) / (1000 * 60 * 60 * 24)))
@@ -389,6 +526,27 @@ export default function LongTermPlanPage() {
                   Sent to the AI coach. Saved automatically on blur.
                 </p>
               </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleManualReplan}
+                  disabled={replanLoading || trainingBlocks.loading}
+                >
+                  {replanLoading ? "Replanning..." : "Replan with AI Coach"}
+                </Button>
+                {replanData?.weekly_structure?.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleApplyReplan}
+                    disabled={replanApplying || selectedWeekCount === 0}
+                  >
+                    {replanApplying ? "Applying..." : `Apply ${selectedWeekCount} Selected Week${selectedWeekCount === 1 ? "" : "s"}`}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -431,6 +589,80 @@ export default function LongTermPlanPage() {
         {/* ── Right panel — timeline ── */}
         <div className="ltp-timeline bg-white border border-slate-200 rounded-2xl p-4">
           <h3 className="m-0 mb-3.5 text-sm font-bold font-sans">Training phases</h3>
+
+          {(replanError || replanSuccess || replanData) && (
+            <div className="mb-3.5 border border-slate-200 rounded-xl bg-slate-50 px-3.5 py-3">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <strong className="text-sm text-slate-900">Manual Replan Preview</strong>
+                {replanData?.weekly_structure?.length > 0 && (
+                  <span className="text-[11px] text-slate-500">
+                    {replanData.weekly_structure.length} week horizon
+                  </span>
+                )}
+              </div>
+              {replanError && <p className="m-0 text-[13px] text-red-600">{replanError}</p>}
+              {replanSuccess && <p className="m-0 text-[13px] text-green-700">{replanSuccess}</p>}
+              {replanData?.horizon_start && replanData?.horizon_end && (
+                <p className="mt-2 mb-0 text-[12px] text-slate-600">
+                  Horizon: {replanData.horizon_start} to {replanData.horizon_end}
+                  {replanData.goal_race_date ? ` (goal race: ${replanData.goal_race_date})` : ""}
+                </p>
+              )}
+              {replanData?.coaching_feedback && (
+                <p className="mt-2 mb-0 text-[13px] text-slate-700 leading-relaxed">
+                  {replanData.coaching_feedback}
+                </p>
+              )}
+              {replanData?.weekly_structure?.length > 0 && (
+                <div className="mt-2 grid gap-1.5">
+                  {replanData.weekly_structure.map((week) => (
+                    <div
+                      key={week.week_start}
+                      className="border border-slate-200 rounded-lg bg-white px-2.5 py-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-slate-700">
+                              {formatPlanDate(week.week_start)} - {formatPlanDate(week.week_end)}
+                            </span>
+                            {week.target_km != null && (
+                              <span className="text-[11px] text-slate-500">{Number(week.target_km).toFixed(1)} km target</span>
+                            )}
+                          </div>
+                          {week.phase_focus && <p className="mb-0 mt-1 text-[12px] text-slate-600">{week.phase_focus}</p>}
+                        </div>
+                        <label className="flex items-center gap-1.5 text-[11px] text-slate-600 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedReplanWeeks[week.week_start])}
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setSelectedReplanWeeks((prev) => ({ ...prev, [week.week_start]: checked }));
+                            }}
+                          />
+                          Apply
+                        </label>
+                      </div>
+                      {week.key_workouts?.length > 0 && (
+                        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                          {week.key_workouts.map((item, idx) => (
+                            <span
+                              key={`${week.week_start}-workout-${idx}`}
+                              className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase tracking-wide ${PREVIEW_WORKOUT_BADGE}`}
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {week.notes && <p className="mb-0 mt-1 text-[12px] text-slate-500">{week.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {!selectedPlanId && (
             <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start building phases.</p>

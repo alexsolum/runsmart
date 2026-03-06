@@ -1383,6 +1383,44 @@ progress {
   color: var(--color-text-muted);
 }
 
+.coach-adaptation-note {
+  border-left: 3px solid var(--accent, #3b82f6);
+  padding-left: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--text, inherit);
+  font-size: 0.875rem;
+}
+
+.coach-adaptation-note strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.coach-adaptation-note p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ltp-adaptation-note {
+  border-left: 3px solid var(--accent, #3b82f6);
+  padding-left: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--text, inherit);
+  font-size: 0.875rem;
+}
+
+.ltp-adaptation-note strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.ltp-adaptation-note p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .coach-plan-race,
 .coach-plan-phase,
 .coach-plan-target {

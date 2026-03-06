@@ -1326,6 +1326,22 @@ describe("Coach page — plan tab", () => {
     });
   });
 
+  it("displays adaptation_summary callout after plan generation", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Fatigue trend across 3 check-ins/i)).toBeInTheDocument();
+    });
+  });
+
   it("refreshes activities, daily logs, and check-ins before initial coaching payload", async () => {
     const mockClient = makeMockClient();
     const loadActivities = vi.fn().mockResolvedValue([]);

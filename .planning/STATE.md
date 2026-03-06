@@ -4,9 +4,24 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 4
 status: planning
-last_updated: "2026-03-06T11:53:43.879Z"
+last_updated: "2026-03-06T11:55:45.037Z"
 progress:
   total_phases: 4
+  completed_phases: 4
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_phase: 4
+status: planning
+last_updated: "2026-03-06T11:53:43.879Z"
+progress:
+  [██████████] 100%
   completed_phases: 3
   total_plans: 15
   completed_plans: 14
@@ -73,7 +88,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 | 1 | Philosophy Platform | Completed (gap-closure 01-04 done) |
 | 2 | Replan Coach Context | Completed (5/5 plans complete) |
 | 3 | Feedback Loop Integration | Completed (4/4 plans complete) |
-| 4 | Insights Coach Layer | In Progress (1/2 plans complete) |
+| 4 | Insights Coach Layer | Completed (2/2 plans complete) |
 
 ## Notes
 
@@ -98,12 +113,15 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - [Phase 03-feedback-loop-integration]: philosophyAddendum passed as optional 4th param to buildDefaultSystemInstruction — now injected into initial and followup Gemini calls alongside replan modes
 - [Phase 03-feedback-loop-integration]: adaptation_summary stored as separate useState in CoachPage; embedded in replanData object in LongTermPlanPage — consistent with each page's existing state shape
 - [Phase 04-insights-coach-layer]: computeTrainingLoadState: locked TSB thresholds (>10=good_form, >=-5=neutral, >=-15=accumulating_fatigue, else overreaching_risk); 15-day trend window ±2 dead-band; reuses coach-adaptation-note CSS class
+- [Phase 04-insights-coach-layer]: INSG-02: INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET inlined in Deno edge function; instructionSnippets.js export for test assertions only
+- [Phase 04-insights-coach-layer]: INSG-02: useRef guard prevents synthesis re-call on re-render; hasData is only useEffect dependency
+- [Phase 04-insights-coach-layer]: INSG-02: Synthesis callout silently omitted on error — no error UI displayed to user
 
 ## Session
 
 - Last session: 2026-03-06
-- Stopped at: Completed `04-01-PLAN.md` (computeTrainingLoadState + InsightsPage load-state overlay, INSG-01 done)
-- Resume command: `$gsd-execute-plan 04-insights-coach-layer 02`
+- Stopped at: Completed `04-02-PLAN.md` (insights_synthesis callout in InsightsPage, INSG-02 done)
+- Resume command: N/A — phase 4 complete
 
 ---
-*Last updated: 2026-03-06 after 04-01 execution (load-state overlay callout, INSG-01 complete)*
+*Last updated: 2026-03-06 after 04-02 execution (synthesis callout, INSG-02 complete, phase 4 done)*

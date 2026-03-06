@@ -9,7 +9,7 @@
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 1 | 4/4 | Complete   | 2026-03-06 | 4 | 1/2 | In Progress|  | Inject active philosophy and latest training context into manual replanning | RPLN-01, RPLN-02, PHIL-03 | 4 |
+| 1 | 4/4 | Complete   | 2026-03-06 | 4 | 2/2 | Complete   | 2026-03-06 | Inject active philosophy and latest training context into manual replanning | RPLN-01, RPLN-02, PHIL-03 | 4 |
 | 3 | 4/4 | Complete    | 2026-03-06 | 4 |
 | 4 | Insights Coach Layer | Add coach overlays and global synthesis to analytics surfaces | INSG-01, INSG-02 | 4 |
 
@@ -67,7 +67,7 @@ Plans:
 
 **Requirements:** INSG-01, INSG-02
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 04-01-PLAN.md — computeTrainingLoadState + Training Load Trend overlay callout (INSG-01)

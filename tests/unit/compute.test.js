@@ -271,3 +271,96 @@ describe("computeWeeklyCalendar", () => {
     expect(days[5].labelKey).toBe("cal.mediumLong");
   });
 });
+
+describe("computeTrainingLoadState", () => {
+  // Helper: build a series array from explicit tsb values
+  const makeSeries = (tsbValues) =>
+    tsbValues.map((tsb, i) => ({
+      date: `2026-01-${String(i + 1).padStart(2, "0")}`,
+      atl: 50,
+      ctl: 50 + tsb,
+      tsb,
+    }));
+
+  it("returns null for empty series", () => {
+    expect(Compute.computeTrainingLoadState([])).toBeNull();
+  });
+
+  it("returns null for a single-entry series (length < 2)", () => {
+    expect(Compute.computeTrainingLoadState(makeSeries([10]))).toBeNull();
+  });
+
+  it("returns good_form / Good Form when latest tsb = 15", () => {
+    const series = makeSeries([0, 15]);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result).not.toBeNull();
+    expect(result.state).toBe("good_form");
+    expect(result.stateLabel).toBe("Good Form");
+    expect(result.tsb).toBe(15);
+  });
+
+  it("returns neutral / Neutral when latest tsb = 0", () => {
+    const series = makeSeries([0, 0]);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result.state).toBe("neutral");
+    expect(result.stateLabel).toBe("Neutral");
+  });
+
+  it("returns accumulating_fatigue / Accumulating Fatigue when latest tsb = -10", () => {
+    const series = makeSeries([0, -10]);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result.state).toBe("accumulating_fatigue");
+    expect(result.stateLabel).toBe("Accumulating Fatigue");
+  });
+
+  it("returns overreaching_risk / Overreaching Risk when latest tsb = -20", () => {
+    const series = makeSeries([0, -20]);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result.state).toBe("overreaching_risk");
+    expect(result.stateLabel).toBe("Overreaching Risk");
+  });
+
+  it("returns trendLabel Improving when tsbDelta > 2", () => {
+    // 15-entry series: reference point at index 0 (tsb=0), latest at index 14 (tsb=10)
+    const tsbValues = Array.from({ length: 15 }, (_, i) => (i === 14 ? 10 : 0));
+    const series = makeSeries(tsbValues);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result.trendLabel).toBe("Improving");
+  });
+
+  it("returns trendLabel Declining when tsbDelta < -2", () => {
+    // 15-entry series: reference point at index 0 (tsb=10), latest at index 14 (tsb=0)
+    const tsbValues = Array.from({ length: 15 }, (_, i) => (i === 0 ? 10 : 0));
+    const series = makeSeries(tsbValues);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result.trendLabel).toBe("Declining");
+  });
+
+  it("returns trendLabel Stable when tsbDelta is within dead-band (-2 to +2)", () => {
+    const series = makeSeries([5, 5]);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result.trendLabel).toBe("Stable");
+  });
+
+  it("uses Math.max(0, series.length - 15) as reference index for trend window", () => {
+    // 20-entry series: index 5 (length 20, 20-15=5) has tsb=0, latest has tsb=10
+    const tsbValues = Array.from({ length: 20 }, (_, i) => {
+      if (i === 5) return 0;
+      if (i === 19) return 10;
+      return 5; // everything else is 5 — reference should be index 5 (=0), latest=10, delta=10 → Improving
+    });
+    const series = makeSeries(tsbValues);
+    const result = Compute.computeTrainingLoadState(series);
+    // ref index = 20-15 = 5, tsb at idx 5 = 0, latest = 10, delta = 10 > 2 → Improving
+    expect(result.trendLabel).toBe("Improving");
+  });
+
+  it("returns correct shape { state, stateLabel, trendLabel, tsb }", () => {
+    const series = makeSeries([0, 12]);
+    const result = Compute.computeTrainingLoadState(series);
+    expect(result).toHaveProperty("state");
+    expect(result).toHaveProperty("stateLabel");
+    expect(result).toHaveProperty("trendLabel");
+    expect(result).toHaveProperty("tsb");
+  });
+});

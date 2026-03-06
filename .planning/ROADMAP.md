@@ -68,6 +68,12 @@ Plans:
 
 **Requirements:** INSG-01, INSG-02
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — computeTrainingLoadState + Training Load Trend overlay callout (INSG-01)
+- [ ] 04-02-PLAN.md — insights_synthesis edge function mode + Insights synthesis callout (INSG-02)
+
 **Success Criteria:**
 1. Training Load Trend displays coach overlay states tied to computed load/form windows.
 2. Insights page renders one overall coach synthesis comment derived from current data.
@@ -75,4 +81,4 @@ Plans:
 4. UI remains readable on desktop and mobile without chart clutter or blocking interactions.
 
 ---
-*Last updated: 2026-03-06 after 03 planning*
+*Last updated: 2026-03-06 after 04 planning*

@@ -9,7 +9,7 @@
 
 - [ ] **RPLN-01**: User can trigger manual long-term replanning from the app and receive updated weekly structure up to goal race.
 - [ ] **RPLN-02**: Replanning uses latest activities, daily logs, and check-ins as input context.
-- [ ] **RPLN-03**: Replanning response includes a clear summary of what changed and why.
+- [x] **RPLN-03**: Replanning response includes a clear summary of what changed and why.
 
 ### Coaching Philosophy
 
@@ -55,7 +55,7 @@
 |-------------|-------|--------|
 | RPLN-01 | Phase 2 | Pending |
 | RPLN-02 | Phase 2 | Pending |
-| RPLN-03 | Phase 3 | Pending |
+| RPLN-03 | Phase 3 | Complete |
 | PHIL-01 | Phase 1 | Complete |
 | PHIL-02 | Phase 1 | Complete |
 | PHIL-03 | Phase 2 | Pending |

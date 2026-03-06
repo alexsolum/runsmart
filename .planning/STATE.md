@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 3
 status: in-progress
-last_updated: "2026-03-06T09:50:00Z"
+last_updated: "2026-03-06T09:55:00Z"
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 13
-  completed_plans: 11
-  percent: 85
-  bar: "[█████████░] 85%"
+  completed_plans: 12
+  percent: 92
+  bar: "[█████████░] 92%"
 ---
 
 # State
@@ -43,7 +43,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 |-------|------|--------|
 | 1 | Philosophy Platform | Completed (gap-closure 01-04 done) |
 | 2 | Replan Coach Context | Completed (5/5 plans complete) |
-| 3 | Feedback Loop Integration | In Progress (2/4 plans complete) |
+| 3 | Feedback Loop Integration | In Progress (2/4 plans complete — 03-00 + 03-01 done) |
 | 4 | Insights Coach Layer | Pending |
 
 ## Notes
@@ -64,12 +64,14 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - [Phase 03-feedback-loop-integration]: gemini-instructions stubs use .jsx extension for jsdom pickup; module-not-found is intentional RED state for 03-01
 - [Phase 03-feedback-loop-integration]: makeAppData default checkins updated to SAMPLE_CHECKINS with loadCheckins mock to prevent undefined.catch() crashes
 - [Phase 03-feedback-loop-integration]: recentCheckins uses slice(0,3).map(normalizeCheckin).filter(Boolean); latestCheckin unchanged for backward compat
+- [Phase 03-feedback-loop-integration]: instructionSnippets.js is frontend-only for test assertions; citation/methodology mandate strings are copied by value into Deno edge function instruction builders
+- [Phase 03-feedback-loop-integration]: philosophyAddendum passed as optional 4th param to buildDefaultSystemInstruction — now injected into initial and followup Gemini calls alongside replan modes
 
 ## Session
 
 - Last session: 2026-03-06
-- Stopped at: Completed `03-02-PLAN.md` (recentCheckins in buildCoachPayload + spy test)
+- Stopped at: Completed `03-01-PLAN.md` (gemini-coach instruction mandates + instructionSnippets.js)
 - Resume command: `$gsd-plan-phase 3`
 
 ---
-*Last updated: 2026-03-06 after 03-02 execution (recentCheckins array in coach payload)*
+*Last updated: 2026-03-06 after 03-01 execution (citation/methodology mandates, philosophy-in-all-modes, adaptation_summary)*

@@ -48,9 +48,17 @@
 
 **Requirements:** RPLN-03, FDBK-01, FDBK-02
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-00-PLAN.md — Test infrastructure: SAMPLE_CHECKINS fixtures + gemini-instructions stub tests
+- [ ] 03-01-PLAN.md — Edge function: instruction mandates, adaptation_summary, philosophy-in-initial-mode
+- [ ] 03-02-PLAN.md — Payload builder: recentCheckins array in buildCoachPayload
+- [ ] 03-03-PLAN.md — Frontend rendering: adaptation_summary callout in CoachPage and LongTermPlanPage
+
 **Success Criteria:**
 1. Coach feedback references check-in and daily-log inputs where present.
-2. Coach output includes explicit “what changed and why” adaptation summary.
+2. Coach output includes explicit "what changed and why" adaptation summary.
 3. Recommendations align with long-run centric strategy and specific intensity distribution.
 4. Replan and coaching flows keep schema-safe responses with fallback behavior on parse errors.
 
@@ -67,4 +75,4 @@
 4. UI remains readable on desktop and mobile without chart clutter or blocking interactions.
 
 ---
-*Last updated: 2026-03-05 after 02-05 execution*
+*Last updated: 2026-03-06 after 03 planning*

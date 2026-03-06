@@ -348,7 +348,13 @@ export default function InsightsPage() {
         const { data, error } = await client.functions.invoke("gemini-coach", {
           body: { mode: "insights_synthesis", ...payload },
         });
-        if (!error && data?.synthesis) setSynthesis(data.synthesis);
+        if (!error && data) {
+          let text = data.synthesis;
+          if (typeof text === "string" && text.trimStart().startsWith("{")) {
+            try { text = JSON.parse(text)?.synthesis ?? text; } catch { /* keep raw */ }
+          }
+          if (text) setSynthesis(text);
+        }
       } catch {
         // silent fail — callout is omitted
       } finally {

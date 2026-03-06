@@ -4,9 +4,24 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 4
 status: planning
-last_updated: "2026-03-06T09:06:44.992Z"
+last_updated: "2026-03-06T11:53:43.879Z"
 progress:
   total_phases: 4
+  completed_phases: 3
+  total_plans: 15
+  completed_plans: 14
+  percent: 93
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_phase: 4
+status: planning
+last_updated: "2026-03-06T09:06:44.992Z"
+progress:
+  [█████████░] 93%
   completed_phases: 3
   total_plans: 13
   completed_plans: 13
@@ -58,7 +73,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 | 1 | Philosophy Platform | Completed (gap-closure 01-04 done) |
 | 2 | Replan Coach Context | Completed (5/5 plans complete) |
 | 3 | Feedback Loop Integration | Completed (4/4 plans complete) |
-| 4 | Insights Coach Layer | Pending |
+| 4 | Insights Coach Layer | In Progress (1/2 plans complete) |
 
 ## Notes
 
@@ -82,12 +97,13 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - [Phase 03-feedback-loop-integration]: instructionSnippets.js is frontend-only for test assertions; citation/methodology mandate strings are copied by value into Deno edge function instruction builders
 - [Phase 03-feedback-loop-integration]: philosophyAddendum passed as optional 4th param to buildDefaultSystemInstruction — now injected into initial and followup Gemini calls alongside replan modes
 - [Phase 03-feedback-loop-integration]: adaptation_summary stored as separate useState in CoachPage; embedded in replanData object in LongTermPlanPage — consistent with each page's existing state shape
+- [Phase 04-insights-coach-layer]: computeTrainingLoadState: locked TSB thresholds (>10=good_form, >=-5=neutral, >=-15=accumulating_fatigue, else overreaching_risk); 15-day trend window ±2 dead-band; reuses coach-adaptation-note CSS class
 
 ## Session
 
 - Last session: 2026-03-06
-- Stopped at: Completed `03-03-PLAN.md` (adaptation_summary frontend rendering, RPLN-03 complete)
-- Resume command: `$gsd-plan-phase 4`
+- Stopped at: Completed `04-01-PLAN.md` (computeTrainingLoadState + InsightsPage load-state overlay, INSG-01 done)
+- Resume command: `$gsd-execute-plan 04-insights-coach-layer 02`
 
 ---
-*Last updated: 2026-03-06 after 03-03 execution (adaptation_summary callout in CoachPage + LongTermPlanPage, phase 3 complete)*
+*Last updated: 2026-03-06 after 04-01 execution (load-state overlay callout, INSG-01 complete)*

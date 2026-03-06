@@ -232,6 +232,33 @@ export const SAMPLE_MESSAGES = [
   },
 ];
 
+export const SAMPLE_CHECKINS = [
+  {
+    id: "chk-1",
+    week_of: weeksAgoOnDow(1, 1).split("T")[0],
+    fatigue: 4,
+    sleep_quality: 3,
+    motivation: 3,
+    niggles: "mild left calf tightness",
+  },
+  {
+    id: "chk-2",
+    week_of: weeksAgoOnDow(2, 1).split("T")[0],
+    fatigue: 3,
+    sleep_quality: 4,
+    motivation: 4,
+    niggles: null,
+  },
+  {
+    id: "chk-3",
+    week_of: weeksAgoOnDow(3, 1).split("T")[0],
+    fatigue: 2,
+    sleep_quality: 5,
+    motivation: 5,
+    niggles: null,
+  },
+];
+
 export const SAMPLE_WORKOUT_ENTRIES = [
   {
     id: "we-1",
@@ -281,8 +308,9 @@ export function makeAppData(overrides = {}) {
       loadActivities: vi.fn().mockResolvedValue(SAMPLE_ACTIVITIES),
     },
     checkins: {
-      checkins: [],
+      checkins: SAMPLE_CHECKINS,
       loading: false,
+      loadCheckins: vi.fn().mockResolvedValue(SAMPLE_CHECKINS),
     },
     plans: {
       plans: [SAMPLE_PLAN],

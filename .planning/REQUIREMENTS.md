@@ -19,8 +19,8 @@
 
 ### Feedback Loop
 
-- [ ] **FDBK-01**: Check-in and daily log data are incorporated into coach feedback responses for next-step recommendations.
-- [ ] **FDBK-02**: Coach feedback explicitly reflects long-run centric planning and specific intensity distribution.
+- [x] **FDBK-01**: Check-in and daily log data are incorporated into coach feedback responses for next-step recommendations.
+- [x] **FDBK-02**: Coach feedback explicitly reflects long-run centric planning and specific intensity distribution.
 
 ### Insights Integration
 
@@ -59,8 +59,8 @@
 | PHIL-01 | Phase 1 | Complete |
 | PHIL-02 | Phase 1 | Complete |
 | PHIL-03 | Phase 2 | Pending |
-| FDBK-01 | Phase 3 | Pending |
-| FDBK-02 | Phase 3 | Pending |
+| FDBK-01 | Phase 3 | Complete |
+| FDBK-02 | Phase 3 | Complete |
 | INSG-01 | Phase 4 | Pending |
 | INSG-02 | Phase 4 | Pending |
 

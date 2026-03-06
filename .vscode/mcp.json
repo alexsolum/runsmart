@@ -1,5 +1,4 @@
 {
-{
   "servers": {
     "supabase": {
       "type": "http",

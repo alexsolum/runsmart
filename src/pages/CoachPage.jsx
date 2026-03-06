@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import { buildCoachPayload } from "../lib/coachPayload";
 import CoachAvatar from "../components/CoachAvatar";
 import { useI18n } from "../i18n/translations";
 import { Button } from "@/components/ui/button";
@@ -10,44 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function getWeekStartUtc(date) {
-  const d = new Date(date);
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - day + 1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function buildWeeklySummaries(activities) {
-  const now = new Date();
-  const summaries = [];
-  for (let i = 4; i >= 1; i--) {
-    const weekStart = getWeekStartUtc(new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000));
-    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const weekActs = activities.filter((a) => {
-      const d = new Date(a.started_at);
-      return d >= weekStart && d < weekEnd;
-    });
-    const distance = weekActs.reduce((s, a) => s + (Number(a.distance) || 0) / 1000, 0);
-    const distances = weekActs.map((a) => (Number(a.distance) || 0) / 1000);
-    const longestRun = distances.length ? Math.max(...distances) : 0;
-    summaries.push({ weekOf: weekStart.toISOString().split("T")[0], distance, runs: weekActs.length, longestRun });
-  }
-  return summaries;
-}
-
-function getRecentActivities(activities) {
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  return activities
-    .filter((a) => new Date(a.started_at) >= cutoff)
-    .map((a) => ({
-      name: a.name || a.type || "Run",
-      distance: (Number(a.distance) || 0) / 1000,
-      duration: a.moving_time || 0,
-      effort: a.perceived_effort ?? null,
-    }));
-}
 
 function buildPlanContext(plan, blocks) {
   if (!plan) return null;
@@ -473,22 +436,16 @@ export default function CoachPage() {
 
   // ── Shared payload builder ───────────────────────────────────────────────
   const buildBasePayload = useCallback(async () => {
-    const [freshLogs] = await Promise.all([
-      dailyLogs.loadLogs().catch(() => dailyLogs.logs),
-    ]);
-    const background = runnerProfile.background;
-    const goal = activePlan?.goal ?? null;
-    const runnerProfilePayload = (background || goal) ? { background: background || null, goal } : null;
-    return {
-      weeklySummary: buildWeeklySummaries(activities.activities),
-      recentActivities: getRecentActivities(activities.activities),
-      latestCheckin: checkins.checkins[0] ?? null,
-      planContext: buildPlanContext(activePlan, trainingBlocks.blocks),
-      dailyLogs: getRecentDailyLogs(freshLogs ?? []),
-      runnerProfile: runnerProfilePayload,
+    return buildCoachPayload({
+      activities,
+      dailyLogs,
+      checkins,
+      activePlan,
+      trainingBlocks,
+      runnerProfile,
       lang,
-    };
-  }, [activities.activities, checkins.checkins, dailyLogs, activePlan, trainingBlocks.blocks, runnerProfile, lang]);
+    });
+  }, [activities, checkins, dailyLogs, activePlan, trainingBlocks, runnerProfile, lang]);
 
   // ── Chat tab handlers ────────────────────────────────────────────────────
 

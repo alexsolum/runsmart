@@ -59,9 +59,9 @@ skipped: 6
 ## Gaps
 
 - truth: "Admin nav entry is visible to the owner/first authenticated user after app bootstraps their role"
-  status: failed
-  reason: "User reported: I cant see the admin entry, but it is probably because i havent been set as owner. Is there a functionality to be set as owner?"
+  status: resolved
+  reason: "Fixed in 01-04: useCoachPhilosophy.load() now runs a count query on coach_admins; if count===0 (table empty), first authenticated user gets isAdmin=true automatically."
   severity: blocker
   test: 1
-  artifacts: []
+  artifacts: [src/hooks/useCoachPhilosophy.js]
   missing: []

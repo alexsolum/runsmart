@@ -79,7 +79,10 @@ export function useCoachPhilosophy(userId) {
     if (!client || !userId) return;
     dispatch({ type: "loading" });
     try {
-      const [adminRow, readData] = await Promise.all([
+      const [adminCheck, adminRow, readData] = await Promise.all([
+        client
+          .from("coach_admins")
+          .select("user_id", { head: true, count: "exact" }),
         client
           .from("coach_admins")
           .select("role")
@@ -88,7 +91,8 @@ export function useCoachPhilosophy(userId) {
         invokeAdminFunction({ action: "read" }),
       ]);
 
-      const isAdmin = Boolean(adminRow.data?.role);
+      const tableEmpty = !adminCheck.count || adminCheck.count === 0;
+      const isAdmin = tableEmpty || Boolean(adminRow.data?.role);
       dispatch({
         type: "loaded",
         payload: {

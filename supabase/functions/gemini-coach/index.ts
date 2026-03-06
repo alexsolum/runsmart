@@ -44,9 +44,10 @@ const SYSTEM_INSTRUCTION =
 const PLAN_SYSTEM_INSTRUCTION =
   `You are Marius AI Bakken, an elite endurance running coach. ` +
   `Analyze the athlete's 4-week training history and generate a complete 7-day training plan for the upcoming week. ` +
-  `Your response MUST be a single valid JSON object with exactly two fields:\n` +
+  `Your response MUST be a single valid JSON object with exactly three fields:\n` +
   `1. "coaching_feedback": a string (2-4 sentences) summarizing the last 4 weeks of training — key trends, progress, and any concerns.\n` +
-  `2. "structured_plan": an array of exactly 7 objects, one per day starting from the next Monday, each with:\n` +
+  `2. "adaptation_summary": a string (2-3 sentences) explaining what wellness/load signal drove the adaptation and how long-run structure or intensity distribution was adjusted. REQUIRED.\n` +
+  `3. "structured_plan": an array of exactly 7 objects, one per day starting from the next Monday, each with:\n` +
   `   - "date": ISO date string (YYYY-MM-DD)\n` +
   `   - "workout_type": one of "Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"\n` +
   `   - "distance_km": number (0 for rest days)\n` +
@@ -71,9 +72,10 @@ const PLAN_REVISION_SYSTEM_INSTRUCTION =
   `You are Marius AI Bakken, an elite endurance running coach in an ongoing conversation with your athlete. ` +
   `The athlete has provided feedback or constraints about their upcoming week. ` +
   `Revise the 7-day training plan accordingly while maintaining athletic integrity. ` +
-  `Your response MUST be a single valid JSON object with exactly two fields:\n` +
+  `Your response MUST be a single valid JSON object with exactly three fields:\n` +
   `1. "coaching_feedback": a string (1-3 sentences) acknowledging the athlete's feedback and explaining the key changes you made.\n` +
-  `2. "structured_plan": an array of exactly 7 objects, one per day, each with:\n` +
+  `2. "adaptation_summary": a string (2-3 sentences) explaining what wellness/load signal drove the adaptation and how long-run structure or intensity distribution was adjusted. REQUIRED.\n` +
+  `3. "structured_plan": an array of exactly 7 objects, one per day, each with:\n` +
   `   - "date": ISO date string (YYYY-MM-DD)\n` +
   `   - "workout_type": one of "Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"\n` +
   `   - "distance_km": number (0 for rest days)\n` +
@@ -84,9 +86,10 @@ const PLAN_REVISION_SYSTEM_INSTRUCTION =
 const LONG_TERM_REPLAN_SYSTEM_INSTRUCTION =
   `You are Marius AI Bakken, an elite endurance running coach. ` +
   `Generate a long-term weekly structure from the current planning week through the goal race week. ` +
-  `Your response MUST be a single valid JSON object with exactly two fields:\n` +
+  `Your response MUST be a single valid JSON object with exactly three fields:\n` +
   `1. "coaching_feedback": a string (2-5 sentences) summarizing the replan strategy and key progression logic.\n` +
-  `2. "weekly_structure": an array of week objects with one entry per target week, each including:\n` +
+  `2. "adaptation_summary": a string (2-3 sentences) explaining what wellness/load signal drove the adaptation and how long-run structure or intensity distribution was adjusted. REQUIRED.\n` +
+  `3. "weekly_structure": an array of week objects with one entry per target week, each including:\n` +
   `   - "week_start": ISO date string (YYYY-MM-DD, Monday)\n` +
   `   - "week_end": ISO date string (YYYY-MM-DD, Sunday)\n` +
   `   - "phase_focus": short string (5-15 words) describing weekly focus\n` +
@@ -233,6 +236,7 @@ interface RequestBody {
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
   latestCheckin: Checkin | null;
+  recentCheckins?: Checkin[];
   planContext: PlanContext | null;
   dailyLogs: DailyLog[];
   runnerProfile?: RunnerProfile | null;
@@ -401,10 +405,26 @@ function buildDefaultSystemInstruction(
   baseInstruction: string,
   lang: string | undefined,
   dynamicAddendum: string,
+  philosophyAddendum?: string,
 ): string {
   const languageLine = lang === "no"
     ? "Primary response language: Norwegian (bokmal)."
     : "Primary response language: English.";
+
+  const citationMandate =
+    "Data citation requirement: At least one insight body (initial mode) or " +
+    "coaching_feedback sentence (plan/replan modes) MUST cite an actual check-in " +
+    "or daily-log value using the format \"Your [metric] of [value]/5 [interpretation]...\". " +
+    "If no check-in or wellness log data is available, explicitly state: " +
+    "\"No check-in or wellness data available this week — recommendations based on training load only.\"";
+
+  const methodologyMandate =
+    "Methodology alignment requirement: At least one insight body or coaching note " +
+    "MUST explicitly mention long-run positioning in the week OR intensity distribution " +
+    "(e.g., 80/20 easy/quality ratio). " +
+    "Let the koop_weight/bakken_weight blend in the philosophy document guide emphasis: " +
+    "higher koop_weight → emphasize long-run anchoring; higher bakken_weight → emphasize " +
+    "specific intensity blocks.";
 
   return [
     baseInstruction.trim(),
@@ -415,6 +435,12 @@ function buildDefaultSystemInstruction(
     "- Use runtime playbook entries and fallback playbook context for coaching style only.",
     "",
     COACH_GUARDRAILS,
+    "",
+    citationMandate,
+    "",
+    methodologyMandate,
+    "",
+    philosophyAddendum ? `Active published philosophy (runtime):\n${philosophyAddendum}` : "",
     "",
     dynamicAddendum ? `Runtime playbook snippets:\n${dynamicAddendum}` : "",
     "",
@@ -437,6 +463,26 @@ function buildReplanSystemInstruction(
     ? "Primary response language: Norwegian (bokmal)."
     : "Primary response language: English.";
 
+  const citationMandate =
+    "Data citation requirement: At least one insight body (initial mode) or " +
+    "coaching_feedback sentence (plan/replan modes) MUST cite an actual check-in " +
+    "or daily-log value using the format \"Your [metric] of [value]/5 [interpretation]...\". " +
+    "If no check-in or wellness log data is available, explicitly state: " +
+    "\"No check-in or wellness data available this week — recommendations based on training load only.\"";
+
+  const methodologyMandate =
+    "Methodology alignment requirement: At least one insight body or coaching note " +
+    "MUST explicitly mention long-run positioning in the week OR intensity distribution " +
+    "(e.g., 80/20 easy/quality ratio). " +
+    "Let the koop_weight/bakken_weight blend in the philosophy document guide emphasis: " +
+    "higher koop_weight → emphasize long-run anchoring; higher bakken_weight → emphasize " +
+    "specific intensity blocks.";
+
+  const adaptationSummaryMandate =
+    "adaptation_summary MUST cite the wellness signal(s) that drove the change " +
+    "(check-in scores, log trends, or training load) and MUST mention long-run structure " +
+    "or intensity distribution.";
+
   return [
     baseInstruction.trim(),
     "",
@@ -448,6 +494,12 @@ function buildReplanSystemInstruction(
     "5) Static playbook fallback context.",
     "",
     COACH_GUARDRAILS,
+    "",
+    citationMandate,
+    "",
+    methodologyMandate,
+    "",
+    adaptationSummaryMandate,
     "",
     "Active published philosophy (runtime):",
     philosophyAddendum,
@@ -573,6 +625,24 @@ function buildPrompt(data: RequestBody): string {
       `Latest check-in: fatigue ${c.fatigue}/5, sleep ${c.sleepQuality}/5, motivation ${c.motivation}/5` +
         (c.niggles ? `, niggles: ${c.niggles}` : ""),
     );
+    lines.push("");
+  }
+
+  const checkinList = data.recentCheckins ?? (data.latestCheckin ? [data.latestCheckin] : []);
+  if (checkinList.length > 1) {
+    lines.push("Check-in trend (most recent first):");
+    checkinList.forEach((c) => {
+      const weekLabel = (c as Checkin & { weekOf?: string; week_of?: string }).weekOf ??
+        (c as Checkin & { weekOf?: string; week_of?: string }).week_of ??
+        "recent week";
+      lines.push(
+        `- Week of ${weekLabel}: fatigue ${c.fatigue}/5, sleep ${c.sleepQuality}/5, motivation ${c.motivation}/5` +
+          (c.niggles ? `, niggles: ${c.niggles}` : ""),
+      );
+    });
+    lines.push("");
+  } else if (checkinList.length === 0 && !data.dailyLogs?.length) {
+    lines.push("No wellness data available this week — coaching based on training load only.");
     lines.push("");
   }
 
@@ -785,11 +855,13 @@ Deno.serve(async (req) => {
 
     const body: RequestBody = await req.json();
     const mode: CoachMode = body.mode ?? "initial";
-    const dynamicPlaybookAddendum = await fetchDynamicPlaybookAddendum(supabase, body, mode);
+    const [dynamicPlaybookAddendum, activePhilosophy] = await Promise.all([
+      fetchDynamicPlaybookAddendum(supabase, body, mode),
+      fetchActivePhilosophyDocument(supabase),
+    ]);
+    const philosophyAddendum = buildActivePhilosophyAddendum(activePhilosophy);
 
     if (mode === "long_term_replan") {
-      const activePhilosophy = await fetchActivePhilosophyDocument(supabase);
-      const philosophyAddendum = buildActivePhilosophyAddendum(activePhilosophy);
       const systemInstruction = buildReplanSystemInstruction(
         LONG_TERM_REPLAN_SYSTEM_INSTRUCTION,
         body.lang,
@@ -834,10 +906,14 @@ Deno.serve(async (req) => {
         ? "Long-term replan generated with fallback horizon due to unavailable or out-of-range race date context. Keep progression conservative and update race context when available."
         : "Long-term replan generated through goal-race week with progressive load and recovery balance.";
       const coachingFeedback = String(parsedResult.coaching_feedback || defaultFeedback).slice(0, 1000);
+      const adaptationSummary = String(
+        (parsedResult as Record<string, unknown>).adaptation_summary || "Adaptation based on available training context."
+      ).slice(0, 600);
 
       return new Response(
         JSON.stringify({
           coaching_feedback: coachingFeedback,
+          adaptation_summary: adaptationSummary,
           weekly_structure: weeklyStructure,
           horizon_start: toIsoDate(horizon.startMonday),
           horizon_end: toIsoDate(horizon.endSunday),
@@ -853,8 +929,6 @@ Deno.serve(async (req) => {
     if (mode === "plan" || mode === "plan_revision") {
       const isPlanRevision = mode === "plan_revision";
       const baseInstruction = isPlanRevision ? PLAN_REVISION_SYSTEM_INSTRUCTION : PLAN_SYSTEM_INSTRUCTION;
-      const activePhilosophy = await fetchActivePhilosophyDocument(supabase);
-      const philosophyAddendum = buildActivePhilosophyAddendum(activePhilosophy);
       const systemInstruction = buildReplanSystemInstruction(
         baseInstruction,
         body.lang,
@@ -910,7 +984,7 @@ Deno.serve(async (req) => {
       const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
       const rawText = (outputPart?.text || "").trim();
 
-      let result: { coaching_feedback?: string; structured_plan?: Record<string, unknown>[] };
+      let result: { coaching_feedback?: string; adaptation_summary?: string; structured_plan?: Record<string, unknown>[] };
       try {
         result = JSON.parse(stripMarkdownFences(rawText));
       } catch {
@@ -924,9 +998,12 @@ Deno.serve(async (req) => {
         Array.isArray(result.structured_plan) ? result.structured_plan : [],
       );
       const coachingFeedback = String(result.coaching_feedback || "").slice(0, 1000);
+      const adaptationSummary = String(
+        result.adaptation_summary || "Adaptation based on available training context."
+      ).slice(0, 600);
 
       return new Response(
-        JSON.stringify({ coaching_feedback: coachingFeedback, structured_plan: structuredPlan }),
+        JSON.stringify({ coaching_feedback: coachingFeedback, adaptation_summary: adaptationSummary, structured_plan: structuredPlan }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -955,7 +1032,7 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: buildDefaultSystemInstruction(FOLLOWUP_SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
+            parts: [{ text: buildDefaultSystemInstruction(FOLLOWUP_SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum, philosophyAddendum) }],
           },
           contents,
           generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
@@ -1004,7 +1081,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: {
-          parts: [{ text: buildDefaultSystemInstruction(SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum) }],
+          parts: [{ text: buildDefaultSystemInstruction(SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum, philosophyAddendum) }],
         },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },

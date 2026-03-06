@@ -231,7 +231,7 @@ interface ConversationTurn {
 }
 
 interface RequestBody {
-  mode?: "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan";
+  mode?: "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan" | "insights_synthesis";
   conversationHistory?: ConversationTurn[];
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
@@ -243,7 +243,7 @@ interface RequestBody {
   lang?: string;
 }
 
-type CoachMode = "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan";
+type CoachMode = "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan" | "insights_synthesis";
 
 interface LongTermWeek {
   week_start: string;
@@ -1065,6 +1065,53 @@ Deno.serve(async (req) => {
         JSON.stringify({ text }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // ── Insights synthesis mode ───────────────────────────────────────────────
+    if (mode === "insights_synthesis") {
+      const INSIGHTS_SYNTHESIS_INSTRUCTION = [
+        "You are Marius AI Bakken, an expert endurance running coach.",
+        "Write a single concise paragraph (2-4 sentences) interpreting the athlete's current training state. Focus on: current fitness trend (CTL direction), form/fatigue balance (TSB), and one practical recommendation.",
+        "Your tone is direct and supportive — like a coach summarizing a training week.",
+        'Respond with a single valid JSON object: { "synthesis": "<paragraph text>" }',
+        "No markdown fences. No other fields.",
+      ].join(" ");
+
+      const systemInstruction = buildDefaultSystemInstruction(
+        INSIGHTS_SYNTHESIS_INSTRUCTION,
+        body.lang,
+        dynamicPlaybookAddendum,
+        philosophyAddendum,
+      );
+      const userMessage = buildPrompt(body);
+
+      const geminiRes = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ role: "user", parts: [{ text: userMessage }] }],
+          generationConfig: { temperature: 0.6, maxOutputTokens: 512 },
+        }),
+      });
+
+      const geminiJson = await geminiRes.json();
+      const rawText = geminiJson.candidates?.[0]?.content?.parts?.find(
+        (p: { thought?: boolean; text?: string }) => !p.thought && p.text
+      )?.text ?? "";
+      const cleaned = stripMarkdownFences(rawText);
+
+      let synthesis = "";
+      try {
+        const parsed = JSON.parse(cleaned);
+        synthesis = (parsed.synthesis ?? "").slice(0, 600);
+      } catch {
+        synthesis = cleaned.slice(0, 600);
+      }
+
+      return new Response(JSON.stringify({ synthesis }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ── Initial coaching mode (default) ──────────────────────────────────────

@@ -109,6 +109,47 @@
     });
   }
 
+  // ---- Training load state classification ----
+
+  function computeTrainingLoadState(series) {
+    if (!series || series.length < 2) return null;
+
+    var latest = series[series.length - 1];
+    var tsb = latest.tsb;
+
+    // State classification using locked TSB thresholds
+    var state, stateLabel;
+    if (tsb > 10) {
+      state = "good_form";
+      stateLabel = "Good Form";
+    } else if (tsb >= -5) {
+      state = "neutral";
+      stateLabel = "Neutral";
+    } else if (tsb >= -15) {
+      state = "accumulating_fatigue";
+      stateLabel = "Accumulating Fatigue";
+    } else {
+      state = "overreaching_risk";
+      stateLabel = "Overreaching Risk";
+    }
+
+    // Trend: compare latest tsb vs tsb at ~2 weeks ago (index series.length - 15)
+    var twoWeeksAgoIdx = Math.max(0, series.length - 15);
+    var twoWeeksTsb = series[twoWeeksAgoIdx].tsb;
+    var tsbDelta = tsb - twoWeeksTsb;
+
+    var trendLabel;
+    if (tsbDelta > 2) {
+      trendLabel = "Improving";
+    } else if (tsbDelta < -2) {
+      trendLabel = "Declining";
+    } else {
+      trendLabel = "Stable";
+    }
+
+    return { state: state, stateLabel: stateLabel, trendLabel: trendLabel, tsb: tsb };
+  }
+
   // ---- Long run progression ----
 
   function computeLongRuns(activities) {
@@ -742,6 +783,7 @@ export {
   computeTrainingBlocks,
   computeCurrentBlock,
   computeTrainingLoad,
+  computeTrainingLoadState,
   computeLongRuns,
   computeKoopPlan,
   computeWeeklyCalendar,

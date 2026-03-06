@@ -163,6 +163,7 @@ export async function buildCoachPayload({
     weeklySummary: buildWeeklySummaries(freshActivities),
     recentActivities: getRecentActivities(freshActivities),
     latestCheckin: normalizeCheckin(freshCheckins[0] ?? null),
+    recentCheckins: freshCheckins.slice(0, 3).map(normalizeCheckin).filter(Boolean),
     planContext: buildPlanContext(activePlan, trainingBlocks.blocks ?? []),
     dailyLogs: getRecentDailyLogs(freshLogs),
     runnerProfile: runnerProfilePayload,

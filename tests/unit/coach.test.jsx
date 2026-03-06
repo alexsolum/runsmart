@@ -19,6 +19,7 @@ import AdminPhilosophyPage from "../../src/pages/AdminPhilosophyPage";
 import { useCoachPhilosophy } from "../../src/hooks/useCoachPhilosophy";
 import {
   makeAppData,
+  SAMPLE_CHECKINS,
   SAMPLE_DAILY_LOGS,
   SAMPLE_BLOCKS,
   SAMPLE_PLAN,
@@ -64,6 +65,8 @@ const SAMPLE_INSIGHTS = [
 const SAMPLE_PLAN_DATA = {
   coaching_feedback:
     "Your training over the last 4 weeks shows solid aerobic consistency. Keep total volume in range this week and prioritize recovery after the long run.",
+  adaptation_summary:
+    "Fatigue trend across 3 check-ins drove a load reduction this week. Long run remains Sunday anchor. Intensity sessions reduced from 2 to 1 given elevated fatigue.",
   structured_plan: [
     { date: "2026-03-09", workout_type: "Easy", distance_km: 8, duration_min: 50, description: "Easy aerobic run at comfortable conversational pace." },
     { date: "2026-03-10", workout_type: "Rest", distance_km: 0, duration_min: 0, description: "Full rest day. Focus on sleep and nutrition." },
@@ -771,6 +774,34 @@ describe("Coach page — initial coaching", () => {
       );
     });
   });
+
+  it("includes recentCheckins array in initial coaching payload", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    const appData = makeAppDataWithNewConv({
+      checkins: {
+        checkins: SAMPLE_CHECKINS,
+        loading: false,
+        loadCheckins: vi.fn().mockResolvedValue(SAMPLE_CHECKINS),
+      },
+    });
+    useAppData.mockReturnValue(appData);
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+
+    await waitFor(() => {
+      const invokeCall = mockClient.functions.invoke.mock.calls.find(
+        ([_fn, opts]) => !opts?.body?.mode || opts?.body?.mode === "initial"
+      );
+      expect(invokeCall).toBeDefined();
+      const body = invokeCall[1].body;
+      expect(Array.isArray(body.recentCheckins)).toBe(true);
+      expect(body.recentCheckins.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
 
 // ── Follow-up messages ────────────────────────────────────────────────────────
@@ -1292,6 +1323,22 @@ describe("Coach page — plan tab", () => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
       expect(screen.getByText(/Plan generation failed/i)).toBeInTheDocument();
       expect(screen.getByText(/Edge Function returned a non-2xx status code/i)).toBeInTheDocument();
+    });
+  });
+
+  it("displays adaptation_summary callout after plan generation", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Fatigue trend across 3 check-ins/i)).toBeInTheDocument();
     });
   });
 

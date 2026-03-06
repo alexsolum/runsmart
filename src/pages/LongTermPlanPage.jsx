@@ -414,6 +414,7 @@ export default function LongTermPlanPage() {
       );
       setReplanData({
         coaching_feedback: data?.coaching_feedback ?? "",
+        adaptation_summary: data?.adaptation_summary ?? null,
         weekly_structure: weeklyStructure,
         horizon_start: data?.horizon_start ?? weeklyStructure[0]?.week_start ?? null,
         horizon_end: data?.horizon_end ?? weeklyStructure[weeklyStructure.length - 1]?.week_end ?? null,
@@ -612,6 +613,12 @@ export default function LongTermPlanPage() {
                 <p className="mt-2 mb-0 text-[13px] text-slate-700 leading-relaxed">
                   {replanData.coaching_feedback}
                 </p>
+              )}
+              {replanData?.adaptation_summary && (
+                <div className="ltp-adaptation-note mt-2">
+                  <strong>Coaching note</strong>
+                  <p>{replanData.adaptation_summary}</p>
+                </div>
               )}
               {replanData?.weekly_structure?.length > 0 && (
                 <div className="mt-2 grid gap-1.5">

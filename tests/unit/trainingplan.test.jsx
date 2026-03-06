@@ -5,7 +5,7 @@
  * across weeks, with create/edit/delete functionality backed by Supabase.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
 import KoopTimeline from "../../src/components/KoopTimeline";
@@ -87,6 +87,49 @@ describe("Training Plan - manual replan", () => {
     expect(screen.getByText(/Manual Replan Preview/i)).toBeInTheDocument();
     expect(screen.getByText(/1 week horizon/i)).toBeInTheDocument();
     expect(screen.getByText(/Horizon: 2026-04-06 to 2026-06-28/i)).toBeInTheDocument();
+  });
+
+  it("displays adaptation_summary callout after long-term replan", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        coaching_feedback: "Adjusted for your current fatigue.",
+        adaptation_summary: "Fatigue trend across 3 check-ins drove a load reduction this week. Long run remains Sunday anchor. Intensity sessions reduced from 2 to 1 given elevated fatigue.",
+        weekly_structure: [
+          {
+            week_start: "2026-04-06",
+            week_end: "2026-04-12",
+            phase_focus: "Aerobic support",
+            target_km: 58,
+            key_workouts: ["Long run progression"],
+            notes: "Keep fatigue manageable",
+          },
+        ],
+        horizon_start: "2026-04-06",
+        horizon_end: "2026-04-12",
+        goal_race_date: "2026-06-29",
+      },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      planContext: { phase: "Build" },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+
+    useAppData.mockReturnValue(makeAppData());
+    render(<LongTermPlanPage />);
+
+    await user.click(screen.getByRole("button", { name: /Replan with AI Coach/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Fatigue trend across 3 check-ins/i)).toBeInTheDocument();
+    });
   });
 
   it("applies only selected horizon weeks after explicit confirmation", async () => {

@@ -408,6 +408,7 @@ export default function CoachPage() {
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState(null);
   const [planData, setPlanData] = useState(null); // { coaching_feedback, structured_plan }
+  const [adaptationSummary, setAdaptationSummary] = useState(null);
   const [planConvHistory, setPlanConvHistory] = useState([]); // [{ role: "user"|"model", text }]
   const [revisionInput, setRevisionInput] = useState("");
   const [planAccepting, setPlanAccepting] = useState(false);
@@ -561,6 +562,7 @@ export default function CoachPage() {
     setPlanLoading(true);
     setPlanError(null);
     setPlanAccepted(false);
+    setAdaptationSummary(null);
     try {
       const basePayload = await buildBasePayload();
       const payload = { mode: "plan", ...basePayload };
@@ -568,6 +570,7 @@ export default function CoachPage() {
       if (invokeError) throw new Error(`Plan generation failed: ${invokeError.message}`);
       if (data?.error) throw new Error(data.error);
       if (!data?.structured_plan?.length) throw new Error("No plan returned from coach.");
+      setAdaptationSummary(data?.adaptation_summary ?? null);
       setPlanData(data);
       // Initialize conversation history
       const initialHistory = [
@@ -599,6 +602,7 @@ export default function CoachPage() {
       if (invokeError) throw new Error(`Revision failed: ${invokeError.message}`);
       if (data?.error) throw new Error(data.error);
       if (!data?.structured_plan?.length) throw new Error("No revised plan returned.");
+      setAdaptationSummary(data?.adaptation_summary ?? null);
       setPlanData(data);
       setPlanConvHistory([...newHistory, { role: "model", text: data.coaching_feedback }]);
     } catch (err) {
@@ -925,6 +929,14 @@ export default function CoachPage() {
 
                 {planData && (
                   <div className="space-y-4">
+                    {/* Adaptation summary callout */}
+                    {adaptationSummary && (
+                      <div className="coach-adaptation-note">
+                        <strong>Coaching note</strong>
+                        <p>{adaptationSummary}</p>
+                      </div>
+                    )}
+
                     {/* Coaching feedback */}
                     <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
                       <div className="flex gap-2.5 items-start">

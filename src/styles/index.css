@@ -1402,6 +1402,19 @@ progress {
   line-height: 1.5;
 }
 
+.insights-coach-synthesis {
+  border-left: 3px solid var(--accent, #3b82f6);
+  padding-left: 0.75rem;
+  margin-bottom: 1rem;
+  color: var(--text, inherit);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.insights-coach-synthesis p {
+  margin: 0;
+}
+
 .ltp-adaptation-note {
   border-left: 3px solid var(--accent, #3b82f6);
   padding-left: 0.75rem;

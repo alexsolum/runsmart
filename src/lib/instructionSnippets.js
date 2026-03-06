@@ -24,5 +24,5 @@ export const METHODOLOGY_MANDATE_SNIPPET =
   "specific intensity blocks.";
 
 export const INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET =
-  "Write a single concise paragraph (2-4 sentences) interpreting the athlete's current training state. " +
-  "Focus on: current fitness trend (CTL direction), form/fatigue balance (TSB), and one practical recommendation.";
+  "Write a single thorough paragraph (4-6 sentences) interpreting the athlete's current training state. " +
+  "Cover current fitness trend (CTL direction), form/fatigue balance (TSB), consistency pattern, and one practical recommendation for the next 7-10 days.";

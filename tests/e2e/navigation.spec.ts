@@ -42,23 +42,20 @@ test.describe('Authenticated navigation', () => {
     await page.goto('/');
     // Wait for the sidebar to be ready.
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 10000 });
-    // Click the Weekly Plan sidebar button.
-    await page.getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('button', { name: 'Weekly Plan' })
-      .click();
-    // Verify Weekly Plan heading is visible.
-    await expect(page.getByRole('heading', { name: /Weekly Plan/i })).toBeVisible({ timeout: 10000 });
+    // Click weekly plan via stable key-based test id (language independent).
+    await page.getByTestId('nav-weekly-plan').click();
+    // Verify Weekly Plan heading is visible (supports EN + NO locale).
+    await expect(page.getByRole('heading', { name: /Weekly Plan|Ukeplan/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('coach page loads via sidebar', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 10000 });
-    // Click the Coach sidebar button.
-    await page.getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('button', { name: 'Coach' })
-      .click();
-    // Coach page shows the AI coach heading.
-    await expect(page.getByRole('heading', { level: 2 })).toBeVisible({ timeout: 10000 });
+    // Click coach via stable key-based test id (language independent).
+    await page.getByTestId('nav-coach').click();
+    // Verify coach page container and canonical heading are visible.
+    await expect(page.locator('#coach')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Marius AI Bakken/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('no unexpected console errors on dashboard', async ({ page }) => {

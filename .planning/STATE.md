@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 3
-status: in-progress
-last_updated: "2026-03-06T09:55:00Z"
+status: completed
+last_updated: "2026-03-06T09:00:00Z"
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 13
-  completed_plans: 12
-  percent: 92
-  bar: "[█████████░] 92%"
+  completed_plans: 13
+  percent: 100
+  bar: "[██████████] 100%"
 ---
 
 # State
@@ -19,14 +19,14 @@ progress:
 **Initialized:** 2026-03-05
 **Current Phase:** 3
 **Current Focus:** Feedback Loop Integration
-**Status:** In Progress
+**Status:** Completed
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The coaching guidance must produce practical, tailored training decisions that fit real life while preserving long-term progression and injury prevention.
-**Current focus:** Phase 3 - Feedback Loop Integration
+**Current focus:** Phase 3 complete — Phase 4 (Insights Coach Layer) next
 
 ## Artifacts
 
@@ -43,7 +43,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 |-------|------|--------|
 | 1 | Philosophy Platform | Completed (gap-closure 01-04 done) |
 | 2 | Replan Coach Context | Completed (5/5 plans complete) |
-| 3 | Feedback Loop Integration | In Progress (2/4 plans complete — 03-00 + 03-01 done) |
+| 3 | Feedback Loop Integration | Completed (4/4 plans complete) |
 | 4 | Insights Coach Layer | Pending |
 
 ## Notes
@@ -56,6 +56,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - 02-05 wired long-horizon replan into `LongTermPlanPage` and added explicit week-selection apply flow to persist selected horizon weeks safely.
 - Long-horizon apply now maps week-level structure into render-safe `workout_entries` rows via `applyLongTermWeeklyStructure`.
 - 01-04 (gap-closure): Fixed isAdmin bootstrap deadlock in useCoachPhilosophy.load() — count query on coach_admins now grants first authenticated user admin access without prior mutation.
+- 03-03 complete: adaptation_summary callout now rendered in CoachPage plan tab and LongTermPlanPage replan result; RPLN-03 done.
 
 ## Decisions
 
@@ -66,12 +67,13 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - [Phase 03-feedback-loop-integration]: recentCheckins uses slice(0,3).map(normalizeCheckin).filter(Boolean); latestCheckin unchanged for backward compat
 - [Phase 03-feedback-loop-integration]: instructionSnippets.js is frontend-only for test assertions; citation/methodology mandate strings are copied by value into Deno edge function instruction builders
 - [Phase 03-feedback-loop-integration]: philosophyAddendum passed as optional 4th param to buildDefaultSystemInstruction — now injected into initial and followup Gemini calls alongside replan modes
+- [Phase 03-feedback-loop-integration]: adaptation_summary stored as separate useState in CoachPage; embedded in replanData object in LongTermPlanPage — consistent with each page's existing state shape
 
 ## Session
 
 - Last session: 2026-03-06
-- Stopped at: Completed `03-01-PLAN.md` (gemini-coach instruction mandates + instructionSnippets.js)
-- Resume command: `$gsd-plan-phase 3`
+- Stopped at: Completed `03-03-PLAN.md` (adaptation_summary frontend rendering, RPLN-03 complete)
+- Resume command: `$gsd-plan-phase 4`
 
 ---
-*Last updated: 2026-03-06 after 03-01 execution (citation/methodology mandates, philosophy-in-all-modes, adaptation_summary)*
+*Last updated: 2026-03-06 after 03-03 execution (adaptation_summary callout in CoachPage + LongTermPlanPage, phase 3 complete)*

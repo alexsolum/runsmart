@@ -38,6 +38,29 @@ function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function parseSynthesisText(value) {
+  if (!value) return null;
+  if (typeof value !== "string") return value.synthesis ?? null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      try {
+        const nested = JSON.parse(parsed);
+        return nested?.synthesis ?? parsed;
+      } catch {
+        return parsed;
+      }
+    }
+    return parsed?.synthesis ?? trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
 const TICK = { fontSize: 11, fill: "#94a3b8" };
 const TOOLTIP_STYLE = {
   backgroundColor: "white",
@@ -349,10 +372,7 @@ export default function InsightsPage() {
           body: { mode: "insights_synthesis", ...payload },
         });
         if (!error && data) {
-          let text = data.synthesis;
-          if (typeof text === "string" && text.trimStart().startsWith("{")) {
-            try { text = JSON.parse(text)?.synthesis ?? text; } catch { /* keep raw */ }
-          }
+          const text = parseSynthesisText(data.synthesis);
           if (text) setSynthesis(text);
         }
       } catch {

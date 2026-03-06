@@ -241,6 +241,21 @@ describe("Insights — synthesis callout (INSG-02)", () => {
     expect(callout).toHaveTextContent("Your training load is building steadily.");
   });
 
+  it("parses wrapped JSON-string synthesis payloads", async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: { synthesis: "\"{ \\\"synthesis\\\": \\\"You've made a significant leap in volume this past week.\\\"}\"" },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<InsightsPage />);
+    const callout = await screen.findByTestId("synthesis-callout");
+    expect(callout).toBeInTheDocument();
+    expect(callout).toHaveTextContent("You've made a significant leap in volume this past week.");
+    expect(callout).not.toHaveTextContent("{ \"synthesis\":");
+  });
+
   it("omits synthesis callout when edge function returns an error", async () => {
     const mockInvoke = vi.fn().mockResolvedValue({
       data: null,

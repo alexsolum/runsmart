@@ -122,6 +122,7 @@ function Shell() {
                     <button
                       key={item.key}
                       type="button"
+                      data-testid={`nav-${item.key}`}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${
                         isActive
                           ? "bg-white/10 text-white"

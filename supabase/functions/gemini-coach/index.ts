@@ -717,6 +717,34 @@ function stripMarkdownFences(text: string): string {
   return text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 }
 
+function parseSynthesisText(rawText: string): string {
+  const cleaned = stripMarkdownFences(rawText).trim();
+  if (!cleaned) return "";
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (typeof parsed === "string") {
+      try {
+        const nested = JSON.parse(parsed);
+        if (nested && typeof nested === "object" && typeof nested.synthesis === "string") {
+          return nested.synthesis.trim();
+        }
+      } catch {
+        return parsed.trim();
+      }
+      return parsed.trim();
+    }
+
+    if (parsed && typeof parsed === "object" && typeof parsed.synthesis === "string") {
+      return parsed.synthesis.trim();
+    }
+  } catch {
+    // fall back to raw cleaned text
+  }
+
+  return cleaned;
+}
+
 const VALID_WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
 
 function validateAndSanitizePlan(plan: Record<string, unknown>[]): Record<string, unknown>[] {
@@ -1071,7 +1099,9 @@ Deno.serve(async (req) => {
     if (mode === "insights_synthesis") {
       const INSIGHTS_SYNTHESIS_INSTRUCTION = [
         "You are Marius AI Bakken, an expert endurance running coach.",
-        "Write a single concise paragraph (2-4 sentences) interpreting the athlete's current training state. Focus on: current fitness trend (CTL direction), form/fatigue balance (TSB), and one practical recommendation.",
+        "Write a single thorough paragraph (4-6 sentences) interpreting the athlete's current training state.",
+        "Cover all of the following: current fitness trend (CTL direction), form/fatigue balance (TSB), consistency pattern, and one practical recommendation for the next 7-10 days.",
+        "Include at least one concrete data reference from the provided context (e.g. trend direction, load change, long-run pattern, or check-in signal).",
         "Your tone is direct and supportive — like a coach summarizing a training week.",
         'Respond with a single valid JSON object: { "synthesis": "<paragraph text>" }',
         "No markdown fences. No other fields.",
@@ -1091,7 +1121,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents: [{ role: "user", parts: [{ text: userMessage }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 512 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 768 },
         }),
       });
 
@@ -1099,15 +1129,7 @@ Deno.serve(async (req) => {
       const rawText = geminiJson.candidates?.[0]?.content?.parts?.find(
         (p: { thought?: boolean; text?: string }) => !p.thought && p.text
       )?.text ?? "";
-      const cleaned = stripMarkdownFences(rawText);
-
-      let synthesis = "";
-      try {
-        const parsed = JSON.parse(cleaned);
-        synthesis = (parsed.synthesis ?? "").slice(0, 600);
-      } catch {
-        synthesis = cleaned.slice(0, 600);
-      }
+      const synthesis = parseSynthesisText(rawText).slice(0, 1200);
 
       return new Response(JSON.stringify({ synthesis }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

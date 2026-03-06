@@ -38,4 +38,9 @@ describe("gemini-coach insights synthesis instruction", () => {
   it("INSG-02: INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET contains synthesis-focused language", () => {
     expect(INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET).toContain("current fitness trend");
   });
+
+  it("INSG-02: synthesis instruction requests a thorough 4-6 sentence paragraph", () => {
+    expect(INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET).toMatch(/4-6 sentences/i);
+    expect(INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET).toMatch(/consistency pattern/i);
+  });
 });

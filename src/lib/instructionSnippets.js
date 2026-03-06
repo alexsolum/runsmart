@@ -22,3 +22,7 @@ export const METHODOLOGY_MANDATE_SNIPPET =
   "Let the koop_weight/bakken_weight blend in the philosophy document guide emphasis: " +
   "higher koop_weight → emphasize long-run anchoring; higher bakken_weight → emphasize " +
   "specific intensity blocks.";
+
+export const INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET =
+  "Write a single concise paragraph (2-4 sentences) interpreting the athlete's current training state. " +
+  "Focus on: current fitness trend (CTL direction), form/fatigue balance (TSB), and one practical recommendation.";

@@ -7,11 +7,13 @@
  * Wave 1 (03-01): Tests turn GREEN after instruction snippets are exported.
  *
  * Covers: FDBK-01 (citation mandate), FDBK-02 (methodology requirement + philosophy blend)
+ * Covers: INSG-02 (synthesis instruction snippet)
  */
 import { describe, it, expect } from "vitest";
 import {
   CITATION_MANDATE_SNIPPET,
   METHODOLOGY_MANDATE_SNIPPET,
+  INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET,
 } from "../../src/lib/instructionSnippets.js";
 
 describe("gemini-coach instruction mandates", () => {
@@ -29,5 +31,11 @@ describe("gemini-coach instruction mandates", () => {
 
   it("FDBK-02: methodology mandate snippet references koop_weight or bakken_weight blend", () => {
     expect(METHODOLOGY_MANDATE_SNIPPET).toMatch(/koop_weight|bakken_weight|philosophy.*blend|blend.*philosophy/i);
+  });
+});
+
+describe("gemini-coach insights synthesis instruction", () => {
+  it("INSG-02: INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET contains synthesis-focused language", () => {
+    expect(INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET).toContain("current fitness trend");
   });
 });

@@ -19,6 +19,7 @@ import AdminPhilosophyPage from "../../src/pages/AdminPhilosophyPage";
 import { useCoachPhilosophy } from "../../src/hooks/useCoachPhilosophy";
 import {
   makeAppData,
+  SAMPLE_CHECKINS,
   SAMPLE_DAILY_LOGS,
   SAMPLE_BLOCKS,
   SAMPLE_PLAN,
@@ -771,6 +772,34 @@ describe("Coach page — initial coaching", () => {
           body: expect.objectContaining({ lang: "no" }),
         })
       );
+    });
+  });
+
+  it("includes recentCheckins array in initial coaching payload", async () => {
+    const mockClient = makeMockClient();
+    getSupabaseClient.mockReturnValue(mockClient);
+    const appData = makeAppDataWithNewConv({
+      checkins: {
+        checkins: SAMPLE_CHECKINS,
+        loading: false,
+        loadCheckins: vi.fn().mockResolvedValue(SAMPLE_CHECKINS),
+      },
+    });
+    useAppData.mockReturnValue(appData);
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+
+    await waitFor(() => {
+      const invokeCall = mockClient.functions.invoke.mock.calls.find(
+        ([_fn, opts]) => !opts?.body?.mode || opts?.body?.mode === "initial"
+      );
+      expect(invokeCall).toBeDefined();
+      const body = invokeCall[1].body;
+      expect(Array.isArray(body.recentCheckins)).toBe(true);
+      expect(body.recentCheckins.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useActivities } from "../hooks/useActivities";
 import { useCheckins } from "../hooks/useCheckins";
@@ -20,20 +20,24 @@ export function AppDataProvider({ children }) {
   const plans = usePlans(userId);
   const activities = useActivities(userId);
   const checkins = useCheckins(userId);
+  const wrappedLoadCheckins = useCallback(async (...args) => {
+    const rows = await checkins.loadCheckins?.(...args);
+    return (rows ?? []).map(normalizeCheckin);
+  }, [checkins.loadCheckins]);
+
+  const wrappedCreateCheckin = useCallback(async (...args) => {
+    const row = await checkins.createCheckin?.(...args);
+    return normalizeCheckin(row);
+  }, [checkins.createCheckin]);
+
   const normalizedCheckins = useMemo(
     () => ({
       ...checkins,
       checkins: (checkins.checkins ?? []).map(normalizeCheckin),
-      loadCheckins: async (...args) => {
-        const rows = await checkins.loadCheckins?.(...args);
-        return (rows ?? []).map(normalizeCheckin);
-      },
-      createCheckin: async (...args) => {
-        const row = await checkins.createCheckin?.(...args);
-        return normalizeCheckin(row);
-      },
+      loadCheckins: wrappedLoadCheckins,
+      createCheckin: wrappedCreateCheckin,
     }),
-    [checkins],
+    [checkins, wrappedLoadCheckins, wrappedCreateCheckin],
   );
   const dailyLogs = useDailyLogs(userId);
   const strava = useStrava(userId, auth.session, async () => {

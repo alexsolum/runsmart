@@ -11,7 +11,7 @@
 |---|-------|------|--------------|------------------|
 | 1 | 4/4 | Complete   | 2026-03-06 | 4 |
 | 2 | Replan Coach Context | Inject active philosophy and latest training context into manual replanning | RPLN-01, RPLN-02, PHIL-03 | 4 |
-| 3 | 1/4 | In Progress|  | 4 |
+| 3 | 2/4 | In Progress|  | 4 |
 | 4 | Insights Coach Layer | Add coach overlays and global synthesis to analytics surfaces | INSG-01, INSG-02 | 4 |
 
 ## Phase 1: Philosophy Platform
@@ -48,7 +48,7 @@
 
 **Requirements:** RPLN-03, FDBK-01, FDBK-02
 
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 - [ ] 03-00-PLAN.md — Test infrastructure: SAMPLE_CHECKINS fixtures + gemini-instructions stub tests

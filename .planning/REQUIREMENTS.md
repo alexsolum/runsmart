@@ -13,8 +13,8 @@
 
 ### Coaching Philosophy
 
-- [ ] **PHIL-01**: User can maintain coaching philosophy content in a persistent structured store.
-- [ ] **PHIL-02**: Only authenticated owner/admin can edit coaching philosophy in-app.
+- [x] **PHIL-01**: User can maintain coaching philosophy content in a persistent structured store.
+- [x] **PHIL-02**: Only authenticated owner/admin can edit coaching philosophy in-app.
 - [ ] **PHIL-03**: `gemini-coach` applies active philosophy content at runtime when generating coaching output.
 
 ### Feedback Loop
@@ -56,8 +56,8 @@
 | RPLN-01 | Phase 2 | Pending |
 | RPLN-02 | Phase 2 | Pending |
 | RPLN-03 | Phase 3 | Pending |
-| PHIL-01 | Phase 1 | Pending |
-| PHIL-02 | Phase 1 | Pending |
+| PHIL-01 | Phase 1 | Complete |
+| PHIL-02 | Phase 1 | Complete |
 | PHIL-03 | Phase 2 | Pending |
 | FDBK-01 | Phase 3 | Pending |
 | FDBK-02 | Phase 3 | Pending |

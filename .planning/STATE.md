@@ -39,7 +39,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | Philosophy Platform | Completed |
+| 1 | Philosophy Platform | Completed (gap-closure 01-04 done) |
 | 2 | Replan Coach Context | Completed (5/5 plans complete) |
 | 3 | Feedback Loop Integration | Pending |
 | 4 | Insights Coach Layer | Pending |
@@ -53,13 +53,18 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - Replan instruction precedence is now explicit: schema/safety first, active philosophy second, playbook fallback after.
 - 02-05 wired long-horizon replan into `LongTermPlanPage` and added explicit week-selection apply flow to persist selected horizon weeks safely.
 - Long-horizon apply now maps week-level structure into render-safe `workout_entries` rows via `applyLongTermWeeklyStructure`.
+- 01-04 (gap-closure): Fixed isAdmin bootstrap deadlock in useCoachPhilosophy.load() — count query on coach_admins now grants first authenticated user admin access without prior mutation.
+
+## Decisions
+
+- isAdmin bootstrap: tableEmpty (count=0) || existing row — OR logic resolves deadlock without changing App.jsx or edge function
+- Server-side ensureAdminAccess() still handles actual row insertion on first saveDraft mutation
 
 ## Session
 
-- Last session: 2026-03-05
-- Stopped at: Completed `02-05-PLAN.md`; Phase 2 complete and ready for Phase 3
-- Resume file: `.planning/phases/02-replan-coach-context/.continue-here.md`
+- Last session: 2026-03-06
+- Stopped at: Completed `01-04-PLAN.md` (gap-closure); Admin bootstrap deadlock resolved
 - Resume command: `$gsd-plan-phase 3`
 
 ---
-*Last updated: 2026-03-05 after 02-05 execution*
+*Last updated: 2026-03-06 after 01-04 gap-closure execution*

@@ -12,10 +12,11 @@
  * - Error state
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, renderHook, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CoachPage from "../../src/pages/CoachPage";
 import AdminPhilosophyPage from "../../src/pages/AdminPhilosophyPage";
+import { useCoachPhilosophy } from "../../src/hooks/useCoachPhilosophy";
 import {
   makeAppData,
   SAMPLE_DAILY_LOGS,
@@ -41,6 +42,7 @@ vi.mock("../../src/lib/supabaseClient", () => ({
 
 import { useAppData } from "../../src/context/AppDataContext";
 import { getSupabaseClient } from "../../src/lib/supabaseClient";
+import { buildCoachPayload } from "../../src/lib/coachPayload";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -168,6 +170,69 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   localStorage.clear();
+});
+
+describe("coach payload builder", () => {
+  it("reloads activities, daily logs, and check-ins before payload construction", async () => {
+    const freshActivity = {
+      started_at: new Date().toISOString(),
+      distance: 10000,
+      moving_time: 3200,
+      perceived_effort: 3,
+      name: "Fresh run",
+    };
+    const freshLog = {
+      log_date: new Date().toISOString().split("T")[0],
+      sleep_hours: 7,
+      sleep_quality: 4,
+      fatigue: 2,
+      mood: 4,
+      stress: 2,
+      training_quality: 4,
+      resting_hr: 50,
+      notes: "good day",
+    };
+    const freshCheckin = {
+      fatigue: 3,
+      sleep_quality: 4,
+      motivation: 5,
+      recovery_score: 4,
+      niggles: "none",
+      week_of: "2026-03-02",
+      created_at: "2026-03-05T09:00:00Z",
+    };
+    const loadActivities = vi.fn().mockResolvedValue([freshActivity]);
+    const loadLogs = vi.fn().mockResolvedValue([freshLog]);
+    const loadCheckins = vi.fn().mockResolvedValue([freshCheckin]);
+
+    const payload = await buildCoachPayload({
+      activities: { activities: [], loadActivities },
+      dailyLogs: { logs: [], loadLogs },
+      checkins: { checkins: [], loadCheckins },
+      activePlan: SAMPLE_PLAN,
+      trainingBlocks: { blocks: SAMPLE_BLOCKS },
+      runnerProfile: { background: "" },
+      lang: "en",
+    });
+
+    expect(loadActivities).toHaveBeenCalledTimes(1);
+    expect(loadLogs).toHaveBeenCalledTimes(1);
+    expect(loadCheckins).toHaveBeenCalledTimes(1);
+    expect(payload.recentActivities[0]).toMatchObject({ name: "Fresh run" });
+    expect(payload.dailyLogs[0]).toMatchObject({ sleep_quality: 4, fatigue: 2 });
+    expect(payload.latestCheckin).toMatchObject({
+      fatigue: 3,
+      sleepQuality: 4,
+      sleep_quality: 4,
+      motivation: 5,
+      recovery: 4,
+      recovery_score: 4,
+      weekOf: "2026-03-02",
+      week_of: "2026-03-02",
+      createdAt: "2026-03-05T09:00:00Z",
+      created_at: "2026-03-05T09:00:00Z",
+    });
+  });
 });
 
 // ── Branding ──────────────────────────────────────────────────────────────────
@@ -1229,6 +1294,47 @@ describe("Coach page — plan tab", () => {
       expect(screen.getByText(/Edge Function returned a non-2xx status code/i)).toBeInTheDocument();
     });
   });
+
+  it("refreshes activities, daily logs, and check-ins before initial coaching payload", async () => {
+    const mockClient = makeMockClient();
+    const loadActivities = vi.fn().mockResolvedValue([]);
+    const loadLogs = vi.fn().mockResolvedValue([]);
+    const loadCheckins = vi.fn().mockResolvedValue([]);
+    getSupabaseClient.mockReturnValue(mockClient);
+    useAppData.mockReturnValue(
+      makeAppDataWithNewConv({
+        activities: {
+          activities: [],
+          loading: false,
+          error: null,
+          loadActivities,
+        },
+        dailyLogs: {
+          logs: [],
+          loading: false,
+          error: null,
+          loadLogs,
+          saveLog: vi.fn(),
+        },
+        checkins: {
+          checkins: [],
+          loading: false,
+          error: null,
+          loadCheckins,
+        },
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+
+    await waitFor(() => {
+      expect(loadActivities).toHaveBeenCalledTimes(1);
+      expect(loadLogs).toHaveBeenCalledTimes(1);
+      expect(loadCheckins).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 // —— Admin philosophy workflow —— 
@@ -1322,5 +1428,121 @@ describe("Admin philosophy page — workflow guards", () => {
     render(<AdminPhilosophyPage />);
     await user.click(screen.getByRole("button", { name: /Rollback/i }));
     expect(rollback).toHaveBeenCalledWith("v1");
+  });
+});
+
+// ── useCoachPhilosophy bootstrap detection ────────────────────────────────────
+
+describe("useCoachPhilosophy bootstrap", () => {
+  /**
+   * Helper to create a chainable Supabase query builder mock.
+   * Supports: .from(table).select(cols, opts).eq(col, val).maybeSingle()
+   *
+   * fromImplementation(table) is called per table name, returns mock object.
+   */
+  function makePhilosophyClient({ tableCountResult, adminRowResult }) {
+    const makeCountChain = () => ({
+      select: vi.fn().mockReturnValue({
+        // count query resolves immediately (no .eq or .maybeSingle needed)
+        then: (resolve) => resolve(tableCountResult),
+        // also expose as a thenable for await
+        ...tableCountResult,
+      }),
+    });
+
+    const makeRowChain = () => ({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue(adminRowResult),
+        }),
+      }),
+    });
+
+    // We need the client.from("coach_admins") to behave differently depending
+    // on the second argument to .select() (presence of { count: "exact" }).
+    // Easiest approach: track calls and return different chains by call order.
+    let fromCallCount = 0;
+    const fromMock = vi.fn().mockImplementation(() => {
+      fromCallCount++;
+      if (fromCallCount === 1) {
+        // First call: count query (select with { head: true, count: "exact" })
+        return {
+          select: vi.fn().mockResolvedValue(tableCountResult),
+        };
+      }
+      // Second call: row query (select "role" + .eq + .maybeSingle)
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue(adminRowResult),
+          }),
+        }),
+      };
+    });
+
+    return {
+      from: fromMock,
+      functions: {
+        invoke: vi.fn().mockResolvedValue({
+          data: { document: null, versions: [] },
+          error: null,
+        }),
+      },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sets isAdmin=true when coach_admins table is empty (count=0)", async () => {
+    // Empty table: count=0 → first user gets admin access automatically
+    const client = makePhilosophyClient({
+      tableCountResult: { count: 0, error: null },
+      adminRowResult: { data: null, error: null },
+    });
+    getSupabaseClient.mockReturnValue(client);
+
+    const { result } = renderHook(() => useCoachPhilosophy("user-1"));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.isAdmin).toBe(true);
+  });
+
+  it("sets isAdmin=false when coach_admins has rows but none for this user", async () => {
+    // Populated table but no row for user-1 → not an admin
+    const client = makePhilosophyClient({
+      tableCountResult: { count: 1, error: null },
+      adminRowResult: { data: null, error: null },
+    });
+    getSupabaseClient.mockReturnValue(client);
+
+    const { result } = renderHook(() => useCoachPhilosophy("user-1"));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.isAdmin).toBe(false);
+  });
+
+  it("sets isAdmin=true when coach_admins has a row for this user", async () => {
+    // User already has an admin row → still an admin
+    const client = makePhilosophyClient({
+      tableCountResult: { count: 1, error: null },
+      adminRowResult: { data: { role: "owner" }, error: null },
+    });
+    getSupabaseClient.mockReturnValue(client);
+
+    const { result } = renderHook(() => useCoachPhilosophy("user-1"));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.isAdmin).toBe(true);
   });
 });

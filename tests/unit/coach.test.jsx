@@ -64,6 +64,8 @@ const SAMPLE_INSIGHTS = [
 const SAMPLE_PLAN_DATA = {
   coaching_feedback:
     "Your training over the last 4 weeks shows solid aerobic consistency. Keep total volume in range this week and prioritize recovery after the long run.",
+  adaptation_summary:
+    "Fatigue trend across 3 check-ins drove a load reduction this week. Long run remains Sunday anchor. Intensity sessions reduced from 2 to 1 given elevated fatigue.",
   structured_plan: [
     { date: "2026-03-09", workout_type: "Easy", distance_km: 8, duration_min: 50, description: "Easy aerobic run at comfortable conversational pace." },
     { date: "2026-03-10", workout_type: "Rest", distance_km: 0, duration_min: 0, description: "Full rest day. Focus on sleep and nutrition." },

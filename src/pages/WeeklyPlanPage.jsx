@@ -41,6 +41,19 @@ function isToday(isoDate) {
   return isoDate === new Date().toISOString().split("T")[0];
 }
 
+function normalizeWeeklyEntry(entry) {
+  const workoutDate = entry?.workout_date ?? entry?.date ?? "";
+  return {
+    ...entry,
+    workout_date: workoutDate,
+    workout_type: entry?.workout_type ?? "Easy",
+    distance_km: entry?.distance_km != null && entry?.distance_km !== "" ? Number(entry.distance_km) : null,
+    duration_min: entry?.duration_min != null && entry?.duration_min !== "" ? Number(entry.duration_min) : null,
+    description: entry?.description ?? null,
+    completed: Boolean(entry?.completed),
+  };
+}
+
 // ── Workout type badge styles ─────────────────────────────────────────────────
 
 const TYPE_BADGE_STYLES = {
@@ -311,6 +324,11 @@ export default function WeeklyPlanPage() {
     isoDateOffset(planningStartDate, 21),
   ], [planningStartDate]);
 
+  const normalizedEntries = useMemo(
+    () => workoutEntries.entries.map(normalizeWeeklyEntry),
+    [workoutEntries.entries],
+  );
+
   // Load entries for entire 4-week range
   useEffect(() => {
     if (selectedPlanId && planningStartDate) {
@@ -431,7 +449,7 @@ export default function WeeklyPlanPage() {
               <WeekSection
                 key={weekStart}
                 weekStart={weekStart}
-                allEntries={workoutEntries.entries}
+                allEntries={normalizedEntries}
                 addingTo={addingTo}
                 editingEntry={editingEntry}
                 onAdd={handleAdd}

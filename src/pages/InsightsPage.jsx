@@ -1,9 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useAppData } from "../context/AppDataContext";
+import { getSupabaseClient } from "../lib/supabaseClient.js";
+import { buildCoachPayload } from "../lib/coachPayload.js";
 import PageContainer from "../components/layout/PageContainer";
 import {
   computeLongRuns,
   computeTrainingLoad,
+  computeTrainingLoadState,
   computeWeeklyHRZones,
   computeRecentActivityZones,
 } from "../domain/compute";
@@ -50,15 +53,41 @@ const ZONE_KEYS = ["z1", "z2", "z3", "z4", "z5"];
 const ZONE_LABELS = ["Z1 Recovery", "Z2 Aerobic", "Z3 Tempo", "Z4 Threshold", "Z5 VO\u2082max"];
 const ZONE_COLORS = ["#94a3b8", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
 
+// ── Coach overlay messages ──────────────────────────────────────────────────
+
+const OVERLAY_MESSAGES = {
+  good_form: {
+    Improving: "You're in excellent form right now (TSB +{tsb}, improving). This is a prime window for a quality session or long run.",
+    Stable:    "You're in good form (TSB +{tsb}, stable). Training stress is well-controlled — a good time to hit your key sessions.",
+    Declining: "Form is still positive (TSB +{tsb}) but trending down. Normal in a build week — monitor load and protect sleep.",
+  },
+  neutral: {
+    Improving: "Load and form are balancing out (TSB {tsb}, improving). Stay consistent — fitness is accumulating.",
+    Stable:    "Training load is balanced (TSB {tsb}). Neutral form is normal mid-block — stick to the plan.",
+    Declining: "Form is sliding toward the neutral zone (TSB {tsb}). Consider whether fatigue is planned or unexpected.",
+  },
+  accumulating_fatigue: {
+    Improving: "Fatigue is elevated but easing (TSB {tsb}, improving). A recovery day or easy session will accelerate the rebound.",
+    Stable:    "Fatigue is accumulating (TSB {tsb}). Expected in a hard block — keep quality low, volume easy.",
+    Declining: "Fatigue is building and not recovering (TSB {tsb}, declining). Prioritize sleep and consider a rest day.",
+  },
+  overreaching_risk: {
+    Improving: "High fatigue, but rebounding (TSB {tsb}, improving). You're coming out of a hard block — protect recovery.",
+    Stable:    "Training stress is very high (TSB {tsb}). Overreaching risk is real — reduce load now.",
+    Declining: "Overreaching risk: TSB at {tsb} and declining. Back off intensity immediately and prioritize recovery.",
+  },
+};
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 // skeleton-block class preserved for tests
-function SkeletonBlock({ height = 240 }) {
+function SkeletonBlock({ height = 240, ...props }) {
   return (
     <div
       className="skeleton-block rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 animate-pulse"
       style={{ height }}
       aria-hidden="true"
+      {...props}
     />
   );
 }
@@ -123,7 +152,7 @@ function ActivityZoneBreakdown({ activityZones }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const { activities, checkins, plans, strava } = useAppData();
+  const { activities, checkins, plans, strava, dailyLogs, trainingBlocks, runnerProfile } = useAppData();
 
   // ── Data derivation ──────────────────────────────────────────────────────
 
@@ -134,6 +163,11 @@ export default function InsightsPage() {
         dateObj: new Date(item.date),
       })),
     [activities.activities],
+  );
+
+  const loadState = useMemo(
+    () => computeTrainingLoadState(trainingLoadSeries),
+    [trainingLoadSeries],
   );
 
   const longRunPoints = useMemo(
@@ -288,6 +322,41 @@ export default function InsightsPage() {
   const hasData = activities.activities.length > 0;
   const isLoading = activities.loading;
 
+  // ── Synthesis callout state ───────────────────────────────────────────────
+
+  const [synthesis, setSynthesis] = useState(null);
+  const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const synthesisFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasData || synthesisFetchedRef.current) return;
+    synthesisFetchedRef.current = true;
+    setSynthesisLoading(true);
+
+    (async () => {
+      try {
+        const client = getSupabaseClient();
+        const payload = await buildCoachPayload({
+          activities,
+          dailyLogs,
+          checkins,
+          activePlan: plans.plans[0] ?? null,
+          trainingBlocks,
+          runnerProfile,
+          lang: undefined,
+        });
+        const { data, error } = await client.functions.invoke("gemini-coach", {
+          body: { mode: "insights_synthesis", ...payload },
+        });
+        if (!error && data?.synthesis) setSynthesis(data.synthesis);
+      } catch {
+        // silent fail — callout is omitted
+      } finally {
+        setSynthesisLoading(false);
+      }
+    })();
+  }, [hasData]);
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -302,6 +371,14 @@ export default function InsightsPage() {
           Understand readiness, spot risk early, and see the impact of your consistency.
         </p>
       </div>
+
+      {/* Synthesis callout — above KPI strip */}
+      {synthesisLoading && <SkeletonBlock height={72} data-testid="synthesis-skeleton" />}
+      {!synthesisLoading && synthesis && (
+        <div className="insights-coach-synthesis" data-testid="synthesis-callout">
+          <p>{synthesis}</p>
+        </div>
+      )}
 
       {/* KPI strip — kpi-strip / kpi-card classes preserved for tests */}
       <div className="kpi-strip grid grid-cols-4 gap-4 mb-6 max-[960px]:grid-cols-2 max-[600px]:grid-cols-1">
@@ -445,6 +522,18 @@ export default function InsightsPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          )}
+
+          {/* Training load state overlay callout */}
+          {loadState && (
+            <div className="coach-adaptation-note" data-testid="load-state-callout">
+              <p>
+                <strong>{loadState.stateLabel} · {loadState.trendLabel}</strong>
+                {" — "}
+                {(OVERLAY_MESSAGES[loadState.state]?.[loadState.trendLabel] ?? "")
+                  .replace("{tsb}", Math.round(loadState.tsb))}
+              </p>
+            </div>
           )}
 
           {/* Weekly Load + HR Zone — 2 columns */}

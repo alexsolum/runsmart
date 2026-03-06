@@ -5,7 +5,7 @@
  * data stored in the Supabase `activities` table.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import InsightsPage from "../../src/pages/InsightsPage";
 import { makeAppData, SAMPLE_ACTIVITIES } from "./mockAppData";
 
@@ -13,7 +13,16 @@ vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
+vi.mock("../../src/lib/supabaseClient.js", () => ({
+  getSupabaseClient: vi.fn(),
+}));
+
+vi.mock("../../src/lib/coachPayload.js", () => ({
+  buildCoachPayload: vi.fn().mockResolvedValue({}),
+}));
+
 import { useAppData } from "../../src/context/AppDataContext";
+import { getSupabaseClient } from "../../src/lib/supabaseClient.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -142,5 +151,129 @@ describe("Insights — with enough data for charts", () => {
     expect(fill).toBeInTheDocument();
     // width style should be set (non-zero CTL → non-zero fitness score)
     expect(fill.style.width).not.toBe("0%");
+  });
+});
+
+describe("Training Load Trend overlay (INSG-01)", () => {
+  // Build 15+ activities spread over 15 consecutive days so computeTrainingLoad returns >= 15 entries
+  function makeRichActivities(count = 15) {
+    return Array.from({ length: count }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (count - 1 - i)); // oldest first, newest = today
+      return {
+        id: `rl-${i}`,
+        user_id: "user-1",
+        name: `Run ${i}`,
+        type: "Run",
+        started_at: d.toISOString(),
+        distance: 10000,
+        moving_time: 3600,
+        average_speed: 2.78,
+        elevation_gain: 50,
+      };
+    });
+  }
+
+  it("renders load-state-callout when series has >= 2 entries", async () => {
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: makeRichActivities(15), loading: false, error: null, loadActivities: vi.fn() },
+    }));
+    render(<InsightsPage />);
+    const callout = await screen.findByTestId("load-state-callout");
+    expect(callout).toBeInTheDocument();
+  });
+
+  it("callout text contains a state label", async () => {
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: makeRichActivities(15), loading: false, error: null, loadActivities: vi.fn() },
+    }));
+    render(<InsightsPage />);
+    const callout = await screen.findByTestId("load-state-callout");
+    const stateLabels = ["Good Form", "Neutral", "Accumulating Fatigue", "Overreaching Risk"];
+    const hasStateLabel = stateLabels.some((label) => callout.textContent.includes(label));
+    expect(hasStateLabel).toBe(true);
+  });
+
+  it("callout text contains a trend label", async () => {
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: makeRichActivities(15), loading: false, error: null, loadActivities: vi.fn() },
+    }));
+    render(<InsightsPage />);
+    const callout = await screen.findByTestId("load-state-callout");
+    const trendLabels = ["Improving", "Declining", "Stable"];
+    const hasTrendLabel = trendLabels.some((label) => callout.textContent.includes(label));
+    expect(hasTrendLabel).toBe(true);
+  });
+
+  it("callout is absent when activities are empty", () => {
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
+    }));
+    render(<InsightsPage />);
+    expect(screen.queryByTestId("load-state-callout")).not.toBeInTheDocument();
+  });
+
+  it("callout is absent when activities.loading is true", () => {
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: makeRichActivities(15), loading: true, error: null, loadActivities: vi.fn() },
+    }));
+    render(<InsightsPage />);
+    expect(screen.queryByTestId("load-state-callout")).not.toBeInTheDocument();
+  });
+});
+
+describe("Insights — synthesis callout (INSG-02)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders synthesis callout when edge function returns synthesis text", async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: { synthesis: "Your training load is building steadily." },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<InsightsPage />);
+    const callout = await screen.findByTestId("synthesis-callout");
+    expect(callout).toBeInTheDocument();
+    expect(callout).toHaveTextContent("Your training load is building steadily.");
+  });
+
+  it("omits synthesis callout when edge function returns an error", async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: null,
+      error: new Error("fail"),
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<InsightsPage />);
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalled());
+    expect(screen.queryByTestId("synthesis-callout")).toBeNull();
+  });
+
+  it("shows skeleton while synthesis is loading", async () => {
+    const mockInvoke = vi.fn().mockReturnValue(new Promise(() => {})); // never resolves
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<InsightsPage />);
+    const skeleton = await screen.findByTestId("synthesis-skeleton");
+    expect(skeleton).toBeInTheDocument();
+  });
+
+  it("omits synthesis callout when activities list is empty (hasData false)", () => {
+    const mockInvoke = vi.fn();
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
+    }));
+
+    render(<InsightsPage />);
+    expect(screen.queryByTestId("synthesis-callout")).toBeNull();
+    expect(screen.queryByTestId("synthesis-skeleton")).toBeNull();
+    expect(mockInvoke).not.toHaveBeenCalled();
   });
 });

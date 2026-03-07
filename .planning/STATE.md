@@ -4,12 +4,12 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 05
 status: in_progress
-last_updated: "2026-03-07T08:35:00Z"
+last_updated: "2026-03-07T08:37:10Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 ---
@@ -76,7 +76,7 @@ progress:
 
 **Initialized:** 2026-03-05
 **Current Phase:** 05
-**Current focus:** Phase 5 active - hardening insights synthesis context depth and output stability
+**Current focus:** Phase 5 active - hardening insights synthesis contract, sanitization, and UI safety
 **Status:** In progress
 
 ## Project Reference
@@ -84,7 +84,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The coaching guidance must produce practical, tailored training decisions that fit real life while preserving long-term progression and injury prevention.
-**Current focus:** Phase 5 active - hardening insights synthesis context depth and output stability
+**Current focus:** Phase 5 active - hardening insights synthesis contract, sanitization, and UI safety
 
 ## Artifacts
 
@@ -103,7 +103,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 | 2 | Replan Coach Context | Completed (5/5 plans complete) |
 | 3 | Feedback Loop Integration | Completed (4/4 plans complete) |
 | 4 | Insights Coach Layer | Completed (2/2 plans complete) |
-| 5 | Insights Synthesis Hardening | In progress (1/3 plans complete) |
+| 5 | Insights Synthesis Hardening | In progress (2/3 plans complete) |
 
 ## Notes
 
@@ -130,15 +130,17 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 - [Phase 04-insights-coach-layer]: computeTrainingLoadState: locked TSB thresholds (>10=good_form, >=-5=neutral, >=-15=accumulating_fatigue, else overreaching_risk); 15-day trend window ±2 dead-band; reuses coach-adaptation-note CSS class
 - [Phase 04-insights-coach-layer]: INSG-02: INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET inlined in Deno edge function; instructionSnippets.js export for test assertions only
 - [Phase 04-insights-coach-layer]: INSG-02: Synthesis callout silently omitted on error - no error UI displayed to user
+- [Phase 05-insights-synthesis-hardening]: 05-01 migrated insights_synthesis to strict plain-text four-section contract (Mileage Trend, Intensity Distribution, Long-Run Progression, Race Readiness) with 10-12 week interpretation horizon wording
+- [Phase 05-insights-synthesis-hardening]: 05-01 enforces sanitize -> section-validation -> deterministic fallback pipeline in edge function before returning synthesis
 - [Phase 05-insights-synthesis-hardening]: 05-02 sets mode-aware payload windows (default 4w/7d, insights_synthesis 12w/84d) with deterministic chronology and explicit insights-mode wiring from InsightsPage
 
 ## Session
 
 - Last session: 2026-03-07
-- Stopped at: Completed `05-02-PLAN.md` (synthesis payload horizon expanded and regression-tested)
+- Stopped at: Completed `05-01-PLAN.md` (synthesis contract hardening, sanitizer/validator/fallback, integration regression gate)
 - Resume command: Execute `05-03-PLAN.md`
 
 ---
-*Last updated: 2026-03-07 after 05-02 execution (synthesis payload horizon hardening, phase 5 in progress)*
+*Last updated: 2026-03-07 after 05-01 execution (synthesis contract hardening complete, phase 5 at 2/3 plans)*
 
 

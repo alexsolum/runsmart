@@ -25,7 +25,7 @@
 ### Insights Integration
 
 - [x] **INSG-01**: Training Load Trend chart shows coach overlay signals tied to current load/fatigue interpretation.
-- [x] **INSG-02**: Insights page shows one overall coach synthesis comment based on available training data.
+- [ ] **INSG-02**: Insights page shows one overall coach synthesis comment based on available training data.
 
 ## v2 Requirements
 
@@ -62,7 +62,7 @@
 | FDBK-01 | Phase 3 | Complete |
 | FDBK-02 | Phase 3 | Complete |
 | INSG-01 | Phase 4 | Complete |
-| INSG-02 | Phase 4 | Complete |
+| INSG-02 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 10 total
@@ -71,4 +71,4 @@
 
 ---
 *Requirements defined: 2026-03-05*
-*Last updated: 2026-03-05 after initial definition*
+*Last updated: 2026-03-07 after adding Phase 5 gap-closure mapping for INSG-02*

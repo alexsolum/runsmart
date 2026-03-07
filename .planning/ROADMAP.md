@@ -79,5 +79,27 @@ Plans:
 3. Overlay/comment text stays consistent with latest coach response context.
 4. UI remains readable on desktop and mobile without chart clutter or blocking interactions.
 
+## Phase 5: Insights Synthesis Hardening
+
+**Goal:** Close the diagnosed Insights synthesis gap so the callout consistently returns rich plain-text coaching without JSON wrapper artifacts.
+
+**Requirements:** INSG-02
+
+**Gap Closure:** Closes debug gap `.planning/debug/phase-04-insights-json-wrapper.md`
+
+**Plans:** 0/0 plans complete
+
+Planned tasks:
+- [ ] Update `insights_synthesis` contract to require sectioned plain-text output covering mileage trend, intensity distribution, long-run progression, and race readiness.
+- [ ] Expand synthesis context window from 4 weeks to 10-12 weeks so prompts and payload support the requested analysis horizon.
+- [ ] Harden edge/UI sanitization so malformed JSON-like wrappers are stripped and never rendered in the Insights callout.
+- [ ] Add regression tests for malformed wrapper responses and required section/richness behavior.
+
+**Success Criteria:**
+1. Insights synthesis callout never renders JSON wrapper text.
+2. Generated synthesis includes clear sectioned coverage of the requested coaching dimensions.
+3. Prompt and payload context support 10-12 week interpretation.
+4. Unit/integration tests fail on wrapper leakage or contract regressions.
+
 ---
-*Last updated: 2026-03-06 after 04 planning*
+*Last updated: 2026-03-07 after adding Phase 5 gap-closure plan*

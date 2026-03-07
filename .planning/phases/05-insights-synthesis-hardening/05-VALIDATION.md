@@ -39,10 +39,10 @@ created: 2026-03-07
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/gemini-instructions.test.jsx` | ? | ? pending |
-| 05-01-02 | 01 | 1 | INSG-02 | integration | `npm run test:integration -- tests/integration/edge-functions.spec.ts` | ? | ? pending |
-| 05-02-01 | 02 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | ? | ? pending |
-| 05-02-02 | 02 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | ? | ? pending |
+| 05-01-01 | 01 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/gemini-instructions.test.jsx` | yes | green |
+| 05-01-02 | 01 | 1 | INSG-02 | integration | `npm run test:integration -- tests/integration/edge-functions.spec.ts` | yes | green (5 skipped, 8 passed) |
+| 05-02-01 | 02 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | yes | green (pass: 2026-03-07) |
+| 05-02-02 | 02 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | yes | green (pass: 2026-03-07) |
 | 05-03-01 | 03 | 2 | INSG-02 | unit | `npm test -- --run tests/unit/insights.test.jsx` | ? | ? pending |
 | 05-03-02 | 03 | 2 | INSG-02 | unit | `npm test -- --run tests/unit/insights.test.jsx` | ? | ? pending |
 

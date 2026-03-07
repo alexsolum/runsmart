@@ -87,11 +87,11 @@ Plans:
 
 **Gap Closure:** Closes debug gap `.planning/debug/phase-04-insights-json-wrapper.md`
 
-**Plans:** 0/3 plans complete
+**Plans:** 1/3 plans complete
 
 Planned tasks:
 - [ ] Update `insights_synthesis` contract to require sectioned plain-text output covering mileage trend, intensity distribution, long-run progression, and race readiness.
-- [ ] Expand synthesis context window from 4 weeks to 10-12 weeks so prompts and payload support the requested analysis horizon.
+- [x] Expand synthesis context window from 4 weeks to 10-12 weeks so prompts and payload support the requested analysis horizon.
 - [ ] Harden edge/UI sanitization so malformed JSON-like wrappers are stripped and never rendered in the Insights callout.
 - [ ] Add regression tests for malformed wrapper responses and required section/richness behavior.
 

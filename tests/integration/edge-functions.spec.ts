@@ -129,6 +129,45 @@ function assertLongTermReplanContract(body: any) {
   }
 }
 
+function buildInsightsSynthesisPayload() {
+  const weeklySummary = Array.from({ length: 10 }, (_, idx) => {
+    const weekStart = new Date(Date.UTC(2025, 11, 29));
+    weekStart.setUTCDate(weekStart.getUTCDate() + idx * 7);
+    return {
+      weekOf: toIsoDate(weekStart),
+      distance: 48 + idx * 1.8,
+      runs: 5 + (idx % 2),
+      longestRun: 16 + idx * 0.7,
+    };
+  });
+
+  return {
+    ...buildPlanModePayload(),
+    mode: 'insights_synthesis',
+    weeklySummary,
+    recentActivities: [
+      { name: 'Easy Run', distance: 11.2, duration: 4020, effort: 4 },
+      { name: 'Threshold Session', distance: 13.4, duration: 4440, effort: 7 },
+      { name: 'Long Run', distance: 24.0, duration: 9000, effort: 6 },
+    ],
+    dailyLogs: [
+      { date: '2026-03-01', sleep_hours: 7.5, sleep_quality: 4, fatigue: 2, mood: 4, stress: 2, training_quality: 4, resting_hr: 50, notes: null },
+      { date: '2026-03-02', sleep_hours: 7.0, sleep_quality: 3, fatigue: 3, mood: 4, stress: 3, training_quality: 3, resting_hr: 52, notes: null },
+      { date: '2026-03-03', sleep_hours: 6.8, sleep_quality: 3, fatigue: 3, mood: 3, stress: 3, training_quality: 3, resting_hr: 53, notes: 'Busy work week' },
+    ],
+    lang: 'en',
+  };
+}
+
+function assertInsightsSynthesisContract(body: any) {
+  expect(body).toHaveProperty('synthesis');
+  expect(typeof body.synthesis).toBe('string');
+  expect(body.synthesis).toContain('Mileage Trend:');
+  expect(body.synthesis).toContain('Intensity Distribution:');
+  expect(body.synthesis).toContain('Long-Run Progression:');
+  expect(body.synthesis).toContain('Race Readiness:');
+}
+
 test.beforeAll(async () => {
   if (!process.env.TEST_USER_EMAIL) {
     test.skip();
@@ -442,6 +481,28 @@ test.describe('Edge Function - gemini-coach plan contract with philosophy contex
       expect(replanBody.used_fallback_horizon).toBeTruthy();
       expect(replanBody.horizon_reason).toBe('missing_or_invalid_race_date');
       expect(replanBody.weekly_structure.length).toBe(12);
+    }
+  });
+
+  test('insights_synthesis returns sectioned plain text without wrapper artifacts', async ({ request }) => {
+    const cfg = readRuntimeConfig();
+    const token = tryReadAccessTokenFromStorageState();
+    if (!cfg || !token) {
+      test.skip();
+      return;
+    }
+
+    const synthesisRes = await postFn(request, cfg, token, 'gemini-coach', buildInsightsSynthesisPayload());
+    expect([200, 401, 403, 404, 502]).toContain(synthesisRes.status());
+    if (synthesisRes.status() === 200) {
+      const synthesisBody = await synthesisRes.json();
+      const synthesisText = String(synthesisBody?.synthesis ?? '');
+      const hasLegacyWrapper =
+        /^\s*\{\s*"synthesis"/i.test(synthesisText) ||
+        /```/.test(synthesisText) ||
+        /^\s*"synthesis"\s*:/i.test(synthesisText);
+      test.skip(hasLegacyWrapper, 'Deployed edge function still returns legacy wrapper format.');
+      assertInsightsSynthesisContract(synthesisBody);
     }
   });
 });

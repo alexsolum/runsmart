@@ -87,7 +87,7 @@ function buildWeeklySummaries(activities, weeks = 4) {
 }
 
 function getRecentActivities(activities, days = 7) {
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - Math.max(days - 1, 0) * 24 * 60 * 60 * 1000);
   return activities
     .filter((activity) => new Date(activity.started_at) >= cutoff)
     .sort((a, b) => toTime(a.started_at) - toTime(b.started_at))
@@ -124,10 +124,10 @@ function buildPlanContext(plan, blocks) {
 }
 
 function getRecentDailyLogs(logs, days = 7) {
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - Math.max(days - 1, 0) * 24 * 60 * 60 * 1000);
   return logs
-    .filter((log) => new Date(`${log.log_date}T00:00:00`) >= cutoff)
-    .sort((a, b) => toTime(`${a.log_date}T00:00:00`) - toTime(`${b.log_date}T00:00:00`))
+    .filter((log) => new Date(`${log.log_date}T00:00:00Z`) >= cutoff)
+    .sort((a, b) => toTime(`${a.log_date}T00:00:00Z`) - toTime(`${b.log_date}T00:00:00Z`))
     .map((log) => ({
       date: log.log_date,
       sleep_hours: log.sleep_hours ?? null,

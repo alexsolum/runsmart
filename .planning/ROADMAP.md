@@ -87,7 +87,7 @@ Plans:
 
 **Gap Closure:** Closes debug gap `.planning/debug/phase-04-insights-json-wrapper.md`
 
-**Plans:** 0/0 plans complete
+**Plans:** 0/3 plans complete
 
 Planned tasks:
 - [ ] Update `insights_synthesis` contract to require sectioned plain-text output covering mileage trend, intensity distribution, long-run progression, and race readiness.

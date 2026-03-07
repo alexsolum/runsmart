@@ -730,6 +730,9 @@ function sanitizeSynthesisResponse(raw: string): string {
 
   try {
     const parsed = JSON.parse(cleaned);
+    if (typeof parsed === "string") {
+      return sanitizeSynthesisResponse(parsed);
+    }
     if (parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).synthesis === "string") {
       return String((parsed as Record<string, unknown>).synthesis).trim();
     }
@@ -737,11 +740,25 @@ function sanitizeSynthesisResponse(raw: string): string {
     // fall through to text sanitizer
   }
 
+  const wrappedMatch = cleaned.match(/^\s*\{\s*["']?synthesis["']?\s*:\s*([\s\S]+?)\s*\}?\s*$/i);
+  if (wrappedMatch?.[1]) {
+    return String(wrappedMatch[1])
+      .replace(/^["']\s*/, "")
+      .replace(/\s*["']$/, "")
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, "\"")
+      .trim();
+  }
+
   return cleaned
+    .replace(/^\s*\{\s*/, "")
+    .replace(/\s*\}\s*$/, "")
     .replace(/^\s*["']?synthesis["']?\s*:\s*/i, "")
     .replace(/^["']\s*/, "")
     .replace(/\s*["']$/, "")
     .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\"/g, "\"")
     .trim();
 }
 

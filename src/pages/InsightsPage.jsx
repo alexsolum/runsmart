@@ -344,6 +344,7 @@ export default function InsightsPage() {
           trainingBlocks,
           runnerProfile,
           lang: undefined,
+          mode: "insights_synthesis",
         });
         const { data, error } = await client.functions.invoke("gemini-coach", {
           body: { mode: "insights_synthesis", ...payload },

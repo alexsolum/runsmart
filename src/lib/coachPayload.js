@@ -16,6 +16,27 @@ function firstDefined(...values) {
   return values.find((value) => value !== undefined && value !== null);
 }
 
+const PAYLOAD_WINDOWS_BY_MODE = {
+  default: {
+    summaryWeeks: 4,
+    activityDays: 7,
+    logDays: 7,
+  },
+  insights_synthesis: {
+    summaryWeeks: 12,
+    activityDays: 84,
+    logDays: 84,
+  },
+};
+
+function getPayloadWindows(mode) {
+  return PAYLOAD_WINDOWS_BY_MODE[mode] ?? PAYLOAD_WINDOWS_BY_MODE.default;
+}
+
+function toTime(value) {
+  return new Date(value).getTime();
+}
+
 export function normalizeCheckin(checkin) {
   if (!checkin) return null;
   const sleepQuality = numberOrNull(firstDefined(checkin.sleepQuality, checkin.sleep_quality));
@@ -42,10 +63,10 @@ export function normalizeCheckin(checkin) {
   };
 }
 
-function buildWeeklySummaries(activities) {
+function buildWeeklySummaries(activities, weeks = 4) {
   const now = new Date();
   const summaries = [];
-  for (let i = 4; i >= 1; i -= 1) {
+  for (let i = weeks; i >= 1; i -= 1) {
     const weekStart = getWeekStartUtc(new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000));
     const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
     const weekActs = activities.filter((activity) => {
@@ -65,10 +86,11 @@ function buildWeeklySummaries(activities) {
   return summaries;
 }
 
-function getRecentActivities(activities) {
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+function getRecentActivities(activities, days = 7) {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   return activities
     .filter((activity) => new Date(activity.started_at) >= cutoff)
+    .sort((a, b) => toTime(a.started_at) - toTime(b.started_at))
     .map((activity) => ({
       name: activity.name || activity.type || "Run",
       distance: (Number(activity.distance) || 0) / 1000,
@@ -101,10 +123,11 @@ function buildPlanContext(plan, blocks) {
   };
 }
 
-function getRecentDailyLogs(logs) {
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+function getRecentDailyLogs(logs, days = 7) {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   return logs
     .filter((log) => new Date(`${log.log_date}T00:00:00`) >= cutoff)
+    .sort((a, b) => toTime(`${a.log_date}T00:00:00`) - toTime(`${b.log_date}T00:00:00`))
     .map((log) => ({
       date: log.log_date,
       sleep_hours: log.sleep_hours ?? null,
@@ -118,9 +141,10 @@ function getRecentDailyLogs(logs) {
     }));
 }
 
-async function loadFreshActivities(activities) {
+async function loadFreshActivities(activities, daysWindow = 7) {
+  const limit = Math.max(20, daysWindow * 2);
   try {
-    return (await activities.loadActivities?.({ limit: 20, ascending: false })) ?? activities.activities ?? [];
+    return (await activities.loadActivities?.({ limit, ascending: false })) ?? activities.activities ?? [];
   } catch {
     return activities.activities ?? [];
   }
@@ -150,9 +174,11 @@ export async function buildCoachPayload({
   trainingBlocks,
   runnerProfile,
   lang,
+  mode = "default",
 }) {
+  const windows = getPayloadWindows(mode);
   const [freshActivities, freshLogs, freshCheckins] = await Promise.all([
-    loadFreshActivities(activities),
+    loadFreshActivities(activities, windows.activityDays),
     loadFreshDailyLogs(dailyLogs),
     loadFreshCheckins(checkins),
   ]);
@@ -160,12 +186,12 @@ export async function buildCoachPayload({
   const goal = activePlan?.goal ?? null;
   const runnerProfilePayload = (background || goal) ? { background: background || null, goal } : null;
   return {
-    weeklySummary: buildWeeklySummaries(freshActivities),
-    recentActivities: getRecentActivities(freshActivities),
+    weeklySummary: buildWeeklySummaries(freshActivities, windows.summaryWeeks),
+    recentActivities: getRecentActivities(freshActivities, windows.activityDays),
     latestCheckin: normalizeCheckin(freshCheckins[0] ?? null),
     recentCheckins: freshCheckins.slice(0, 3).map(normalizeCheckin).filter(Boolean),
     planContext: buildPlanContext(activePlan, trainingBlocks.blocks ?? []),
-    dailyLogs: getRecentDailyLogs(freshLogs),
+    dailyLogs: getRecentDailyLogs(freshLogs, windows.logDays),
     runnerProfile: runnerProfilePayload,
     lang,
   };

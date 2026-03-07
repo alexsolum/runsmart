@@ -1,11 +1,11 @@
 ---
-status: complete
+status: diagnosed
 phase: 04-insights-coach-layer
 source:
   - 04-01-SUMMARY.md
   - 04-02-SUMMARY.md
 started: 2026-03-07T07:32:41+01:00
-updated: 2026-03-07T07:40:54+01:00
+updated: 2026-03-07T07:43:18+01:00
 ---
 
 ## Current Test
@@ -56,7 +56,19 @@ skipped: 1
   reason: "User reported: I still see the json formattin: { \"synthesis\": \"Your training has seen a significant increase in volume, jumping from 49.5km to 10 ... and it is too short; requested longer structured feedback across mileage, intensity distribution, long run progression, race readiness, based on last 10-12 weeks."
   severity: major
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Synthesis flow is still built for short paragraph output and only 4-week/7-day context; parse fallback in edge+UI can still pass JSON-like wrapper text through when parsing fails."
+  artifacts:
+    - path: "supabase/functions/gemini-coach/index.ts"
+      issue: "insights_synthesis instruction enforces single paragraph; parseSynthesisText falls back to raw cleaned text"
+    - path: "src/lib/coachPayload.js"
+      issue: "weeklySummary/recent windows are too short for requested 10-12 week analysis"
+    - path: "src/pages/InsightsPage.jsx"
+      issue: "UI synthesis parser also falls back to raw text when parse fails"
+    - path: "tests/unit/insights.test.jsx"
+      issue: "missing regression tests for malformed JSON wrapper and structured section requirements"
+  missing:
+    - "Expand synthesis context horizon to 10-12 weeks and include long-run/intensity distribution signals"
+    - "Change synthesis contract to structured sections: Mileage, Intensity Distribution, Long Run Progression, Race Readiness"
+    - "Harden parser behavior to suppress/clean JSON wrappers on parse failure rather than rendering raw JSON-like text"
+    - "Add regression tests for sectioned output, minimum richness, and no-raw-JSON rendering"
+  debug_session: ".planning/debug/phase-04-insights-json-wrapper.md"

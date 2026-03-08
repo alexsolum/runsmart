@@ -38,29 +38,6 @@ function fmtDate(value) {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function parseSynthesisText(value) {
-  if (!value) return null;
-  if (typeof value !== "string") return value.synthesis ?? null;
-
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (typeof parsed === "string") {
-      try {
-        const nested = JSON.parse(parsed);
-        return nested?.synthesis ?? parsed;
-      } catch {
-        return parsed;
-      }
-    }
-    return parsed?.synthesis ?? trimmed;
-  } catch {
-    return trimmed;
-  }
-}
-
 const TICK = { fontSize: 11, fill: "#94a3b8" };
 const TOOLTIP_STYLE = {
   backgroundColor: "white",
@@ -69,6 +46,42 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
   boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
 };
+const REQUIRED_SYNTHESIS_HEADINGS = [
+  "Mileage Trend",
+  "Intensity Distribution",
+  "Long-Run Progression",
+  "Race Readiness",
+];
+
+function sanitizeSynthesisText(input) {
+  if (typeof input !== "string") return "";
+  let text = input.trim();
+  if (!text) return "";
+
+  text = text.replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/, "").trim();
+  if (!text) return "";
+
+  if (text.startsWith("{") && text.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.synthesis === "string") {
+        text = parsed.synthesis.trim();
+      }
+    } catch {
+      // keep original text if not valid JSON
+    }
+  }
+
+  return text.trim();
+}
+
+function hasRequiredSynthesisHeadings(text) {
+  if (!text) return false;
+  return REQUIRED_SYNTHESIS_HEADINGS.every((heading) => {
+    const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?(?:#+\\s*)?${heading}\\s*:`, "i");
+    return pattern.test(text);
+  });
+}
 
 // ── Zone config ────────────────────────────────────────────────────────────
 
@@ -350,6 +363,10 @@ export default function InsightsPage() {
   const [synthesis, setSynthesis] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const synthesisFetchedRef = useRef(false);
+  const renderableSynthesis = useMemo(() => {
+    const sanitized = sanitizeSynthesisText(synthesis);
+    return hasRequiredSynthesisHeadings(sanitized) ? sanitized : null;
+  }, [synthesis]);
 
   useEffect(() => {
     if (!hasData || synthesisFetchedRef.current) return;
@@ -367,13 +384,16 @@ export default function InsightsPage() {
           trainingBlocks,
           runnerProfile,
           lang: undefined,
+          mode: "insights_synthesis",
         });
         const { data, error } = await client.functions.invoke("gemini-coach", {
           body: { mode: "insights_synthesis", ...payload },
         });
-        if (!error && data) {
-          const text = parseSynthesisText(data.synthesis);
-          if (text) setSynthesis(text);
+        if (!error && data?.synthesis) {
+          const sanitizedSynthesis = sanitizeSynthesisText(data.synthesis);
+          if (hasRequiredSynthesisHeadings(sanitizedSynthesis)) {
+            setSynthesis(sanitizedSynthesis);
+          }
         }
       } catch {
         // silent fail — callout is omitted
@@ -400,9 +420,9 @@ export default function InsightsPage() {
 
       {/* Synthesis callout — above KPI strip */}
       {synthesisLoading && <SkeletonBlock height={72} data-testid="synthesis-skeleton" />}
-      {!synthesisLoading && synthesis && (
+      {!synthesisLoading && renderableSynthesis && (
         <div className="insights-coach-synthesis" data-testid="synthesis-callout">
-          <p>{synthesis}</p>
+          <p>{renderableSynthesis}</p>
         </div>
       )}
 

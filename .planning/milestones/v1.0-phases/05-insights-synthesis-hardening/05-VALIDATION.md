@@ -1,0 +1,79 @@
+---
+phase: 05
+slug: insights-synthesis-hardening
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
+created: 2026-03-07
+---
+
+# Phase 05 - Validation Strategy
+
+> Per-phase validation contract for feedback sampling during execution.
+
+---
+
+## Test Infrastructure
+
+| Property | Value |
+|----------|-------|
+| **Framework** | Vitest + Playwright |
+| **Config file** | `vitest.config.js`, `playwright.config.js` |
+| **Quick run command** | `npm test -- --run tests/unit/insights.test.jsx` |
+| **Full suite command** | `npm test -- --run` |
+| **Estimated runtime** | ~180 seconds |
+
+---
+
+## Sampling Rate
+
+- **After every task commit:** Run the task-specific verify command from the per-task map.
+- **After wave 1:** Run `npm run test:integration -- tests/integration/edge-functions.spec.ts`
+- **After wave 2:** Run `npm test -- --run tests/unit/insights.test.jsx` and `npm run test:integration -- tests/integration/edge-functions.spec.ts`
+- **Before `$gsd-verify-work`:** Full suite must be green
+- **Max feedback latency:** 180 seconds
+
+---
+
+## Per-Task Verification Map
+
+| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
+|---------|------|------|-------------|-----------|-------------------|-------------|--------|
+| 05-01-01 | 01 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/gemini-instructions.test.jsx` | yes | green |
+| 05-01-02 | 01 | 1 | INSG-02 | integration | `npm run test:integration -- tests/integration/edge-functions.spec.ts` | yes | green (5 skipped, 8 passed) |
+| 05-02-01 | 02 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | yes | green (pass: 2026-03-07) |
+| 05-02-02 | 02 | 1 | INSG-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | yes | green (pass: 2026-03-07) |
+| 05-03-01 | 03 | 2 | INSG-02 | unit | `npm test -- --run tests/unit/insights.test.jsx` | yes | green (23 passed) |
+| 05-03-02 | 03 | 2 | INSG-02 | unit | `npm test -- --run tests/unit/insights.test.jsx` | yes | green (23 passed) |
+
+*Status: pending | green | red | flaky*
+
+---
+
+## Wave 0 Requirements
+
+- [ ] Existing infrastructure covers all phase requirements.
+
+---
+
+## Manual-Only Verifications
+
+| Behavior | Requirement | Why Manual | Test Instructions |
+|----------|-------------|------------|-------------------|
+| Insights synthesis readability and usefulness | INSG-02 | Content quality is subjective | Open Insights with realistic data, review output sections and language quality |
+
+---
+
+## Validation Sign-Off
+
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
+- [x] Post-execution artifact updates complete:
+  - `05-VALIDATION.md` task statuses updated with observed results
+  - `.planning/REQUIREMENTS.md` updated to mark `INSG-02` complete after all phase checks are green
+- [x] `nyquist_compliant: true` set in frontmatter
+
+**Approval:** approved 2026-03-08

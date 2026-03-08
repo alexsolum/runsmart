@@ -717,32 +717,77 @@ function stripMarkdownFences(text: string): string {
   return text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
 }
 
-function parseSynthesisText(rawText: string): string {
-  const cleaned = stripMarkdownFences(rawText).trim();
+const REQUIRED_SYNTHESIS_HEADINGS = [
+  "Mileage Trend",
+  "Intensity Distribution",
+  "Long-Run Progression",
+  "Race Readiness",
+] as const;
+
+function sanitizeSynthesisResponse(raw: string): string {
+  const cleaned = stripMarkdownFences(String(raw || "")).trim();
   if (!cleaned) return "";
 
   try {
     const parsed = JSON.parse(cleaned);
     if (typeof parsed === "string") {
-      try {
-        const nested = JSON.parse(parsed);
-        if (nested && typeof nested === "object" && typeof nested.synthesis === "string") {
-          return nested.synthesis.trim();
-        }
-      } catch {
-        return parsed.trim();
-      }
-      return parsed.trim();
+      return sanitizeSynthesisResponse(parsed);
     }
-
-    if (parsed && typeof parsed === "object" && typeof parsed.synthesis === "string") {
-      return parsed.synthesis.trim();
+    if (parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).synthesis === "string") {
+      return String((parsed as Record<string, unknown>).synthesis).trim();
     }
   } catch {
-    // fall back to raw cleaned text
+    // fall through to text sanitizer
   }
 
-  return cleaned;
+  const wrappedMatch = cleaned.match(/^\s*\{\s*["']?synthesis["']?\s*:\s*([\s\S]+?)\s*\}?\s*$/i);
+  if (wrappedMatch?.[1]) {
+    return String(wrappedMatch[1])
+      .replace(/^["']\s*/, "")
+      .replace(/\s*["']$/, "")
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, "\"")
+      .trim();
+  }
+
+  return cleaned
+    .replace(/^\s*\{\s*/, "")
+    .replace(/\s*\}\s*$/, "")
+    .replace(/^\s*["']?synthesis["']?\s*:\s*/i, "")
+    .replace(/^["']\s*/, "")
+    .replace(/\s*["']$/, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\"/g, "\"")
+    .trim();
+}
+
+function hasRequiredSynthesisSections(text: string): boolean {
+  if (!text) return false;
+  return REQUIRED_SYNTHESIS_HEADINGS.every((heading) =>
+    new RegExp(`(^|\\n)\\s*${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`, "m").test(text)
+  );
+}
+
+function buildFallbackSynthesis(body: RequestBody): string {
+  const latestWeek = body.weeklySummary?.[body.weeklySummary.length - 1];
+  const previousWeek = body.weeklySummary?.[body.weeklySummary.length - 2];
+  const latestDistance = latestWeek ? `${latestWeek.distance.toFixed(1)}km` : "recent volume";
+  const distanceTrend = latestWeek && previousWeek
+    ? `${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week`
+    : "stable progression";
+  const latestLongRun = latestWeek ? `${latestWeek.longestRun.toFixed(1)}km` : "your recent long run";
+  const effortSamples = (body.recentActivities || []).filter((a) => Number.isFinite(a.effort)).length;
+  const raceWindow = body.planContext?.daysToRace != null
+    ? `${body.planContext.daysToRace} days to race`
+    : "your current goal timeline";
+
+  return [
+    `Mileage Trend: Recent weekly volume is around ${latestDistance} with ${distanceTrend}; keep weekly load changes controlled and prioritize one recovery-focused day to absorb work.`,
+    `Intensity Distribution: Current activity load includes ${effortSamples} effort-tagged sessions in the recent window; keep quality to 1-2 purposeful sessions while protecting easy aerobic volume.`,
+    `Long-Run Progression: Long-run execution is currently around ${latestLongRun}; progress duration gradually and add only small finish-quality segments when freshness remains high.`,
+    `Race Readiness: With ${raceWindow}, readiness improves most through consistency rather than spikes; hold a sustainable rhythm this week and reassess fatigue markers before adding intensity.`,
+  ].join("\n");
 }
 
 const VALID_WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
@@ -1099,12 +1144,10 @@ Deno.serve(async (req) => {
     if (mode === "insights_synthesis") {
       const INSIGHTS_SYNTHESIS_INSTRUCTION = [
         "You are Marius AI Bakken, an expert endurance running coach.",
-        "Write a single thorough paragraph (4-6 sentences) interpreting the athlete's current training state.",
-        "Cover all of the following: current fitness trend (CTL direction), form/fatigue balance (TSB), consistency pattern, and one practical recommendation for the next 7-10 days.",
-        "Include at least one concrete data reference from the provided context (e.g. trend direction, load change, long-run pattern, or check-in signal).",
-        "Your tone is direct and supportive — like a coach summarizing a training week.",
-        'Respond with a single valid JSON object: { "synthesis": "<paragraph text>" }',
-        "No markdown fences. No other fields.",
+        "Interpret the athlete context over a 10-12 week horizon.",
+        "Respond in plain text only. Do not output JSON. Do not output markdown.",
+        `Use exactly these headings with a colon: ${REQUIRED_SYNTHESIS_HEADINGS.join(", ")}.`,
+        "Each section must contain concise interpretation and one practical recommendation tied to the data.",
       ].join(" ");
 
       const systemInstruction = buildDefaultSystemInstruction(
@@ -1121,15 +1164,22 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents: [{ role: "user", parts: [{ text: userMessage }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 768 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 512 },
         }),
       });
 
-      const geminiJson = await geminiRes.json();
-      const rawText = geminiJson.candidates?.[0]?.content?.parts?.find(
-        (p: { thought?: boolean; text?: string }) => !p.thought && p.text
-      )?.text ?? "";
-      const synthesis = parseSynthesisText(rawText).slice(0, 1200);
+      let rawText = "";
+      if (geminiRes.ok) {
+        const geminiJson = await geminiRes.json();
+        rawText = geminiJson.candidates?.[0]?.content?.parts?.find(
+          (p: { thought?: boolean; text?: string }) => !p.thought && p.text
+        )?.text ?? "";
+      }
+
+      const sanitized = sanitizeSynthesisResponse(rawText);
+      const synthesis = (hasRequiredSynthesisSections(sanitized)
+        ? sanitized
+        : buildFallbackSynthesis(body)).slice(0, 1600);
 
       return new Response(JSON.stringify({ synthesis }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1219,3 +1269,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+

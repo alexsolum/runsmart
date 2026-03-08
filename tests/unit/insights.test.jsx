@@ -227,9 +227,21 @@ describe("Insights — synthesis callout (INSG-02)", () => {
     vi.clearAllMocks();
   });
 
-  it("renders synthesis callout when edge function returns synthesis text", async () => {
+  it("strips wrapper artifacts and renders cleaned synthesis callout", async () => {
+    const wrappedSynthesis = [
+      "```json",
+      JSON.stringify({
+        synthesis: [
+          "Mileage Trend: volume is steady with a slight build.",
+          "Intensity Distribution: most work is in Z1-Z2 with controlled quality.",
+          "Long-Run Progression: long run duration is extending safely week over week.",
+          "Race Readiness: current consistency supports a positive readiness trend.",
+        ].join("\n"),
+      }),
+      "```",
+    ].join("\n");
     const mockInvoke = vi.fn().mockResolvedValue({
-      data: { synthesis: "Your training load is building steadily." },
+      data: { synthesis: wrappedSynthesis },
       error: null,
     });
     getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
@@ -238,7 +250,45 @@ describe("Insights — synthesis callout (INSG-02)", () => {
     render(<InsightsPage />);
     const callout = await screen.findByTestId("synthesis-callout");
     expect(callout).toBeInTheDocument();
-    expect(callout).toHaveTextContent("Your training load is building steadily.");
+    expect(callout).toHaveTextContent("Mileage Trend:");
+    expect(callout).toHaveTextContent("Race Readiness:");
+    expect(callout).not.toHaveTextContent('{"synthesis"');
+    expect(callout).not.toHaveTextContent("```");
+  });
+
+  it("renders all four required synthesis headings when synthesis is valid", async () => {
+    const validSynthesis = [
+      "Mileage Trend: volume is stable and gradually rising.",
+      "Intensity Distribution: intensity remains mostly aerobic with one quality focus.",
+      "Long-Run Progression: long runs are progressing with manageable fatigue cost.",
+      "Race Readiness: consistency and recovery suggest readiness is improving.",
+    ].join("\n");
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: { synthesis: validSynthesis },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<InsightsPage />);
+    const callout = await screen.findByTestId("synthesis-callout");
+    expect(callout).toHaveTextContent("Mileage Trend:");
+    expect(callout).toHaveTextContent("Intensity Distribution:");
+    expect(callout).toHaveTextContent("Long-Run Progression:");
+    expect(callout).toHaveTextContent("Race Readiness:");
+  });
+
+  it("omits synthesis callout when synthesis is invalid after sanitization", async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: { synthesis: "This is generic text with no required headings." },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<InsightsPage />);
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalled());
+    expect(screen.queryByTestId("synthesis-callout")).toBeNull();
   });
 
   it("parses wrapped JSON-string synthesis payloads", async () => {

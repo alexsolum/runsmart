@@ -81,6 +81,8 @@ Plans:
 
 ## Phase 5: Insights Synthesis Hardening
 
+**Status:** Completed on 2026-03-08 (3/3 plans complete)
+
 **Goal:** Close the diagnosed Insights synthesis gap so the callout consistently returns rich plain-text coaching without JSON wrapper artifacts.
 
 **Requirements:** INSG-02
@@ -102,4 +104,4 @@ Planned tasks:
 4. Unit/integration tests fail on wrapper leakage or contract regressions.
 
 ---
-*Last updated: 2026-03-07 after 05-03 execution (Phase 5 at 3/3 plans complete)*
+*Last updated: 2026-03-08 after Phase 5 execution and verification pass*

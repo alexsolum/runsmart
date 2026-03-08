@@ -46,6 +46,42 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
   boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
 };
+const REQUIRED_SYNTHESIS_HEADINGS = [
+  "Mileage Trend",
+  "Intensity Distribution",
+  "Long-Run Progression",
+  "Race Readiness",
+];
+
+function sanitizeSynthesisText(input) {
+  if (typeof input !== "string") return "";
+  let text = input.trim();
+  if (!text) return "";
+
+  text = text.replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/, "").trim();
+  if (!text) return "";
+
+  if (text.startsWith("{") && text.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.synthesis === "string") {
+        text = parsed.synthesis.trim();
+      }
+    } catch {
+      // keep original text if not valid JSON
+    }
+  }
+
+  return text.trim();
+}
+
+function hasRequiredSynthesisHeadings(text) {
+  if (!text) return false;
+  return REQUIRED_SYNTHESIS_HEADINGS.every((heading) => {
+    const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?(?:#+\\s*)?${heading}\\s*:`, "i");
+    return pattern.test(text);
+  });
+}
 
 // ── Zone config ────────────────────────────────────────────────────────────
 
@@ -327,6 +363,10 @@ export default function InsightsPage() {
   const [synthesis, setSynthesis] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const synthesisFetchedRef = useRef(false);
+  const renderableSynthesis = useMemo(() => {
+    const sanitized = sanitizeSynthesisText(synthesis);
+    return hasRequiredSynthesisHeadings(sanitized) ? sanitized : null;
+  }, [synthesis]);
 
   useEffect(() => {
     if (!hasData || synthesisFetchedRef.current) return;
@@ -349,7 +389,12 @@ export default function InsightsPage() {
         const { data, error } = await client.functions.invoke("gemini-coach", {
           body: { mode: "insights_synthesis", ...payload },
         });
-        if (!error && data?.synthesis) setSynthesis(data.synthesis);
+        if (!error && data?.synthesis) {
+          const sanitizedSynthesis = sanitizeSynthesisText(data.synthesis);
+          if (hasRequiredSynthesisHeadings(sanitizedSynthesis)) {
+            setSynthesis(sanitizedSynthesis);
+          }
+        }
       } catch {
         // silent fail — callout is omitted
       } finally {
@@ -375,9 +420,9 @@ export default function InsightsPage() {
 
       {/* Synthesis callout — above KPI strip */}
       {synthesisLoading && <SkeletonBlock height={72} data-testid="synthesis-skeleton" />}
-      {!synthesisLoading && synthesis && (
+      {!synthesisLoading && renderableSynthesis && (
         <div className="insights-coach-synthesis" data-testid="synthesis-callout">
-          <p>{synthesis}</p>
+          <p>{renderableSynthesis}</p>
         </div>
       )}
 

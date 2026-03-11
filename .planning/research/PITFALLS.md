@@ -1,42 +1,32 @@
-# Pitfalls Research (Milestone: Coach Integration)
+# Pitfalls Research
 
-## Pitfall 1: Philosophy text becomes unstructured prompt bloat
-- Warning signs:
-  - Prompt size growth causes unstable or generic responses.
-  - Coach output drifts from strict response schema.
-- Prevention:
-  - Store philosophy in structured sections (principles, constraints, examples).
-  - Enforce length and format guardrails before persistence.
-  - Keep output contracts strict in function validation.
-- Phase to address:
-  - Phase 1 (philosophy platform), Phase 2 (runtime prompt integration).
+## Strava Integration
+- **Rate Limits:** 100 req/15 min is tight.
+  - *Risk:* A "Deep Sync" (all history) for a user with 2,000 activities uses 20 requests. 5 users doing this simultaneously hits the app limit.
+  - *Mitigation:* Implement incremental sync using `after` parameter. Only fetch full history on explicit user request.
+- **Webhook Timeouts:** Strava requires < 2s response.
+  - *Risk:* Fetching activity details inside the main handler thread will timeout.
+  - *Mitigation:* Use `EdgeRuntime.waitUntil` for async processing. Return 200 OK immediately.
+- **Duplicate Events:** Strava might retry webhooks.
+  - *Mitigation:* Idempotent upsert logic (`ON CONFLICT (strava_id) DO UPDATE`).
 
-## Pitfall 2: Replanning logic becomes opaque to user
-- Warning signs:
-  - User cannot tell why weekly targets changed.
-  - Plan updates feel arbitrary and untrustworthy.
-- Prevention:
-  - Return explicit “what changed and why” summary with each replan.
-  - Surface change rationale in plan UI.
-- Phase to address:
-  - Phase 2 and Phase 3.
+## Analytics & Trends
+- **Data Quality:** "Garbage in, garbage out."
+  - *Risk:* Including warmups, cooldowns, or treadmill runs (bad pace data) in efficiency trend.
+  - *Mitigation:* Filter aggressively: `type === "Run"`, `manual === false`, `avg_heartrate > 0`, `distance > 2km`.
+- **Seasonality:** Pace/HR decouples in heat/humidity.
+  - *Risk:* User sees "declining fitness" in summer when it's just heat drift.
+  - *Mitigation:* AI insight should contextually mention temperature impact if weather data is available (unlikely for MVP), or generic disclaimer text.
 
-## Pitfall 3: Insights overlays conflict with chart semantics
-- Warning signs:
-  - Visual clutter on load trend chart.
-  - Overlays not tied to real data points/date windows.
-- Prevention:
-  - Limit overlays to a small set of coach states.
-  - Bind overlays to computed intervals already present in domain compute outputs.
-- Phase to address:
-  - Phase 4.
+## Insight Synthesis
+- **Format Leakage:** LLMs love Markdown code blocks (` ```markdown `).
+  - *Risk:* The UI renders the code block syntax instead of the formatted text.
+  - *Mitigation:* Regex strip `^```(markdown|json)?` and trailing ````$`.
+- **Validation Failure:**
+  - *Risk:* Strict validation rejects a perfectly good response because of a missing header.
+  - *Mitigation:* Relaxed validation (warn, don't fail). Or render "Raw" text in a `<pre>` block only in dev mode for debugging.
 
-## Pitfall 4: Admin edit path weakens security boundary
-- Warning signs:
-  - Non-owner users can mutate philosophy.
-  - Direct client writes bypass intended policy.
-- Prevention:
-  - RLS owner-only policies plus explicit checks in update path.
-  - Integration tests for unauthorized updates.
-- Phase to address:
-  - Phase 1.
+## General
+- **Security:** Public webhook endpoint exposure.
+  - *Risk:* malicious actors flooding the endpoint.
+  - *Mitigation:* Verify `hub.verify_token` (GET) and `owner_id` check (POST).

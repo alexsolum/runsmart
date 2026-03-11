@@ -22,6 +22,15 @@ The coaching guidance must produce practical, tailored training decisions that f
 - Address remaining synthesis prompt wording consistency debt
 - Define and scope v1.1 requirements with a fresh milestone setup
 
+## Current Milestone: v1.1 Strava Sync & Insight Trends
+
+**Goal:** Enhance coaching insights with deeper trend analysis and robust, real-time Strava integration.
+
+**Target features:**
+- Robust Strava Integration (Webhooks, unlimited sync, update handling)
+- Advanced Progress Analytics (Pace/HR efficiency trends by workout type)
+- Insight Synthesis Fixes (Reliable rich-text AI summaries)
+
 ## Constraints
 
 - Sensitive AI/Strava logic remains in Supabase Edge Functions

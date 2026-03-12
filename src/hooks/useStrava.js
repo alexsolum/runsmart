@@ -64,7 +64,7 @@ export function useStrava(userId, session, onActivitiesSynced, client) {
       if (!activeSession) throw new Error("No active session. Please sign in first.");
 
       const { data, error: invokeError } = await client.functions.invoke(functionName, {
-        body,
+        body: { ...body, v: 2 },
         headers: {
           Authorization: `Bearer ${activeSession.access_token}`,
         },

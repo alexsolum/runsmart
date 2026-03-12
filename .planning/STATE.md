@@ -18,7 +18,7 @@ progress:
 **Current Phase:** 8 (Insight Reliability)
 **Status:** Decisions finalized, moving to research.
 
-Last activity: 2026-03-12 - Completed quick task 5: Improve the aerobic efficiency trend chart (180-day window, regression quality badge, pace tooltip)
+Last activity: 2026-03-12 - Completed quick task 6: Improve aerobic efficiency trend chart — pace (min/km) Y-axis, HR-based classification, inverted axis, larger dots
 
 ## Project Reference
 
@@ -59,6 +59,7 @@ See: .planning/PROJECT.md
 | 3 | I need you to change the Innsikt page to norwegian as well (as i have selected norwegian in the sidebar navigation). All text on the page should be norwegian, as well as the response from the AI Coach (gemini) | 2026-03-12 | 36eeea2 | [3-i-need-you-to-change-the-innsikt-page-to](./quick/3-i-need-you-to-change-the-innsikt-page-to/) |
 | 4 | Cache the AI coaching feedback on the InsightsPage (insights_synthesis mode) with 1-hour TTL keyed by language | 2026-03-12 | 68345f5 | [4-cache-the-ai-coaching-feedback-on-the-in](./quick/4-cache-the-ai-coaching-feedback-on-the-in/) |
 | 5 | Improve the aerobic efficiency trend chart (180-day window, regression quality badge R²/strength/count, pace in tooltip) | 2026-03-12 | 2e00225 | [5-improve-the-aerobic-efficiency-trend-cha](./quick/5-improve-the-aerobic-efficiency-trend-cha/) |
+| 6 | Improve aerobic efficiency chart: pace (min/km) Y-axis, HR-based classification, inverted axis, larger dots | 2026-03-12 | 32c19cd | [6-improve-aerobic-efficiency-trend-chart-m](./quick/6-improve-aerobic-efficiency-trend-chart-m/) |
 
 ## Decisions
 
@@ -78,3 +79,4 @@ See: .planning/PROJECT.md
 - [Phase 05-insights-synthesis-hardening]: 05-02 sets mode-aware payload windows (default 4w/7d, insights_synthesis 12w/84d) with deterministic chronology and explicit insights-mode wiring from InsightsPage
 - [quick-4]: SYNTHESIS_CACHE uses module-level object (not localStorage) — survives SPA navigation, resets on browser reload; keyed by lang so en/no caches are independent
 - [quick-5]: rStrength thresholds: >=0.5=strong, >=0.25=moderate, else weak; pace in tooltip = 60/speed(km/h) formatted M:SS min/km with "—" fallback for zero speed
+- [quick-6]: maxHR = 95th-percentile of all activity average_heartrate values (fallback 190); easy filter HR<75%, workout HR>=85% or intensityScore>75, long duration>4500s AND HR<85%; trend-gain badge inverted for pace (negative=faster=green)

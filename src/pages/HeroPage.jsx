@@ -64,10 +64,11 @@ function fmtActiveTime(seconds) {
   return `${m} min`;
 }
 
-function fmtPaceDisplay(speedMs) {
-  if (!Number(speedMs)) return "—";
-  const spm = 1000 / Number(speedMs);
-  return `${Math.floor(spm / 60)}:${String(Math.round(spm % 60)).padStart(2, "0")} /km`;
+function fmtPaceDisplay(secPerKm) {
+  if (!Number(secPerKm) || secPerKm <= 0) return "—";
+  const m = Math.floor(secPerKm / 60);
+  const s = Math.round(secPerKm % 60);
+  return `${m}:${String(s).padStart(2, "0")} /km`;
 }
 
 function fmtRelativeDate(dateStr) {
@@ -248,12 +249,17 @@ export default function HeroPage() {
     const curSessions = filtered.length;
     const prevSessions = prevFiltered.length;
 
-    const avgSpeed = (arr) => {
-      const r = arr.filter((a) => Number(a.average_speed) > 0);
-      return r.length ? sum(r, "average_speed") / r.length : 0;
+    const avgPaceSpm = (arr) => {
+      const r = arr.filter((a) => {
+        const pace = Number(a.average_pace) || (a.moving_time && a.distance ? (Number(a.moving_time) / Number(a.distance)) * 1000 : 0);
+        return pace > 0 && (a.type === "Run" || a.type === "Walk");
+      });
+      if (!r.length) return 0;
+      const paces = r.map((a) => Number(a.average_pace) || (Number(a.moving_time) / Number(a.distance)) * 1000);
+      return paces.reduce((s, p) => s + p, 0) / paces.length;
     };
-    const curSpeed = avgSpeed(filtered);
-    const prevSpeed = avgSpeed(prevFiltered);
+    const curPace = avgPaceSpm(filtered);
+    const prevPace = avgPaceSpm(prevFiltered);
 
     const curReadiness = Math.max(0, Math.round(75 - (curTime / 60 - prevTime / 60) * 0.08));
     const prevReadiness = Math.max(0, Math.round(75 - (prevTime / 60 - curTime / 60) * 0.08));
@@ -277,8 +283,8 @@ export default function HeroPage() {
       },
       {
         label: "Avg. Pace",
-        value: fmtPaceDisplay(curSpeed),
-        delta: computeDelta(curSpeed ? 1000 / curSpeed : 0, prevSpeed ? 1000 / prevSpeed : 0, true),
+        value: fmtPaceDisplay(curPace),
+        delta: computeDelta(curPace ? 1 / curPace : 0, prevPace ? 1 / prevPace : 0, true),
         suffix,
         Icon: TrendingUp,
       },

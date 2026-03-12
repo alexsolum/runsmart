@@ -328,6 +328,10 @@ function ActivityZoneBreakdown({ activityZones, locale, copy }) {
 function EfficiencyTooltip({ active, payload, locale, copy }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const paceMinPerKm = data.speed > 0 ? 60 / data.speed : null;
+    const paceStr = paceMinPerKm
+      ? `${Math.floor(paceMinPerKm)}:${Math.round((paceMinPerKm - Math.floor(paceMinPerKm)) * 60).toString().padStart(2, "0")} min/km`
+      : "—";
     return (
       <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-lg text-xs">
         <p className="font-bold text-slate-900 mb-1">{data.name}</p>
@@ -337,6 +341,8 @@ function EfficiencyTooltip({ active, payload, locale, copy }) {
           <span className="text-right font-mono font-bold text-slate-700">{data.speed.toFixed(1)} km/h</span>
           <span className="text-slate-400">{copy.avgHr}</span>
           <span className="text-right font-mono font-bold text-slate-700">{data.hr} bpm</span>
+          <span className="text-slate-400">{copy.pace}</span>
+          <span className="text-right font-mono font-bold text-slate-700">{paceStr}</span>
           <span className="text-slate-400">{copy.efficiency}</span>
           <span className="text-right font-mono font-bold text-blue-600">{data.y.toFixed(3)}</span>
         </div>
@@ -1037,7 +1043,9 @@ export default function InsightsPage() {
                   <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                     {Number(aerobicEfficiencyData.gain) > 0 ? "+" : ""}{aerobicEfficiencyData.gain}%
                   </span>
-                  <span className="block text-[9px] text-slate-400">R² {aerobicEfficiencyData.r2}</span>
+                  <span className="block text-[9px] text-slate-400">
+                    R² {aerobicEfficiencyData.r2} · {copy.rStrengthLabels[aerobicEfficiencyData.rStrength]} · {aerobicEfficiencyData.count} {copy.runs}
+                  </span>
                 </div>
               )}
             </CardHeader>

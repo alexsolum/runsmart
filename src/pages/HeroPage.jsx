@@ -421,6 +421,7 @@ export default function HeroPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="alle-lop">Alle løp</TabsTrigger>
           <TabsTrigger value="analytics" disabled>Analytics</TabsTrigger>
           <TabsTrigger value="reports" disabled>Reports</TabsTrigger>
           <TabsTrigger value="notifications" disabled>Notifications</TabsTrigger>
@@ -541,6 +542,27 @@ export default function HeroPage() {
           </Card>
 
         </TabsContent>
+
+        {/* ── Alle løp Tab ── */}
+        <TabsContent value="alle-lop" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Alle løp</CardTitle>
+              <CardDescription>
+                Komplett aktivitetslogg — {activities.activities.length} aktiviteter totalt
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-5 py-0 pb-4">
+              <ActivitiesTable
+                activities={[...activities.activities].sort(
+                  (a, b) => new Date(b.started_at) - new Date(a.started_at)
+                )}
+                pageSize={10}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
 
     </PageContainer>

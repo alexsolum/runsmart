@@ -18,7 +18,7 @@ progress:
 **Current Phase:** 8 (Insight Reliability)
 **Status:** Decisions finalized, moving to research.
 
-Last activity: 2026-03-12 - Completed quick task 3: I need you to change the Innsikt page to norwegian as well (as i have selected norwegian in the sidebar navigation). All text on the page should be norwegian, as well as the response from the AI Coach (gemini)
+Last activity: 2026-03-12 - Completed quick task 4: Cache the AI coaching feedback on the InsightsPage with a 1-hour TTL keyed by language
 
 ## Project Reference
 
@@ -57,6 +57,7 @@ See: .planning/PROJECT.md
 | 1 | debug why strava sync fails; reproduce with chromium MCP and inspect Supabase + Vercel | 2026-03-12 | 577d04c | [1-debug-why-strava-sync-fails-reproduce-wi](./quick/1-debug-why-strava-sync-fails-reproduce-wi/) |
 | 2 | Resume the Insights / Innsikt AI card fix and finish deployment | 2026-03-12 | pending | [2-resume-the-insights-innsikt-ai-card-fix-](./quick/2-resume-the-insights-innsikt-ai-card-fix-/) |
 | 3 | I need you to change the Innsikt page to norwegian as well (as i have selected norwegian in the sidebar navigation). All text on the page should be norwegian, as well as the response from the AI Coach (gemini) | 2026-03-12 | 36eeea2 | [3-i-need-you-to-change-the-innsikt-page-to](./quick/3-i-need-you-to-change-the-innsikt-page-to/) |
+| 4 | Cache the AI coaching feedback on the InsightsPage (insights_synthesis mode) with 1-hour TTL keyed by language | 2026-03-12 | 68345f5 | [4-cache-the-ai-coaching-feedback-on-the-in](./quick/4-cache-the-ai-coaching-feedback-on-the-in/) |
 
 ## Decisions
 
@@ -74,3 +75,4 @@ See: .planning/PROJECT.md
 - [Phase 05-insights-synthesis-hardening]: 05-01 migrated insights_synthesis to strict plain-text four-section contract (Mileage Trend, Intensity Distribution, Long-Run Progression, Race Readiness) with 10-12 week interpretation horizon wording
 - [Phase 05-insights-synthesis-hardening]: 05-01 enforces sanitize -> section-validation -> deterministic fallback pipeline in edge function before returning synthesis
 - [Phase 05-insights-synthesis-hardening]: 05-02 sets mode-aware payload windows (default 4w/7d, insights_synthesis 12w/84d) with deterministic chronology and explicit insights-mode wiring from InsightsPage
+- [quick-4]: SYNTHESIS_CACHE uses module-level object (not localStorage) — survives SPA navigation, resets on browser reload; keyed by lang so en/no caches are independent

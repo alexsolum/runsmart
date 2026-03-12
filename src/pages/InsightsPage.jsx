@@ -386,7 +386,7 @@ export default function InsightsPage() {
             fatigueLegend: "Tretthet (ATL)",
             formLegend: "Overskudd (TSB)",
             aerobicEfficiencyTitle: "Trend for aerob effektivitet",
-            aerobicEfficiencyDesc: "Forholdet fart/puls (GAP-normalisert) de siste 150 dagene.",
+            aerobicEfficiencyDesc: "Forholdet fart/puls (GAP-normalisert) de siste 180 dagene.",
             trendGain: "Trendgevinst",
             trendLine: "Trendlinje",
             easyAerobic: "Rolig / aerob",
@@ -395,6 +395,9 @@ export default function InsightsPage() {
             speed: "Fart",
             avgHr: "Snittpuls",
             efficiency: "Effektivitet",
+            rStrengthLabels: { strong: "Sterk", moderate: "Moderat", weak: "Svak" },
+            runs: "løp",
+            pace: "Tempo",
             weeklyLoad: "Ukentlig belastning",
             weeklyLoadDesc: "Rullerende 8-ukersvisning av akkumulerte treningsminutter.",
             minutes: "Minutter",
@@ -454,7 +457,7 @@ export default function InsightsPage() {
             fatigueLegend: "Fatigue (ATL)",
             formLegend: "Form (TSB)",
             aerobicEfficiencyTitle: "Aerobic efficiency trend",
-            aerobicEfficiencyDesc: "Speed/HR ratio (GAP normalized) over the past 150 days.",
+            aerobicEfficiencyDesc: "Speed/HR ratio (GAP normalized) over the past 180 days.",
             trendGain: "Trend Gain",
             trendLine: "Trend Line",
             easyAerobic: "Easy / Aerobic",
@@ -463,6 +466,9 @@ export default function InsightsPage() {
             speed: "Speed",
             avgHr: "Avg HR",
             efficiency: "Efficiency",
+            rStrengthLabels: { strong: "Strong", moderate: "Moderate", weak: "Weak" },
+            runs: "runs",
+            pace: "Pace",
             weeklyLoad: "Weekly load",
             weeklyLoadDesc: "Rolling 8-week view of accumulated training minutes.",
             minutes: "Minutes",
@@ -570,7 +576,7 @@ export default function InsightsPage() {
   // ── Aerobic Efficiency Logic ─────────────────────────────────────────────
 
   const aerobicEfficiencyData = useMemo(() => {
-    const windowDays = 150;
+    const windowDays = 180;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - windowDays);
 
@@ -605,11 +611,18 @@ export default function InsightsPage() {
 
     const gain = calculateTrendGain(displayPoints);
 
-    return { 
-      points: displayPoints, 
-      regression: regressionLine, 
+    const rSquared = reg.rSquared;
+    const count = displayPoints.length;
+    // strength thresholds: >=0.5 = strong, >=0.25 = moderate, else weak
+    const rStrength = rSquared >= 0.5 ? "strong" : rSquared >= 0.25 ? "moderate" : "weak";
+
+    return {
+      points: displayPoints,
+      regression: regressionLine,
       gain: gain.toFixed(1),
-      r2: reg.rSquared.toFixed(2)
+      r2: rSquared.toFixed(2),
+      count,
+      rStrength,
     };
   }, [activities.activities, filterMode]);
 

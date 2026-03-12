@@ -328,23 +328,19 @@ function ActivityZoneBreakdown({ activityZones, locale, copy }) {
 function EfficiencyTooltip({ active, payload, locale, copy }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    const paceMinPerKm = data.speed > 0 ? 60 / data.speed : null;
-    const paceStr = paceMinPerKm
-      ? `${Math.floor(paceMinPerKm)}:${Math.round((paceMinPerKm - Math.floor(paceMinPerKm)) * 60).toString().padStart(2, "0")} min/km`
-      : "—";
     return (
       <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-lg text-xs">
         <p className="font-bold text-slate-900 mb-1">{data.name}</p>
         <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString(locale)}</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <span className="text-slate-400">{copy.pace}</span>
+          <span className="text-right font-mono font-bold text-blue-600">
+            {`${Math.floor(data.y)}:${Math.round((data.y - Math.floor(data.y)) * 60).toString().padStart(2, "0")} min/km`}
+          </span>
           <span className="text-slate-400">{copy.speed}</span>
           <span className="text-right font-mono font-bold text-slate-700">{data.speed.toFixed(1)} km/h</span>
           <span className="text-slate-400">{copy.avgHr}</span>
           <span className="text-right font-mono font-bold text-slate-700">{data.hr} bpm</span>
-          <span className="text-slate-400">{copy.pace}</span>
-          <span className="text-right font-mono font-bold text-slate-700">{paceStr}</span>
-          <span className="text-slate-400">{copy.efficiency}</span>
-          <span className="text-right font-mono font-bold text-blue-600">{data.y.toFixed(3)}</span>
         </div>
       </div>
     );
@@ -391,8 +387,8 @@ export default function InsightsPage() {
             fitnessLegend: "Form (CTL)",
             fatigueLegend: "Tretthet (ATL)",
             formLegend: "Overskudd (TSB)",
-            aerobicEfficiencyTitle: "Trend for aerob effektivitet",
-            aerobicEfficiencyDesc: "Forholdet fart/puls (GAP-normalisert) de siste 180 dagene.",
+            aerobicEfficiencyTitle: "Tempo på rolige løp over tid",
+            aerobicEfficiencyDesc: "Tempo (min/km) på aerobe løp de siste 180 dagene. Linje som går ned = du løper fortere.",
             trendGain: "Trendgevinst",
             trendLine: "Trendlinje",
             easyAerobic: "Rolig / aerob",
@@ -462,8 +458,8 @@ export default function InsightsPage() {
             fitnessLegend: "Fitness (CTL)",
             fatigueLegend: "Fatigue (ATL)",
             formLegend: "Form (TSB)",
-            aerobicEfficiencyTitle: "Aerobic efficiency trend",
-            aerobicEfficiencyDesc: "Speed/HR ratio (GAP normalized) over the past 180 days.",
+            aerobicEfficiencyTitle: "Easy run pace trend",
+            aerobicEfficiencyDesc: "Pace (min/km) on aerobic runs over the past 180 days. Line trending down = getting faster.",
             trendGain: "Trend Gain",
             trendLine: "Trend Line",
             easyAerobic: "Easy / Aerobic",
@@ -586,21 +582,36 @@ export default function InsightsPage() {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - windowDays);
 
+    // Compute 95th-percentile max HR from all activities
+    const allHRValues = activities.activities
+      .map(a => Number(a.average_heartrate) || 0)
+      .filter(hr => hr > 0)
+      .sort((a, b) => a - b);
+    const maxHR = allHRValues.length > 0
+      ? allHRValues[Math.floor(allHRValues.length * 0.95)]
+      : 190;
+
     const filtered = activities.activities.filter(a => new Date(a.started_at) >= cutoff);
-    const points = computeAerobicEfficiency(filtered);
-    
-    // Apply UI-level filters
+    const rawPoints = computeAerobicEfficiency(filtered);
+
+    // Replace y with pace in min/km (speed is in km/h)
+    const points = rawPoints.map(p => ({
+      ...p,
+      y: p.speed > 0 ? 60 / p.speed : null,
+    })).filter(p => p.y !== null);
+
+    // Apply UI-level filters using HR-based classification
     let displayPoints = points;
     if (filterMode === "workout") {
-      displayPoints = points.filter(p => (p.name || "").toLowerCase().includes("workout") || p.intensityScore > 50);
+      displayPoints = points.filter(p => p.hr >= maxHR * 0.85 || p.intensityScore > 75);
     } else if (filterMode === "long") {
-      displayPoints = points.filter(p => (p.name || "").toLowerCase().includes("long") || p.distance > 18000);
+      displayPoints = points.filter(p => {
+        const speedMs = p.speed / 3.6;
+        const estimatedDuration = speedMs > 0 ? p.distance / speedMs : 0;
+        return estimatedDuration > 4500 && p.hr < maxHR * 0.85;
+      });
     } else if (filterMode === "easy") {
-      displayPoints = points.filter(p => 
-        !(p.name || "").toLowerCase().includes("workout") && 
-        !(p.name || "").toLowerCase().includes("long") &&
-        p.intensityScore < 50
-      );
+      displayPoints = points.filter(p => p.hr < maxHR * 0.75);
     }
 
     if (displayPoints.length < 2) return { points: displayPoints, regression: [], gain: 0, r2: 0 };
@@ -1040,7 +1051,7 @@ export default function InsightsPage() {
               {aerobicEfficiencyData.points.length >= 2 && (
                 <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg text-right">
                   <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">{copy.trendGain}</span>
-                  <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) <= 0 ? "text-emerald-600" : "text-red-500"}`}>
                     {Number(aerobicEfficiencyData.gain) > 0 ? "+" : ""}{aerobicEfficiencyData.gain}%
                   </span>
                   <span className="block text-[9px] text-slate-400">
@@ -1064,24 +1075,33 @@ export default function InsightsPage() {
                     axisLine={false}
                     tickLine={false}
                   />
-                  <YAxis 
+                  <YAxis
                     type="number"
                     domain={['auto', 'auto']}
-                    tick={TICK} 
-                    axisLine={false} 
-                    tickLine={false} 
+                    reversed={true}
+                    tickFormatter={(val) => {
+                      const mins = Math.floor(val);
+                      const secs = Math.round((val - mins) * 60);
+                      return `${mins}:${secs.toString().padStart(2, "0")}`;
+                    }}
+                    tick={TICK}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <Tooltip content={<EfficiencyTooltip locale={locale} copy={copy} />} />
                   <Scatter
                     name={copy.efficiency}
                     data={aerobicEfficiencyData.points}
                     className="max-[600px]:hidden"
+                    shape={(props) => {
+                      const { cx, cy, fill } = props;
+                      return <circle cx={cx} cy={cy} r={6} fill={fill} fillOpacity={0.75} />;
+                    }}
                   >
                     {aerobicEfficiencyData.points.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.intensityScore > 75 ? "#ef4444" : entry.intensityScore > 40 ? "#f59e0b" : "#22c55e"} 
-                        fillOpacity={0.6}
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.intensityScore > 75 ? "#ef4444" : entry.intensityScore > 40 ? "#f59e0b" : "#22c55e"}
                       />
                     ))}
                   </Scatter>

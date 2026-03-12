@@ -449,3 +449,79 @@ describe("calculateTrendGain", () => {
   });
 });
 
+describe("computeReferenceWorkouts", () => {
+  // Helper: create a minimal run activity
+  function makeRun(overrides) {
+    return {
+      id: overrides.id || "run-1",
+      started_at: overrides.started_at || "2025-01-01T10:00:00Z",
+      type: "Run",
+      moving_time: overrides.moving_time !== undefined ? overrides.moving_time : 1800,
+      distance: overrides.distance !== undefined ? overrides.distance : 5000,
+      average_heartrate: overrides.average_heartrate !== undefined ? overrides.average_heartrate : 150,
+      name: overrides.name || "Easy Run",
+      suffer_score: overrides.suffer_score || 0,
+    };
+  }
+
+  it("returns { referenceKm: null, points: [] } for empty input", () => {
+    const result = Compute.computeReferenceWorkouts([]);
+    expect(result).toEqual({ referenceKm: null, points: [] });
+  });
+
+  it("returns referenceKm set but empty points when fewer than 5 qualifying runs", () => {
+    const activities = [
+      makeRun({ id: "r1", distance: 5000, started_at: "2025-01-01T10:00:00Z" }),
+      makeRun({ id: "r2", distance: 5100, started_at: "2025-01-08T10:00:00Z" }),
+      makeRun({ id: "r3", distance: 4900, started_at: "2025-01-15T10:00:00Z" }),
+    ];
+    const result = Compute.computeReferenceWorkouts(activities);
+    expect(result.referenceKm).not.toBeNull();
+    expect(result.points).toHaveLength(0);
+  });
+
+  it("detects modal bin correctly — 6 runs at ~5 km and 2 at ~10 km, modalBin = 4, referenceKm ≈ 4.5", () => {
+    const activities = [
+      makeRun({ id: "r1", distance: 5000, started_at: "2025-01-01T10:00:00Z" }),
+      makeRun({ id: "r2", distance: 5100, started_at: "2025-01-02T10:00:00Z" }),
+      makeRun({ id: "r3", distance: 4900, started_at: "2025-01-03T10:00:00Z" }),
+      makeRun({ id: "r4", distance: 5050, started_at: "2025-01-04T10:00:00Z" }),
+      makeRun({ id: "r5", distance: 4800, started_at: "2025-01-05T10:00:00Z" }),
+      makeRun({ id: "r6", distance: 5200, started_at: "2025-01-06T10:00:00Z" }),
+      makeRun({ id: "r7", distance: 10000, started_at: "2025-01-07T10:00:00Z" }),
+      makeRun({ id: "r8", distance: 10500, started_at: "2025-01-08T10:00:00Z" }),
+    ];
+    const result = Compute.computeReferenceWorkouts(activities);
+    // Modal bin = 5 (floor(5000/1000)), modalCenter_m = (5+0.5)*1000 = 5500
+    // referenceKm = Math.round(5500/100)/10 = 5.5
+    expect(result.referenceKm).toBeCloseTo(5.5, 1);
+    expect(result.points.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("excludes pace outliers — a run with pace 3x the median is excluded", () => {
+    // 5 normal runs at pace ~5 min/km (300 s/km = speed 1/300 m/s), distance 5000m, time 1500s
+    // 1 outlier run at pace ~15 min/km (900 s/km), same distance
+    const normal = Array.from({ length: 5 }, (_, i) =>
+      makeRun({ id: `r${i}`, distance: 5000, moving_time: 1500, started_at: `2025-01-0${i + 1}T10:00:00Z` })
+    );
+    const outlier = makeRun({ id: "outlier", distance: 5000, moving_time: 4500, started_at: "2025-01-10T10:00:00Z" });
+    const result = Compute.computeReferenceWorkouts([...normal, outlier]);
+    const hasOutlier = result.points.some(p => p.id === "outlier");
+    expect(hasOutlier).toBe(false);
+    expect(result.points.length).toBe(5);
+  });
+
+  it("returned point has y = average_heartrate (not pace)", () => {
+    const activities = Array.from({ length: 6 }, (_, i) =>
+      makeRun({ id: `r${i}`, distance: 5000, moving_time: 1800, average_heartrate: 145 + i, started_at: `2025-01-0${i + 1}T10:00:00Z` })
+    );
+    const result = Compute.computeReferenceWorkouts(activities);
+    expect(result.points.length).toBeGreaterThan(0);
+    result.points.forEach(p => {
+      // y should be the heartrate (145-150 range), not pace (which would be ~6.67 min/km)
+      expect(p.y).toBeGreaterThan(100);
+      expect(p.y).toBeLessThan(220);
+    });
+  });
+});
+

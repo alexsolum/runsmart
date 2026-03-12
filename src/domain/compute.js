@@ -863,6 +863,97 @@
       });
   }
 
+  function computeReferenceWorkouts(activities) {
+    if (!activities || !activities.length) return { referenceKm: null, points: [] };
+
+    // Step 1: filter to valid runs
+    var runs = activities.filter(function(a) {
+      var type = (a.type || "").toLowerCase();
+      return type === "run" &&
+        Number(a.moving_time) >= 1200 &&
+        Number(a.average_heartrate) > 0 &&
+        Number(a.distance) > 0;
+    });
+
+    if (!runs.length) return { referenceKm: null, points: [] };
+
+    // Step 2: bucket by floor(distance_m / 1000)
+    var binCounts = {};
+    runs.forEach(function(a) {
+      var bin = Math.floor(Number(a.distance) / 1000);
+      binCounts[bin] = (binCounts[bin] || 0) + 1;
+    });
+
+    // Step 3: find modal bin (highest count; ties: pick highest bin)
+    var modalBin = null;
+    var modalCount = 0;
+    Object.keys(binCounts).forEach(function(binStr) {
+      var bin = Number(binStr);
+      var count = binCounts[binStr];
+      if (count > modalCount || (count === modalCount && (modalBin === null || bin > modalBin))) {
+        modalBin = bin;
+        modalCount = count;
+      }
+    });
+
+    if (modalBin === null) return { referenceKm: null, points: [] };
+
+    // Step 4: modalCenter_m
+    var modalCenter_m = (modalBin + 0.5) * 1000;
+
+    // Step 5: candidates — within ±15% of modalCenter_m
+    var candidates = runs.filter(function(a) {
+      return Math.abs(Number(a.distance) - modalCenter_m) / modalCenter_m <= 0.15;
+    });
+
+    // Step 6: compute paces and median
+    var paces = candidates.map(function(a) {
+      return Number(a.moving_time) / Number(a.distance);
+    }).sort(function(a, b) { return a - b; });
+
+    var medianPace;
+    var mid = Math.floor(paces.length / 2);
+    if (paces.length % 2 === 0) {
+      medianPace = (paces[mid - 1] + paces[mid]) / 2;
+    } else {
+      medianPace = paces[mid];
+    }
+
+    // Step 7: filter by pace (±20% of median)
+    var filtered = candidates.filter(function(a) {
+      var pace = Number(a.moving_time) / Number(a.distance);
+      return Math.abs(pace - medianPace) / medianPace <= 0.20;
+    });
+
+    // Step 8: referenceKm
+    var referenceKm = Math.round(modalCenter_m / 100) / 10;
+
+    // Return early with empty points if fewer than 5 qualifying runs
+    if (filtered.length < 5) {
+      return { referenceKm: referenceKm, points: [] };
+    }
+
+    // Step 9: map to output shape
+    var points = filtered.map(function(a) {
+      return {
+        id: a.id,
+        date: a.started_at,
+        x: new Date(a.started_at).getTime(),
+        y: Number(a.average_heartrate),
+        name: a.name,
+        distance: Number(a.distance),
+        hr: Number(a.average_heartrate),
+        speed: (Number(a.distance) / Number(a.moving_time)) * 3.6,
+        intensityScore: a.suffer_score || 0,
+      };
+    });
+
+    // Step 10: sort by x ascending
+    points.sort(function(a, b) { return a.x - b.x; });
+
+    return { referenceKm: referenceKm, points: points };
+  }
+
   function calculateTrendGain(points) {
     if (points.length < 2) return 0;
     var reg = linearRegression(points);
@@ -892,6 +983,7 @@ export {
   linearRegression,
   getMinettiFactor,
   computeAerobicEfficiency,
+  computeReferenceWorkouts,
   calculateTrendGain,
   formatDistance,
   formatDuration,

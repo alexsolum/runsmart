@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { useAppData } from "../context/AppDataContext";
 import { getSupabaseClient } from "../lib/supabaseClient.js";
 import { buildCoachPayload } from "../lib/coachPayload.js";
@@ -9,6 +10,9 @@ import {
   computeTrainingLoadState,
   computeWeeklyHRZones,
   computeRecentActivityZones,
+  computeAerobicEfficiency,
+  linearRegression,
+  calculateTrendGain,
 } from "../domain/compute";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +25,9 @@ import {
 import {
   ComposedChart,
   BarChart,
+  ScatterChart,
+  Scatter,
+  Cell,
   Area,
   Bar,
   Line,
@@ -46,6 +53,7 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
   boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
 };
+
 const REQUIRED_SYNTHESIS_HEADINGS = [
   "Mileage Trend",
   "Intensity Distribution",
@@ -53,31 +61,63 @@ const REQUIRED_SYNTHESIS_HEADINGS = [
   "Race Readiness",
 ];
 
+/**
+ * Sanitizes AI synthesis output, stripping JSON artifacts and code fences.
+ * Returns { text: string, isTrusted: boolean }.
+ * 'isTrusted' is true if the text was explicitly extracted from a JSON field
+ * or manual JSON-like structure, bypassing the heading requirement.
+ */
 function sanitizeSynthesisText(input) {
-  if (typeof input !== "string") return "";
+  if (typeof input !== "string") return { text: "", isTrusted: false };
   let text = input.trim();
-  if (!text) return "";
+  if (!text) return { text: "", isTrusted: false };
 
-  text = text.replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/, "").trim();
-  if (!text) return "";
+  // 1. Remove markdown code fences
+  text = text.replace(/^```(?:json|markdown|text)?\s*/i, "").replace(/\s*```$/, "").trim();
+  if (!text) return { text: "", isTrusted: false };
 
-  if (text.startsWith("{") && text.endsWith("}")) {
+  // 2. Try recursive JSON parse (handles double-stringified results)
+  if (text.startsWith("{") || text.startsWith('"')) {
     try {
       const parsed = JSON.parse(text);
+      if (typeof parsed === "string") {
+        const inner = sanitizeSynthesisText(parsed);
+        return { text: inner.text, isTrusted: true };
+      }
       if (typeof parsed?.synthesis === "string") {
-        text = parsed.synthesis.trim();
+        const inner = sanitizeSynthesisText(parsed.synthesis);
+        return { text: inner.text, isTrusted: true };
       }
     } catch {
-      // keep original text if not valid JSON
+      // Not valid JSON
     }
   }
 
-  return text.trim();
+  // 3. High-precision extraction for the pattern: { "synthesis": "value" }
+  const jsonLikeMatch = text.match(/\{\s*["']synthesis["']\s*:\s*(["'])([\s\S]*?)\1\s*\}/i);
+  if (jsonLikeMatch?.[2]) {
+    return { 
+      text: jsonLikeMatch[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').trim(),
+      isTrusted: true 
+    };
+  }
+
+  // 4. Fallback extraction for "synthesis": "value"
+  const synthesisKeyMatch = text.match(/["']synthesis["']\s*:\s*(["'])([\s\S]*?)\1/i);
+  if (synthesisKeyMatch?.[2]) {
+    return { 
+      text: synthesisKeyMatch[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').trim(),
+      isTrusted: true 
+    };
+  }
+
+  return { text: text.trim(), isTrusted: false };
 }
 
 function hasRequiredSynthesisHeadings(text) {
   if (!text) return false;
   return REQUIRED_SYNTHESIS_HEADINGS.every((heading) => {
+    // Look for heading followed by a colon, possibly with markdown artifacts
     const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?(?:#+\\s*)?${heading}\\s*:`, "i");
     return pattern.test(text);
   });
@@ -185,10 +225,35 @@ function ActivityZoneBreakdown({ activityZones }) {
   );
 }
 
+function EfficiencyTooltip({ active, payload }) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-lg text-xs">
+        <p className="font-bold text-slate-900 mb-1">{data.name}</p>
+        <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString()}</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <span className="text-slate-400">Speed</span>
+          <span className="text-right font-mono font-bold text-slate-700">{data.speed.toFixed(1)} km/h</span>
+          <span className="text-slate-400">Avg HR</span>
+          <span className="text-right font-mono font-bold text-slate-700">{data.hr} bpm</span>
+          <span className="text-slate-400">Efficiency</span>
+          <span className="text-right font-mono font-bold text-blue-600">{data.y.toFixed(3)}</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
   const { activities, checkins, plans, strava, dailyLogs, trainingBlocks, runnerProfile } = useAppData();
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+
+  const [filterMode, setFilterMode] = useState("easy"); // 'all', 'easy', 'workout', 'long'
 
   // ── Data derivation ──────────────────────────────────────────────────────
 
@@ -250,6 +315,52 @@ export default function InsightsPage() {
       })),
     [weeklyZones],
   );
+
+  // ── Aerobic Efficiency Logic ─────────────────────────────────────────────
+
+  const aerobicEfficiencyData = useMemo(() => {
+    const windowDays = 150;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - windowDays);
+
+    const filtered = activities.activities.filter(a => new Date(a.started_at) >= cutoff);
+    const points = computeAerobicEfficiency(filtered);
+    
+    // Apply UI-level filters
+    let displayPoints = points;
+    if (filterMode === "workout") {
+      displayPoints = points.filter(p => (p.name || "").toLowerCase().includes("workout") || p.intensityScore > 50);
+    } else if (filterMode === "long") {
+      displayPoints = points.filter(p => (p.name || "").toLowerCase().includes("long") || p.distance > 18000);
+    } else if (filterMode === "easy") {
+      displayPoints = points.filter(p => 
+        !(p.name || "").toLowerCase().includes("workout") && 
+        !(p.name || "").toLowerCase().includes("long") &&
+        p.intensityScore < 50
+      );
+    }
+
+    if (displayPoints.length < 2) return { points: displayPoints, regression: [], gain: 0, r2: 0 };
+
+    // Regression math
+    const reg = linearRegression(displayPoints);
+    const firstX = displayPoints[0].x;
+    const lastX = displayPoints[displayPoints.length - 1].x;
+    
+    const regressionLine = [
+      { x: firstX, regression: reg.intercept + reg.slope * firstX },
+      { x: lastX, regression: reg.intercept + reg.slope * lastX }
+    ];
+
+    const gain = calculateTrendGain(displayPoints);
+
+    return { 
+      points: displayPoints, 
+      regression: regressionLine, 
+      gain: gain.toFixed(1),
+      r2: reg.rSquared.toFixed(2)
+    };
+  }, [activities.activities, filterMode]);
 
   const kpiData = useMemo(() => {
     const now = new Date();
@@ -363,10 +474,6 @@ export default function InsightsPage() {
   const [synthesis, setSynthesis] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const synthesisFetchedRef = useRef(false);
-  const renderableSynthesis = useMemo(() => {
-    const sanitized = sanitizeSynthesisText(synthesis);
-    return hasRequiredSynthesisHeadings(sanitized) ? sanitized : null;
-  }, [synthesis]);
 
   useEffect(() => {
     if (!hasData || synthesisFetchedRef.current) return;
@@ -390,9 +497,9 @@ export default function InsightsPage() {
           body: { mode: "insights_synthesis", ...payload },
         });
         if (!error && data?.synthesis) {
-          const sanitizedSynthesis = sanitizeSynthesisText(data.synthesis);
-          if (hasRequiredSynthesisHeadings(sanitizedSynthesis)) {
-            setSynthesis(sanitizedSynthesis);
+          const { text, isTrusted } = sanitizeSynthesisText(data.synthesis);
+          if (isTrusted || hasRequiredSynthesisHeadings(text)) {
+            setSynthesis(text);
           }
         }
       } catch {
@@ -409,20 +516,72 @@ export default function InsightsPage() {
     <PageContainer id="insights">
 
       {/* Page header */}
-      <div className="mb-6">
-        <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">
-          Training analysis &amp; insights
-        </h2>
-        <p className="m-0 text-sm text-slate-500">
-          Understand readiness, spot risk early, and see the impact of your consistency.
-        </p>
+      <div className="mb-6 flex justify-between items-end gap-4 max-[800px]:flex-col max-[800px]:items-start">
+        <div>
+          <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">
+            Training analysis &amp; insights
+          </h2>
+          <p className="m-0 text-sm text-slate-500">
+            Understand readiness, spot risk early, and see the impact of your consistency.
+          </p>
+        </div>
+        
+        {/* Filter Strip */}
+        <div className="flex bg-slate-100 p-1 rounded-lg gap-1 self-end max-[800px]:self-stretch">
+          {[
+            { id: "all", label: "All Runs" },
+            { id: "easy", label: "Aerobic" },
+            { id: "workout", label: "Workouts" },
+            { id: "long", label: "Long Runs" }
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setFilterMode(f.id)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                filterMode === f.id 
+                ? "bg-white text-blue-600 shadow-sm" 
+                : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Synthesis callout — above KPI strip */}
-      {synthesisLoading && <SkeletonBlock height={72} data-testid="synthesis-skeleton" />}
-      {!synthesisLoading && renderableSynthesis && (
-        <div className="insights-coach-synthesis" data-testid="synthesis-callout">
-          <p>{renderableSynthesis}</p>
+      {synthesisLoading && <SkeletonBlock height={120} data-testid="synthesis-skeleton" />}
+      {!synthesisLoading && synthesis && (
+        <div 
+          className="insights-coach-synthesis bg-blue-50/50 border border-blue-100 rounded-xl p-6 mb-8 shadow-sm" 
+          data-testid="synthesis-callout"
+        >
+          <div className="prose prose-slate max-w-none prose-sm">
+            <ReactMarkdown
+              components={{
+                h3: ({node, ...props}) => (
+                  <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider mt-0 mb-2 flex items-center gap-2" {...props}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    {props.children}
+                  </h3>
+                ),
+                p: ({node, ...props}) => (
+                  <p className="text-slate-700 leading-relaxed mb-4 last:mb-0" {...props} />
+                ),
+                strong: ({node, ...props}) => (
+                  <strong className="font-semibold text-slate-900" {...props} />
+                ),
+                ul: ({node, ...props}) => (
+                  <ul className="list-disc ml-5 mb-4 space-y-1" {...props} />
+                ),
+                li: ({node, ...props}) => (
+                  <li className="text-slate-600" {...props} />
+                )
+              }}
+            >
+              {synthesis}
+            </ReactMarkdown>
+          </div>
         </div>
       )}
 
@@ -569,6 +728,89 @@ export default function InsightsPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Aerobic Efficiency — full width */}
+          <Card id="aerobic-efficiency-section">
+            <CardHeader className="pb-0 flex flex-row items-start justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold">Aerobic efficiency trend</CardTitle>
+                <CardDescription>
+                  Speed/HR ratio (GAP normalized) over the past 150 days.
+                </CardDescription>
+              </div>
+              {aerobicEfficiencyData.points.length >= 2 && (
+                <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg text-right">
+                  <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">Trend Gain</span>
+                  <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {Number(aerobicEfficiencyData.gain) > 0 ? "+" : ""}{aerobicEfficiencyData.gain}%
+                  </span>
+                  <span className="block text-[9px] text-slate-400">R² {aerobicEfficiencyData.r2}</span>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="pt-6">
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="x"
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={fmtDate}
+                    tick={TICK}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    type="number"
+                    domain={['auto', 'auto']}
+                    tick={TICK} 
+                    axisLine={false} 
+                    tickLine={false} 
+                  />
+                  <Tooltip content={<EfficiencyTooltip />} />
+                  <Scatter
+                    name="Efficiency Points"
+                    data={aerobicEfficiencyData.points}
+                    className="max-[600px]:hidden"
+                  >
+                    {aerobicEfficiencyData.points.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.intensityScore > 75 ? "#ef4444" : entry.intensityScore > 40 ? "#f59e0b" : "#22c55e"} 
+                        fillOpacity={0.6}
+                      />
+                    ))}
+                  </Scatter>
+                  <Line
+                    data={aerobicEfficiencyData.regression}
+                    dataKey="regression"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={false}
+                    name="Trend Line"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+              <div className="mt-4 flex items-center justify-center gap-6 text-[11px] text-slate-400 font-medium">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-60" />
+                  <span>Easy / Aerobic</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 opacity-60" />
+                  <span>Moderate</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 opacity-60" />
+                  <span>Intensity</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Training load state overlay callout */}
           {loadState && (

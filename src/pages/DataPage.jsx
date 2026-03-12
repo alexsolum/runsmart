@@ -102,24 +102,54 @@ export default function DataPage() {
                     <strong id="last-sync-time">{formatLastSync(strava.lastSyncAt)}</strong>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    id="strava-sync-btn"
-                    type="button"
-                    onClick={onSync}
-                    disabled={strava.loading}
-                  >
-                    {strava.loading ? "Syncing…" : "Sync now"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    id="strava-disconnect-btn"
-                    type="button"
-                    onClick={onDisconnect}
-                    disabled={strava.loading}
-                  >
-                    Disconnect
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      id="strava-sync-btn"
+                      className="flex-1"
+                      type="button"
+                      onClick={onSync}
+                      disabled={strava.loading || strava.isSyncingHistory}
+                    >
+                      {strava.loading ? "Syncing…" : "Sync now"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      id="strava-disconnect-btn"
+                      type="button"
+                      onClick={onDisconnect}
+                      disabled={strava.loading || strava.isSyncingHistory}
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                  
+                  {!strava.isSyncingHistory ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      id="strava-sync-history-btn"
+                      className="w-full text-xs"
+                      type="button"
+                      onClick={() => strava.syncHistory()}
+                      disabled={strava.loading}
+                    >
+                      Sync full history
+                    </Button>
+                  ) : (
+                    <div className="mt-1 space-y-1">
+                      <div className="flex justify-between text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                        <span>Syncing history...</span>
+                        <span>{strava.syncProgress} activities</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 transition-all duration-500 ease-out"
+                          style={{ width: `${Math.min(100, (strava.syncProgress / 50) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -21,6 +21,8 @@ export function useStrava(userId, session, onActivitiesSynced) {
   const [connected, setConnected] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isSyncingHistory, setIsSyncingHistory] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
   const [error, setError] = useState(null);
   const [statusMessage, setStatusMessage] = useState("");
   const oauthHandledRef = useRef(false);
@@ -149,6 +151,44 @@ export function useStrava(userId, session, onActivitiesSynced) {
     }
   }, [callEdgeFunction, client, onActivitiesSynced, refreshConnection]);
 
+  const syncHistory = useCallback(async () => {
+    if (!client) throw new Error("Supabase is not configured.");
+
+    setIsSyncingHistory(true);
+    setSyncProgress(0);
+    setError(null);
+    setStatusMessage("Starting full history sync...");
+
+    let currentBefore = Math.floor(Date.now() / 1000);
+    let totalSynced = 0;
+    let done = false;
+
+    try {
+      while (!done) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await callEdgeFunction("strava-sync", { full: true, before: currentBefore });
+        totalSynced += result.synced;
+        setSyncProgress(totalSynced);
+        setStatusMessage(`Synced ${totalSynced} activities so far...`);
+        currentBefore = result.next_before;
+        done = result.done;
+
+        if (onActivitiesSynced && result.synced > 0) {
+          // eslint-disable-next-line no-await-in-loop
+          await onActivitiesSynced(result);
+        }
+      }
+      setStatusMessage(`Full history sync complete. ${totalSynced} activities imported.`);
+      await refreshConnection();
+    } catch (syncError) {
+      setError(syncError);
+      setStatusMessage(`Sync failed: ${syncError.message}`);
+      throw syncError;
+    } finally {
+      setIsSyncingHistory(false);
+    }
+  }, [callEdgeFunction, client, onActivitiesSynced, refreshConnection]);
+
   const disconnect = useCallback(async () => {
     if (!client || !userId) throw new Error("Sign in before disconnecting Strava.");
     setLoading(true);
@@ -231,11 +271,14 @@ export function useStrava(userId, session, onActivitiesSynced) {
     connected,
     lastSyncAt,
     loading,
+    isSyncingHistory,
+    syncProgress,
     error,
     statusMessage,
     isConfigured,
     startConnect,
     sync,
+    syncHistory,
     disconnect,
     refreshConnection,
   };

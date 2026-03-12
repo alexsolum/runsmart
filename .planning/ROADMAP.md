@@ -18,10 +18,10 @@
 ### Phase 6: Strava Robustness
 **Goal:** Establish reliable, complete real-time data ingestion via Webhooks and pagination.
 **Requirements:**
-- [ ] **STRV-01**: User's new activities appear automatically via Webhook (Create event).
-- [ ] **STRV-02**: User's activity updates (title, privacy) reflect automatically via Webhook (Update event).
-- [ ] **STRV-03**: User's deleted activities are removed automatically via Webhook (Delete event).
-- [ ] **STRV-04**: User can sync full activity history beyond the default 100-item limit (pagination support).
+- [x] **STRV-01**: User's new activities appear automatically via Webhook (Create event).
+- [x] **STRV-02**: User's activity updates (title, privacy) reflect automatically via Webhook (Update event).
+- [x] **STRV-03**: User's deleted activities are removed automatically via Webhook (Delete event).
+- [x] **STRV-04**: User can sync full activity history beyond the default 100-item limit (pagination support).
 
 **Success Criteria:**
 1. Webhook creates new activity in DB within 5s of upload.
@@ -31,8 +31,8 @@
 ### Phase 7: Advanced Analytics
 **Goal:** Visualize aerobic efficiency trends to prove fitness gains independent of race results.
 **Requirements:**
-- [ ] **ANLY-01**: User can view an Aerobic Efficiency trend chart (Speed/HR over time) with regression line.
-- [ ] **ANLY-02**: System filters analytics data to exclude non-runs, short durations (<10m), and invalid heart rate (0 or null).
+- [x] **ANLY-01**: User can view an Aerobic Efficiency trend chart (Speed/HR over time) with regression line.
+- [x] **ANLY-02**: System filters analytics data to exclude non-runs, short durations (<10m), and invalid heart rate (0 or null).
 
 **Success Criteria:**
 1. Chart displays individual "Easy Run" scatter points with regression trend line.
@@ -42,7 +42,7 @@
 ### Phase 8: Insight Reliability
 **Goal:** Ensure coaching synthesis is always presented as clean, formatted Markdown.
 **Requirements:**
-- [ ] **INSG-03**: User sees a formatted Markdown coaching summary without JSON wrappers or raw code blocks.
+- [x] **INSG-03**: User sees a formatted Markdown coaching summary without JSON wrappers or raw code blocks.
 
 **Success Criteria:**
 1. Synthesis callout never renders raw JSON or code block syntax.

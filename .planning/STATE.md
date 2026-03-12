@@ -2,21 +2,21 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Strava Sync & Insight Trends
-current_phase: 0
-status: planning
+current_phase: 8
+status: in-progress
 last_updated: "2026-03-11"
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 3
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # State
 
 **Initialized:** 2026-03-11
-**Current Phase:** 0 (Planning)
-**Status:** Defining requirements
+**Current Phase:** 8 (Insight Reliability)
+**Status:** Decisions finalized, moving to research.
 
 ## Project Reference
 
@@ -32,12 +32,17 @@ See: .planning/PROJECT.md
 - Requirements: `.planning/REQUIREMENTS.md`
 - Roadmap: `.planning/ROADMAP.md`
 - Codebase map: `.planning/codebase/`
+- Context: `.planning/milestones/v1.0-phases/06-CONTEXT.md`
+- Research: `.planning/milestones/v1.0-phases/06-RESEARCH.md`
+- Plan: `.planning/milestones/v1.0-phases/06-PLAN.md`
 
 ## Phase Status
 
 | Phase | Name | Status |
 |-------|------|--------|
-| - | - | - |
+| 6 | Strava Robustness | In-Progress |
+| 7 | Advanced Analytics | Todo |
+| 8 | Insight Reliability | Todo |
 
 ## Notes
 

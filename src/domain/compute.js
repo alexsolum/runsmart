@@ -162,6 +162,7 @@
         var dist = Number(a.distance) || 0;
         if (!weeks[key] || dist > weeks[key].distance) {
           weeks[key] = {
+            id: a.id,
             distance: dist,
             time: Number(a.moving_time) || 0,
             elevation: Number(a.elevation_gain) || 0,
@@ -777,6 +778,103 @@
     };
   }
 
+  // ---- Advanced Analytics: Linear Regression & Aerobic Efficiency ----
+
+  function linearRegression(points) {
+    var n = points.length;
+    if (n < 2) return { slope: 0, intercept: 0, rSquared: 0 };
+
+    var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    for (var i = 0; i < n; i++) {
+      var x = points[i].x;
+      var y = points[i].y;
+      sumX += x;
+      sumY += y;
+      sumXY += (x * y);
+      sumX2 += (x * x);
+      sumY2 += (y * y);
+    }
+
+    var num = (n * sumXY) - (sumX * sumY);
+    var den = (n * sumX2) - (sumX * sumX);
+    if (den === 0) return { slope: 0, intercept: sumY / n, rSquared: 0 };
+
+    var slope = num / den;
+    var intercept = (sumY - slope * sumX) / n;
+
+    var rNum = num;
+    var rDen = Math.sqrt(((n * sumX2) - (sumX * sumX)) * ((n * sumY2) - (sumY * sumY)));
+    var rSquared = rDen === 0 ? 0 : Math.pow(rNum / rDen, 2);
+
+    return { slope: slope, intercept: intercept, rSquared: rSquared };
+  }
+
+  function getMinettiFactor(grade) {
+    // grade is fractional (e.g. 0.05 for 5%)
+    // C(i) = 155.4*i^5 - 30.4*i^4 - 43.3*i^3 + 46.3*i^2 + 19.5*i + 3.6
+    // Factor relative to flat (i=0, C=3.6)
+    var i = grade;
+    var c = (155.4 * Math.pow(i, 5)) -
+            (30.4 * Math.pow(i, 4)) -
+            (43.3 * Math.pow(i, 3)) +
+            (46.3 * Math.pow(i, 2)) +
+            (19.5 * i) +
+            3.6;
+    return c / 3.6;
+  }
+
+  function computeAerobicEfficiency(activities) {
+    if (!activities || !activities.length) return [];
+
+    return activities
+      .filter(function (a) {
+        var duration = Number(a.moving_time) || 0;
+        var hr = Number(a.average_heartrate) || 0;
+        var type = (a.type || "").toLowerCase();
+        return duration >= 1200 && type === "run" && hr > 0;
+      })
+      .map(function (a) {
+        var dist = Number(a.distance) || 0;
+        var time = Number(a.moving_time) || 0;
+        var elev = Number(a.elevation_gain) || 0;
+        var hr = Number(a.average_heartrate) || 0;
+
+        var speed = time > 0 ? dist / time : 0; // m/s
+        var grade = dist > 0 ? elev / dist : 0;
+        var gap = speed * getMinettiFactor(grade);
+        var efficiency = hr > 0 ? gap / hr : 0;
+
+        return {
+          id: a.id,
+          date: a.started_at,
+          x: new Date(a.started_at).getTime(),
+          y: efficiency,
+          name: a.name,
+          speed: speed * 3.6, // Return km/h for UI display convenience
+          gap: gap * 3.6, // Return km/h for UI display convenience
+          hr: hr,
+          distance: dist,
+          intensityScore: a.suffer_score || 0,
+          heart_rate_zones: a.heart_rate_zones
+        };
+      })
+      .sort(function (a, b) {
+        return a.x - b.x;
+      });
+  }
+
+  function calculateTrendGain(points) {
+    if (points.length < 2) return 0;
+    var reg = linearRegression(points);
+    var startX = points[0].x;
+    var endX = points[points.length - 1].x;
+    var startY = reg.intercept + reg.slope * startX;
+    var endY = reg.intercept + reg.slope * endX;
+
+    if (startY === 0) return 0;
+    return ((endY - startY) / startY) * 100;
+  }
+
 export {
   getWeekStart,
   computeWeeklySummary,
@@ -791,6 +889,10 @@ export {
   computeRecentActivityZones,
   generateCoachingInsights,
   computeWeeklyProgress,
+  linearRegression,
+  getMinettiFactor,
+  computeAerobicEfficiency,
+  calculateTrendGain,
   formatDistance,
   formatDuration,
   formatPace,

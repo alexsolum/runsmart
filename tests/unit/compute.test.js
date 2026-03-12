@@ -364,3 +364,88 @@ describe("computeTrainingLoadState", () => {
     expect(result).toHaveProperty("tsb");
   });
 });
+
+describe("linearRegression", () => {
+  it("computes correct slope and intercept for a simple line", () => {
+    const points = [{ x: 1, y: 2 }, { x: 2, y: 4 }, { x: 3, y: 6 }];
+    const result = Compute.linearRegression(points);
+    expect(result.slope).toBeCloseTo(2);
+    expect(result.intercept).toBeCloseTo(0);
+    expect(result.rSquared).toBeCloseTo(1);
+  });
+
+  it("handles empty or single point array", () => {
+    expect(Compute.linearRegression([])).toEqual({ slope: 0, intercept: 0, rSquared: 0 });
+    expect(Compute.linearRegression([{ x: 1, y: 1 }])).toEqual({ slope: 0, intercept: 0, rSquared: 0 });
+  });
+});
+
+describe("getMinettiFactor", () => {
+  it("returns 1.0 for 0% grade", () => {
+    expect(Compute.getMinettiFactor(0)).toBeCloseTo(1.0);
+  });
+
+  it("returns expected value for positive grade", () => {
+    // 10% grade (i=0.1) factor approx 1.65
+    expect(Compute.getMinettiFactor(0.1)).toBeGreaterThan(1.5);
+    expect(Compute.getMinettiFactor(0.1)).toBeLessThan(1.8);
+  });
+
+  it("returns expected value for negative grade", () => {
+    // -10% grade factor approx 0.6
+    expect(Compute.getMinettiFactor(-0.1)).toBeLessThan(1.0);
+    expect(Compute.getMinettiFactor(-0.1)).toBeGreaterThan(0.5);
+  });
+});
+
+describe("computeAerobicEfficiency", () => {
+  it("filters out short activities and non-runs", () => {
+    const activities = [
+      { started_at: "2025-01-01T10:00:00Z", type: "Run", moving_time: 600, distance: 2000, average_heartrate: 140 }, // too short
+      { started_at: "2025-01-01T11:00:00Z", type: "Ride", moving_time: 3600, distance: 30000, average_heartrate: 130 }, // not a run
+      { started_at: "2025-01-01T12:00:00Z", type: "Run", moving_time: 1800, distance: 5000, average_heartrate: 0 }, // no HR
+    ];
+    expect(Compute.computeAerobicEfficiency(activities)).toHaveLength(0);
+  });
+
+  it("calculates efficiency correctly", () => {
+    const activities = [
+      {
+        started_at: "2025-01-01T10:00:00Z",
+        type: "Run",
+        moving_time: 1800,
+        distance: 5000,
+        elevation_gain: 0,
+        average_heartrate: 150,
+        name: "Test Run"
+      }
+    ];
+    const result = Compute.computeAerobicEfficiency(activities);
+    expect(result).toHaveLength(1);
+    // Speed = 5000 / 1800 = 2.777 m/s
+    // Grade = 0, Factor = 1.0, GAP = 2.777
+    // Efficiency = 2.777 / 150 = 0.0185
+    expect(result[0].y).toBeCloseTo(0.0185, 4);
+    expect(result[0].name).toBe("Test Run");
+  });
+});
+
+describe("calculateTrendGain", () => {
+  it("calculates % gain correctly", () => {
+    const points = [
+      { x: 0, y: 10 },
+      { x: 1, y: 11 },
+      { x: 2, y: 12 }
+    ];
+    // Line: y = 10 + 1*x
+    // Start (x=0): 10
+    // End (x=2): 12
+    // Gain: (12-10)/10 * 100 = 20%
+    expect(Compute.calculateTrendGain(points)).toBeCloseTo(20);
+  });
+
+  it("returns 0 for single point", () => {
+    expect(Compute.calculateTrendGain([{ x: 0, y: 10 }])).toBe(0);
+  });
+});
+

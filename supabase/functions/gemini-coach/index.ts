@@ -11,7 +11,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const COACH_GUARDRAILS =
@@ -103,7 +103,100 @@ const LONG_TERM_REPLAN_SYSTEM_INSTRUCTION =
   `- Keep recommendations practical and metric.\n\n` +
   `Respond ONLY with a valid JSON object. No markdown fences, no explanation outside the JSON.`;
 
+const INSIGHTS_SYNTHESIS_INSTRUCTION =
+  `You are Marius AI Bakken, an expert endurance running coach. ` +
+  `Provide a high-level summary of the athlete's training state. ` +
+  `Respond with four distinct sections, each using the exact heading followed by a colon:\n` +
+  `1. Mileage Trend:\n` +
+  `2. Intensity Distribution:\n` +
+  `3. Long-Run Progression:\n` +
+  `4. Race Readiness:\n\n` +
+  `Inside each section, provide 2-3 sentences of analysis tied to their data and one actionable recommendation. ` +
+  `Respond in plain Markdown. Use ### for section headers. Do not use JSON wrappers.`;
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+async function logAiFailure(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  mode: string,
+  raw: string,
+  error: string,
+) {
+  try {
+    const { error: insertErr } = await supabase.from("ai_audit_logs").insert({
+      user_id: userId,
+      mode,
+      raw_response: raw,
+      error_type: error,
+      metadata: { timestamp: new Date().toISOString() },
+    });
+    if (insertErr) console.error("Error logging AI failure:", insertErr);
+  } catch (err) {
+    console.error("Critical error in logAiFailure:", err);
+  }
+}
+
+const REQUIRED_HEADINGS = [
+  "Mileage Trend",
+  "Intensity Distribution",
+  "Long-Run Progression",
+  "Race Readiness",
+];
+
+/**
+ * Extracts sections using a sliding window regex.
+ */
+function pluckSynthesisSections(rawText: string): Record<string, string> {
+  const sections: Record<string, string> = {};
+  const cleaned = rawText.replace(/```json|```/g, "").trim();
+
+  REQUIRED_HEADINGS.forEach((heading, idx) => {
+    const nextHeading = REQUIRED_HEADINGS[idx + 1];
+    // Pattern: (Start or Newline) -> (Optional markdown artifacts) -> Heading -> Colon -> Content
+    const regex = new RegExp(
+      `(?:^|\\n)\\s*(?:[#\\-\\s]*)${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*(?:[#\\-\\s]*)(?:${REQUIRED_HEADINGS.join("|")})\\s*:|$)`,
+      "i",
+    );
+    const match = cleaned.match(regex);
+    if (match && match[1]) {
+      sections[heading] = match[1].trim();
+    }
+  });
+
+  return sections;
+}
+
+/**
+ * Rebuilds the response as clean H3-based Markdown.
+ */
+function rebuildSanitizedMarkdown(sections: Record<string, string>): string {
+  return REQUIRED_HEADINGS
+    .filter((h) => sections[h])
+    .map((h) => `### ${h}\n${sections[h]}`)
+    .join("\n\n");
+}
+
+function buildFallbackSynthesis(body: RequestBody): string {
+  const latestWeek = body.weeklySummary?.[body.weeklySummary.length - 1];
+  const previousWeek = body.weeklySummary?.[body.weeklySummary.length - 2];
+  const latestDistance = latestWeek ? `${latestWeek.distance.toFixed(1)}km` : "recent volume";
+  const distanceTrend = latestWeek && previousWeek
+    ? `${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week`
+    : "stable progression";
+  const latestLongRun = latestWeek ? `${latestWeek.longestRun.toFixed(1)}km` : "your recent long run";
+  const effortSamples = (body.recentActivities || []).filter((a) => Number.isFinite(a.effort)).length;
+  const raceWindow = body.planContext?.daysToRace != null
+    ? `${body.planContext.daysToRace} days to race`
+    : "your current goal timeline";
+
+  return [
+    `### Mileage Trend\nRecent weekly volume is around ${latestDistance} with ${distanceTrend}; keep weekly load changes controlled and prioritize one recovery-focused day to absorb work.`,
+    `### Intensity Distribution\nCurrent activity load includes ${effortSamples} effort-tagged sessions in the recent window; keep quality to 1-2 purposeful sessions while protecting easy aerobic volume.`,
+    `### Long-Run Progression\nLong-run execution is currently around ${latestLongRun}; progress duration gradually and add only small finish-quality segments when freshness remains high.`,
+    `### Race Readiness\nWith ${raceWindow}, readiness improves most through consistency rather than spikes; hold a sustainable rhythm this week and reassess fatigue markers before adding intensity.`,
+  ].join("\n\n");
+}
 
 function formatDelta(current: number, previous: number): string {
   if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0) return "n/a";
@@ -231,7 +324,7 @@ interface ConversationTurn {
 }
 
 interface RequestBody {
-  mode?: "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan" | "insights_synthesis";
+  mode?: CoachMode;
   conversationHistory?: ConversationTurn[];
   weeklySummary: WeeklySummary[];
   recentActivities: RecentActivity[];
@@ -243,7 +336,13 @@ interface RequestBody {
   lang?: string;
 }
 
-type CoachMode = "initial" | "followup" | "plan" | "plan_revision" | "long_term_replan" | "insights_synthesis";
+type CoachMode =
+  | "initial"
+  | "followup"
+  | "plan"
+  | "plan_revision"
+  | "long_term_replan"
+  | "insights_synthesis";
 
 interface LongTermWeek {
   week_start: string;
@@ -326,7 +425,9 @@ async function fetchDynamicPlaybookAddendum(
 ): Promise<string> {
   const { data, error } = await supabase
     .from("coach_playbook_entries")
-    .select("source, mode, lang, phase, athlete_level, priority, title, principle, application, anti_patterns, example_workout, tags")
+    .select(
+      "source, mode, lang, phase, athlete_level, priority, title, principle, application, anti_patterns, example_workout, tags",
+    )
     .eq("enabled", true)
     .limit(200);
 
@@ -565,9 +666,7 @@ function computeLongTermHorizon(planContext: PlanContext | null): LongTermHorizo
 // ── Prompt builder ─────────────────────────────────────────────────────────────
 
 function getLanguageInstruction(lang: string | undefined): string {
-  return (lang === "no")
-    ? "Respond entirely in Norwegian (bokmål)."
-    : "Respond in English.";
+  return (lang === "no") ? "Respond entirely in Norwegian (bokmål)." : "Respond in English.";
 }
 
 function buildPrompt(data: RequestBody): string {
@@ -599,10 +698,14 @@ function buildPrompt(data: RequestBody): string {
     const previousWeek = data.weeklySummary[data.weeklySummary.length - 2];
     if (latestWeek && previousWeek) {
       lines.push(
-        `Volume trend: ${latestWeek.distance.toFixed(1)}km vs ${previousWeek.distance.toFixed(1)}km (${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week)`,
+        `Volume trend: ${latestWeek.distance.toFixed(1)}km vs ${previousWeek.distance.toFixed(1)}km (${
+          formatDelta(latestWeek.distance, previousWeek.distance)
+        } week-over-week)`,
       );
       lines.push(
-        `Longest run trend: ${latestWeek.longestRun.toFixed(1)}km vs ${previousWeek.longestRun.toFixed(1)}km (${formatDelta(latestWeek.longestRun, previousWeek.longestRun)} week-over-week)`,
+        `Longest run trend: ${latestWeek.longestRun.toFixed(1)}km vs ${previousWeek.longestRun.toFixed(1)}km (${
+          formatDelta(latestWeek.longestRun, previousWeek.longestRun)
+        } week-over-week)`,
       );
     }
     lines.push("");
@@ -698,7 +801,9 @@ function buildLongTermReplanPrompt(data: RequestBody, horizon: LongTermHorizon):
   const contextLines = buildPrompt(data);
   return [
     contextLines,
-    `Generate a long-term weekly structure from week starting ${toIsoDate(horizon.startMonday)} to week ending ${toIsoDate(horizon.endSunday)}.`,
+    `Generate a long-term weekly structure from week starting ${toIsoDate(horizon.startMonday)} to week ending ${
+      toIsoDate(horizon.endSunday)
+    }.`,
     `You MUST return exactly ${horizon.weekCount} week objects in "weekly_structure".`,
     `Each week_start must be Monday and week_end must be Sunday.`,
     horizon.goalRaceDate
@@ -715,79 +820,6 @@ function buildLongTermReplanPrompt(data: RequestBody, horizon: LongTermHorizon):
 
 function stripMarkdownFences(text: string): string {
   return text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-}
-
-const REQUIRED_SYNTHESIS_HEADINGS = [
-  "Mileage Trend",
-  "Intensity Distribution",
-  "Long-Run Progression",
-  "Race Readiness",
-] as const;
-
-function sanitizeSynthesisResponse(raw: string): string {
-  const cleaned = stripMarkdownFences(String(raw || "")).trim();
-  if (!cleaned) return "";
-
-  try {
-    const parsed = JSON.parse(cleaned);
-    if (typeof parsed === "string") {
-      return sanitizeSynthesisResponse(parsed);
-    }
-    if (parsed && typeof parsed === "object" && typeof (parsed as Record<string, unknown>).synthesis === "string") {
-      return String((parsed as Record<string, unknown>).synthesis).trim();
-    }
-  } catch {
-    // fall through to text sanitizer
-  }
-
-  const wrappedMatch = cleaned.match(/^\s*\{\s*["']?synthesis["']?\s*:\s*([\s\S]+?)\s*\}?\s*$/i);
-  if (wrappedMatch?.[1]) {
-    return String(wrappedMatch[1])
-      .replace(/^["']\s*/, "")
-      .replace(/\s*["']$/, "")
-      .replace(/\\n/g, "\n")
-      .replace(/\\"/g, "\"")
-      .trim();
-  }
-
-  return cleaned
-    .replace(/^\s*\{\s*/, "")
-    .replace(/\s*\}\s*$/, "")
-    .replace(/^\s*["']?synthesis["']?\s*:\s*/i, "")
-    .replace(/^["']\s*/, "")
-    .replace(/\s*["']$/, "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\\n/g, "\n")
-    .replace(/\\"/g, "\"")
-    .trim();
-}
-
-function hasRequiredSynthesisSections(text: string): boolean {
-  if (!text) return false;
-  return REQUIRED_SYNTHESIS_HEADINGS.every((heading) =>
-    new RegExp(`(^|\\n)\\s*${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`, "m").test(text)
-  );
-}
-
-function buildFallbackSynthesis(body: RequestBody): string {
-  const latestWeek = body.weeklySummary?.[body.weeklySummary.length - 1];
-  const previousWeek = body.weeklySummary?.[body.weeklySummary.length - 2];
-  const latestDistance = latestWeek ? `${latestWeek.distance.toFixed(1)}km` : "recent volume";
-  const distanceTrend = latestWeek && previousWeek
-    ? `${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week`
-    : "stable progression";
-  const latestLongRun = latestWeek ? `${latestWeek.longestRun.toFixed(1)}km` : "your recent long run";
-  const effortSamples = (body.recentActivities || []).filter((a) => Number.isFinite(a.effort)).length;
-  const raceWindow = body.planContext?.daysToRace != null
-    ? `${body.planContext.daysToRace} days to race`
-    : "your current goal timeline";
-
-  return [
-    `Mileage Trend: Recent weekly volume is around ${latestDistance} with ${distanceTrend}; keep weekly load changes controlled and prioritize one recovery-focused day to absorb work.`,
-    `Intensity Distribution: Current activity load includes ${effortSamples} effort-tagged sessions in the recent window; keep quality to 1-2 purposeful sessions while protecting easy aerobic volume.`,
-    `Long-Run Progression: Long-run execution is currently around ${latestLongRun}; progress duration gradually and add only small finish-quality segments when freshness remains high.`,
-    `Race Readiness: With ${raceWindow}, readiness improves most through consistency rather than spikes; hold a sustainable rhythm this week and reassess fatigue markers before adding intensity.`,
-  ].join("\n");
 }
 
 const VALID_WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
@@ -980,7 +1012,7 @@ Deno.serve(async (req) => {
         : "Long-term replan generated through goal-race week with progressive load and recovery balance.";
       const coachingFeedback = String(parsedResult.coaching_feedback || defaultFeedback).slice(0, 1000);
       const adaptationSummary = String(
-        (parsedResult as Record<string, unknown>).adaptation_summary || "Adaptation based on available training context."
+        (parsedResult as Record<string, unknown>).adaptation_summary || "Adaptation based on available training context.",
       ).slice(0, 600);
 
       return new Response(
@@ -1057,7 +1089,11 @@ Deno.serve(async (req) => {
       const outputPart = parts.find((p) => !p.thought && p.text) ?? parts[parts.length - 1];
       const rawText = (outputPart?.text || "").trim();
 
-      let result: { coaching_feedback?: string; adaptation_summary?: string; structured_plan?: Record<string, unknown>[] };
+      let result: {
+        coaching_feedback?: string;
+        adaptation_summary?: string;
+        structured_plan?: Record<string, unknown>[];
+      };
       try {
         result = JSON.parse(stripMarkdownFences(rawText));
       } catch {
@@ -1072,11 +1108,15 @@ Deno.serve(async (req) => {
       );
       const coachingFeedback = String(result.coaching_feedback || "").slice(0, 1000);
       const adaptationSummary = String(
-        result.adaptation_summary || "Adaptation based on available training context."
+        result.adaptation_summary || "Adaptation based on available training context.",
       ).slice(0, 600);
 
       return new Response(
-        JSON.stringify({ coaching_feedback: coachingFeedback, adaptation_summary: adaptationSummary, structured_plan: structuredPlan }),
+        JSON.stringify({
+          coaching_feedback: coachingFeedback,
+          adaptation_summary: adaptationSummary,
+          structured_plan: structuredPlan,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -1105,7 +1145,14 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: buildDefaultSystemInstruction(FOLLOWUP_SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum, philosophyAddendum) }],
+            parts: [{
+              text: buildDefaultSystemInstruction(
+                FOLLOWUP_SYSTEM_INSTRUCTION,
+                body.lang,
+                dynamicPlaybookAddendum,
+                philosophyAddendum,
+              ),
+            }],
           },
           contents,
           generationConfig: { temperature: 0.8, maxOutputTokens: 1024 },
@@ -1142,14 +1189,6 @@ Deno.serve(async (req) => {
 
     // ── Insights synthesis mode ───────────────────────────────────────────────
     if (mode === "insights_synthesis") {
-      const INSIGHTS_SYNTHESIS_INSTRUCTION = [
-        "You are Marius AI Bakken, an expert endurance running coach.",
-        "Interpret the athlete context over a 10-12 week horizon.",
-        "Respond in plain text only. Do not output JSON. Do not output markdown.",
-        `Use exactly these headings with a colon: ${REQUIRED_SYNTHESIS_HEADINGS.join(", ")}.`,
-        "Each section must contain concise interpretation and one practical recommendation tied to the data.",
-      ].join(" ");
-
       const systemInstruction = buildDefaultSystemInstruction(
         INSIGHTS_SYNTHESIS_INSTRUCTION,
         body.lang,
@@ -1164,22 +1203,36 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents: [{ role: "user", parts: [{ text: userMessage }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 512 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
         }),
       });
 
-      let rawText = "";
-      if (geminiRes.ok) {
-        const geminiJson = await geminiRes.json();
-        rawText = geminiJson.candidates?.[0]?.content?.parts?.find(
-          (p: { thought?: boolean; text?: string }) => !p.thought && p.text
-        )?.text ?? "";
+      if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        console.error("Gemini API error (synthesis):", geminiRes.status, errText);
+        return new Response(
+          JSON.stringify({ error: "Gemini API request failed" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
 
-      const sanitized = sanitizeSynthesisResponse(rawText);
-      const synthesis = (hasRequiredSynthesisSections(sanitized)
-        ? sanitized
-        : buildFallbackSynthesis(body)).slice(0, 1600);
+      const geminiData = await geminiRes.json();
+      const rawText = geminiData.candidates?.[0]?.content?.parts?.find(
+        (p: { thought?: boolean; text?: string }) => !p.thought && p.text,
+      )?.text ?? "";
+
+      const sections = pluckSynthesisSections(rawText);
+      const sanitized = rebuildSanitizedMarkdown(sections);
+
+      const hasAllSections = REQUIRED_HEADINGS.every((h) => sanitized.includes(h));
+
+      if (!hasAllSections) {
+        // Fire and forget logging
+        logAiFailure(supabase, user.id, "insights_synthesis", rawText, "missing_sections")
+          .catch(console.error);
+      }
+
+      const synthesis = (sanitized.trim() ? sanitized : buildFallbackSynthesis(body)).slice(0, 2000);
 
       return new Response(JSON.stringify({ synthesis }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1200,7 +1253,14 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system_instruction: {
-          parts: [{ text: buildDefaultSystemInstruction(SYSTEM_INSTRUCTION, body.lang, dynamicPlaybookAddendum, philosophyAddendum) }],
+          parts: [{
+            text: buildDefaultSystemInstruction(
+              SYSTEM_INSTRUCTION,
+              body.lang,
+              dynamicPlaybookAddendum,
+              philosophyAddendum,
+            ),
+          }],
         },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
@@ -1237,9 +1297,20 @@ Deno.serve(async (req) => {
 
       const validTypes = ["danger", "warning", "positive", "info"];
       const validIcons = [
-        "warning", "alert", "battery", "fatigue", "balance", "trending",
-        "decline", "spike", "longrun", "rest", "motivation", "injury",
-        "race", "taper",
+        "warning",
+        "alert",
+        "battery",
+        "fatigue",
+        "balance",
+        "trending",
+        "decline",
+        "spike",
+        "longrun",
+        "rest",
+        "motivation",
+        "injury",
+        "race",
+        "taper",
       ];
 
       insights = insights
@@ -1269,4 +1340,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-

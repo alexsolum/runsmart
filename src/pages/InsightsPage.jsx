@@ -11,9 +11,8 @@ import {
   computeTrainingLoadState,
   computeWeeklyHRZones,
   computeRecentActivityZones,
-  computeAerobicEfficiency,
+  computeReferenceWorkouts,
   linearRegression,
-  calculateTrendGain,
 } from "../domain/compute";
 import { Button } from "@/components/ui/button";
 import {
@@ -333,14 +332,16 @@ function EfficiencyTooltip({ active, payload, locale, copy }) {
         <p className="font-bold text-slate-900 mb-1">{data.name}</p>
         <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString(locale)}</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <span className="text-slate-400">{copy.avgHr}</span>
+          <span className="text-right font-mono font-bold text-blue-600">{Math.round(data.y)} bpm</span>
           <span className="text-slate-400">{copy.pace}</span>
-          <span className="text-right font-mono font-bold text-blue-600">
-            {`${Math.floor(data.y)}:${Math.round((data.y - Math.floor(data.y)) * 60).toString().padStart(2, "0")} min/km`}
+          <span className="text-right font-mono font-bold text-slate-700">
+            {data.speed > 0
+              ? `${Math.floor(60/data.speed)}:${Math.round(((60/data.speed) - Math.floor(60/data.speed)) * 60).toString().padStart(2,"0")} min/km`
+              : "—"}
           </span>
           <span className="text-slate-400">{copy.speed}</span>
           <span className="text-right font-mono font-bold text-slate-700">{data.speed.toFixed(1)} km/h</span>
-          <span className="text-slate-400">{copy.avgHr}</span>
-          <span className="text-right font-mono font-bold text-slate-700">{data.hr} bpm</span>
         </div>
       </div>
     );
@@ -387,8 +388,9 @@ export default function InsightsPage() {
             fitnessLegend: "Form (CTL)",
             fatigueLegend: "Tretthet (ATL)",
             formLegend: "Overskudd (TSB)",
-            aerobicEfficiencyTitle: "Tempo på rolige løp over tid",
-            aerobicEfficiencyDesc: "Tempo (min/km) på aerobe løp de siste 180 dagene. Linje som går ned = du løper fortere.",
+            aerobicEfficiencyTitle: "Aerob utvikling",
+            aerobicEfficiencyDesc: "Snittpuls på løp rundt {referenceKm} km de siste 180 dagene. Fallende linje = bedre form.",
+            noReferenceRuns: "Ikke nok sammenlignbare løp funnet (minst 5 trengs).",
             trendGain: "Trendgevinst",
             trendLine: "Trendlinje",
             easyAerobic: "Rolig / aerob",
@@ -458,8 +460,9 @@ export default function InsightsPage() {
             fitnessLegend: "Fitness (CTL)",
             fatigueLegend: "Fatigue (ATL)",
             formLegend: "Form (TSB)",
-            aerobicEfficiencyTitle: "Easy run pace trend",
-            aerobicEfficiencyDesc: "Pace (min/km) on aerobic runs over the past 180 days. Line trending down = getting faster.",
+            aerobicEfficiencyTitle: "Aerobic Development",
+            aerobicEfficiencyDesc: "Average HR on runs around {referenceKm} km over the past 180 days. Falling line = better fitness.",
+            noReferenceRuns: "Not enough comparable runs found (at least 5 needed).",
             trendGain: "Trend Gain",
             trendLine: "Trend Line",
             easyAerobic: "Easy / Aerobic",
@@ -580,66 +583,62 @@ export default function InsightsPage() {
   const aerobicEfficiencyData = useMemo(() => {
     const windowDays = 180;
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - windowDays);
+    cutoff.setUTCDate(cutoff.getUTCDate() - windowDays);
+    const recentActivities = activities.activities.filter(
+      a => new Date(a.started_at) >= cutoff
+    );
 
-    // Compute 95th-percentile max HR from all activities
-    const allHRValues = activities.activities
-      .map(a => Number(a.average_heartrate) || 0)
-      .filter(hr => hr > 0)
-      .sort((a, b) => a - b);
-    const maxHR = allHRValues.length > 0
-      ? allHRValues[Math.floor(allHRValues.length * 0.95)]
-      : 190;
+    const { referenceKm, points: rawPoints } = computeReferenceWorkouts(recentActivities);
 
-    const filtered = activities.activities.filter(a => new Date(a.started_at) >= cutoff);
-    const rawPoints = computeAerobicEfficiency(filtered);
-
-    // Replace y with pace in min/km (speed is in km/h)
-    const points = rawPoints.map(p => ({
-      ...p,
-      y: p.speed > 0 ? 60 / p.speed : null,
-    })).filter(p => p.y !== null);
-
-    // Apply UI-level filters using HR-based classification
-    let displayPoints = points;
+    // Apply UI filter on top of reference group
+    let displayPoints = rawPoints;
     if (filterMode === "workout") {
-      displayPoints = points.filter(p => p.hr >= maxHR * 0.85 || p.intensityScore > 75);
+      const allHR = rawPoints.map(p => p.hr).filter(Boolean).sort((a, b) => a - b);
+      const maxHR = allHR.length ? allHR[Math.floor(allHR.length * 0.95)] : 190;
+      displayPoints = rawPoints.filter(p => p.hr >= maxHR * 0.85 || p.intensityScore > 75);
     } else if (filterMode === "long") {
-      displayPoints = points.filter(p => {
+      displayPoints = rawPoints.filter(p => {
         const speedMs = p.speed / 3.6;
-        const estimatedDuration = speedMs > 0 ? p.distance / speedMs : 0;
-        return estimatedDuration > 4500 && p.hr < maxHR * 0.85;
+        const dur = speedMs > 0 ? p.distance / speedMs : 0;
+        return dur > 4500;
       });
     } else if (filterMode === "easy") {
-      displayPoints = points.filter(p => p.hr < maxHR * 0.75);
+      const allHR = rawPoints.map(p => p.hr).filter(Boolean).sort((a, b) => a - b);
+      const maxHR = allHR.length ? allHR[Math.floor(allHR.length * 0.95)] : 190;
+      displayPoints = rawPoints.filter(p => p.hr < maxHR * 0.75);
     }
 
-    if (displayPoints.length < 2) return { points: displayPoints, regression: [], gain: 0, r2: 0 };
+    const MIN_RUNS = 5;
+    if (displayPoints.length < MIN_RUNS) {
+      return { points: displayPoints, regression: [], gain: 0, gainBpm: 0, r2: "0.00", count: displayPoints.length, rStrength: "weak", referenceKm };
+    }
 
-    // Regression math
     const reg = linearRegression(displayPoints);
     const firstX = displayPoints[0].x;
     const lastX = displayPoints[displayPoints.length - 1].x;
-    
     const regressionLine = [
       { x: firstX, regression: reg.intercept + reg.slope * firstX },
-      { x: lastX, regression: reg.intercept + reg.slope * lastX }
+      { x: lastX, regression: reg.intercept + reg.slope * lastX },
     ];
 
-    const gain = calculateTrendGain(displayPoints);
+    const startY = reg.intercept + reg.slope * firstX;
+    const endY = reg.intercept + reg.slope * lastX;
+    const gainPct = startY !== 0 ? ((endY - startY) / startY) * 100 : 0;
+    const gainBpm = endY - startY; // negative = HR fell = improvement
 
     const rSquared = reg.rSquared;
     const count = displayPoints.length;
-    // strength thresholds: >=0.5 = strong, >=0.25 = moderate, else weak
     const rStrength = rSquared >= 0.5 ? "strong" : rSquared >= 0.25 ? "moderate" : "weak";
 
     return {
       points: displayPoints,
       regression: regressionLine,
-      gain: gain.toFixed(1),
+      gain: gainPct.toFixed(1),
+      gainBpm: gainBpm.toFixed(1),
       r2: rSquared.toFixed(2),
       count,
       rStrength,
+      referenceKm,
     };
   }, [activities.activities, filterMode]);
 
@@ -1046,12 +1045,19 @@ export default function InsightsPage() {
             <CardHeader className="pb-0 flex flex-row items-start justify-between">
               <div>
                 <CardTitle className="text-sm font-bold">{copy.aerobicEfficiencyTitle}</CardTitle>
-                <CardDescription>{copy.aerobicEfficiencyDesc}</CardDescription>
+                <CardDescription>
+                  {aerobicEfficiencyData.referenceKm
+                    ? copy.aerobicEfficiencyDesc.replace("{referenceKm}", aerobicEfficiencyData.referenceKm)
+                    : copy.aerobicEfficiencyTitle}
+                </CardDescription>
               </div>
-              {aerobicEfficiencyData.points.length >= 2 && (
+              {aerobicEfficiencyData.points.length >= 5 && (
                 <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg text-right">
                   <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">{copy.trendGain}</span>
                   <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) <= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {Number(aerobicEfficiencyData.gainBpm) > 0 ? "+" : ""}{aerobicEfficiencyData.gainBpm} bpm
+                  </span>
+                  <span className="block text-[10px] text-slate-400">
                     {Number(aerobicEfficiencyData.gain) > 0 ? "+" : ""}{aerobicEfficiencyData.gain}%
                   </span>
                   <span className="block text-[9px] text-slate-400">
@@ -1061,6 +1067,9 @@ export default function InsightsPage() {
               )}
             </CardHeader>
             <CardContent className="pt-6">
+              {aerobicEfficiencyData.points.length < 5 ? (
+                <p className="text-sm text-slate-400 text-center py-12">{copy.noReferenceRuns}</p>
+              ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -1079,11 +1088,7 @@ export default function InsightsPage() {
                     type="number"
                     domain={['auto', 'auto']}
                     reversed={true}
-                    tickFormatter={(val) => {
-                      const mins = Math.floor(val);
-                      const secs = Math.round((val - mins) * 60);
-                      return `${mins}:${secs.toString().padStart(2, "0")}`;
-                    }}
+                    tickFormatter={(val) => `${Math.round(val)}`}
                     tick={TICK}
                     axisLine={false}
                     tickLine={false}
@@ -1116,6 +1121,7 @@ export default function InsightsPage() {
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+              )}
               <div className="mt-4 flex items-center justify-center gap-6 text-[11px] text-slate-400 font-medium">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-60" />

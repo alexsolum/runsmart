@@ -116,5 +116,6 @@ export function useAuth() {
     signInWithGoogle,
     signOut,
     isConfigured: Boolean(client),
+    client,
   };
 }

@@ -1,7 +1,7 @@
 # Quick Task 3 Summary
 
 **Date:** 2026-03-12
-**Status:** Backend deployed, frontend code ready
+**Status:** Deployed and verified live
 
 ## What changed
 
@@ -35,5 +35,20 @@
 
 - Supabase Edge Function redeployed successfully:
   - `npx supabase functions deploy gemini-coach --project-ref rhbnzzxzltjtposwpfin --no-verify-jwt`
-- Vercel CLI deployment from this machine is blocked by missing local credentials.
-- Git-based deployment was attempted as the fallback release path.
+- Frontend deployed through the existing Git-integrated Vercel production pipeline after pushing `main`
+- Production deployment:
+  - commit: `36eeea2`
+  - Vercel deployment: `dpl_CcDh9B1HDFpyYZeSyGAFXYRYWJdF`
+  - alias: `https://runsmart-ten.vercel.app`
+
+## Live verification
+
+- Opened `https://runsmart-ten.vercel.app`
+- Confirmed Norwegian is selected in the sidebar language switcher
+- Confirmed the `Innsikt` page heading, filters, KPI labels, chart labels, and callout copy render in Norwegian
+- Confirmed `[data-testid="synthesis-callout"]` exists in the live DOM
+- Confirmed the live synthesis headings are Norwegian:
+  - `Kilometerutvikling:`
+  - `Intensitetsfordeling:`
+  - `Langturprogresjon:`
+  - `Løpsberedskap:`

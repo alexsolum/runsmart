@@ -56,7 +56,7 @@ See: .planning/PROJECT.md
 |---|-------------|------|--------|-----------|
 | 1 | debug why strava sync fails; reproduce with chromium MCP and inspect Supabase + Vercel | 2026-03-12 | 577d04c | [1-debug-why-strava-sync-fails-reproduce-wi](./quick/1-debug-why-strava-sync-fails-reproduce-wi/) |
 | 2 | Resume the Insights / Innsikt AI card fix and finish deployment | 2026-03-12 | pending | [2-resume-the-insights-innsikt-ai-card-fix-](./quick/2-resume-the-insights-innsikt-ai-card-fix-/) |
-| 3 | I need you to change the Innsikt page to norwegian as well (as i have selected norwegian in the sidebar navigation). All text on the page should be norwegian, as well as the response from the AI Coach (gemini) | 2026-03-12 | pending | [3-i-need-you-to-change-the-innsikt-page-to](./quick/3-i-need-you-to-change-the-innsikt-page-to/) |
+| 3 | I need you to change the Innsikt page to norwegian as well (as i have selected norwegian in the sidebar navigation). All text on the page should be norwegian, as well as the response from the AI Coach (gemini) | 2026-03-12 | 36eeea2 | [3-i-need-you-to-change-the-innsikt-page-to](./quick/3-i-need-you-to-change-the-innsikt-page-to/) |
 
 ## Decisions
 

@@ -42,7 +42,7 @@ export function AppDataProvider({ children }) {
   const dailyLogs = useDailyLogs(userId);
   const strava = useStrava(userId, auth.session, async () => {
     await activities.loadActivities({ limit: 20, ascending: false });
-  });
+  }, auth.client);
   const trainingBlocks = useTrainingBlocks(userId);
   const workoutEntries = useWorkoutEntries(userId);
   const runnerProfile = useRunnerProfile(userId);

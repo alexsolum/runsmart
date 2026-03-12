@@ -16,8 +16,7 @@ function clearOAuthParamsFromUrl() {
   window.history.replaceState({}, document.title, cleanUrl);
 }
 
-export function useStrava(userId, session, onActivitiesSynced) {
-  const client = useMemo(() => getSupabaseClient(), []);
+export function useStrava(userId, session, onActivitiesSynced, client) {
   const [connected, setConnected] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -52,36 +51,17 @@ export function useStrava(userId, session, onActivitiesSynced) {
     return updatedAt;
   }, [client, userId]);
 
-  const getActiveSession = useCallback(async () => {
-    if (!client) {
-      throw new Error("Supabase is not configured.");
-    }
+  const callEdgeFunction = useCallback(
+    async (functionName, body) => {
+      if (!client) throw new Error("Supabase is not configured.");
 
-    // After OAuth redirects, auth state hydration can lag behind the first render.
-    // Give Supabase a short window to restore a persisted session.
-    for (let attempt = 0; attempt < 12; attempt += 1) {
       const {
         data: { session: activeSession },
         error: sessionError,
       } = await client.auth.getSession();
 
       if (sessionError) throw sessionError;
-      if (activeSession?.access_token) return activeSession;
-
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((resolve) => {
-        window.setTimeout(resolve, 200);
-      });
-    }
-
-    throw new Error("No active session. Please sign in first.");
-  }, [client]);
-
-  const callEdgeFunction = useCallback(
-    async (functionName, body) => {
-      if (!client) throw new Error("Supabase is not configured.");
-
-      const activeSession = await getActiveSession();
+      if (!activeSession) throw new Error("No active session. Please sign in first.");
 
       const { data, error: invokeError } = await client.functions.invoke(functionName, {
         body,
@@ -96,7 +76,7 @@ export function useStrava(userId, session, onActivitiesSynced) {
 
       return data;
     },
-    [client, getActiveSession],
+    [client],
   );
 
   const startConnect = useCallback(() => {

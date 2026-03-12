@@ -220,13 +220,13 @@ Deno.serve(async (req) => {
     let done = false;
     let synced = 0;
     let totalFound = 0;
-    let firstError: string | null = null;
     let lastTimestamp = before;
     let pagesProcessed = 0;
 
     while (!done && pagesProcessed < pageLimit) {
+      const perPage = 50; // Reduced from 200 to ensure we stay well within the 60s timeout
       const stravaRes = await fetch(
-        `https://www.strava.com/api/v3/athlete/activities?before=${before}&per_page=200`,
+        `https://www.strava.com/api/v3/athlete/activities?before=${before}&per_page=${perPage}`,
         { headers: { Authorization: `Bearer ${stravaAccessToken}` } },
       );
 
@@ -272,7 +272,7 @@ Deno.serve(async (req) => {
         done = true; // Stop after this chunk
       }
 
-      if (activities.length < 200) {
+      if (activities.length < perPage) {
         done = true;
       }
 
@@ -284,6 +284,7 @@ Deno.serve(async (req) => {
         .in("strava_id", stravaIds);
 
       const existingIds = new Set(existingActivities?.map((a: any) => a.strava_id) || []);
+      const activitiesToUpsert = [];
 
       for (const a of chunkToProcess) {
         if (existingIds.has(a.id)) {
@@ -300,6 +301,7 @@ Deno.serve(async (req) => {
         };
 
         // Only fetch heart rate zones for non-full-history sync (recent activities)
+        // Full sync skips zones to avoid hitting rate limits and timeouts
         const isRecent = Math.floor(new Date(a.start_date).getTime() / 1000) >= ninetyDaysAgo;
         if (!fullSync && isRecent && a.has_heartrate && a.id) {
           try {
@@ -312,60 +314,59 @@ Deno.serve(async (req) => {
           }
         }
 
-        const { error } = await supabase.from("activities").upsert(
-          {
-            user_id: user.id,
-            strava_id: a.id,
-            name: a.name,
-            type: a.type,
-            distance: a.distance,
-            duration: a.moving_time,
-            elevation_gain: a.total_elevation_gain,
-            average_pace:
-              a.distance > 0 ? a.moving_time / (a.distance / 1000) : null,
-            average_heartrate: a.average_heartrate || null,
-            started_at: a.start_date,
-            moving_time: a.moving_time,
-            elapsed_time: a.elapsed_time,
-            heart_rate_zone_times: heartRateZoneData.heart_rate_zone_times,
-            hr_zone_1_seconds: heartRateZoneData.hr_zone_1_seconds,
-            hr_zone_2_seconds: heartRateZoneData.hr_zone_2_seconds,
-            hr_zone_3_seconds: heartRateZoneData.hr_zone_3_seconds,
-            hr_zone_4_seconds: heartRateZoneData.hr_zone_4_seconds,
-            hr_zone_5_seconds: heartRateZoneData.hr_zone_5_seconds,
-            source: "strava",
-          },
-          { onConflict: "strava_id" },
-        );
+        activitiesToUpsert.push({
+          user_id: user.id,
+          strava_id: a.id,
+          name: a.name,
+          type: a.type,
+          distance: a.distance,
+          duration: a.moving_time,
+          elevation_gain: a.total_elevation_gain,
+          average_pace:
+            a.distance > 0 ? a.moving_time / (a.distance / 1000) : null,
+          average_heartrate: a.average_heartrate || null,
+          started_at: a.start_date,
+          moving_time: a.moving_time,
+          elapsed_time: a.elapsed_time,
+          heart_rate_zone_times: heartRateZoneData.heart_rate_zone_times,
+          hr_zone_1_seconds: heartRateZoneData.hr_zone_1_seconds,
+          hr_zone_2_seconds: heartRateZoneData.hr_zone_2_seconds,
+          hr_zone_3_seconds: heartRateZoneData.hr_zone_3_seconds,
+          hr_zone_4_seconds: heartRateZoneData.hr_zone_4_seconds,
+          hr_zone_5_seconds: heartRateZoneData.hr_zone_5_seconds,
+          source: "strava",
+        });
+      }
 
-        if (!error) {
-          synced++;
-        } else if (!firstError) {
-          firstError = error.message;
+      if (activitiesToUpsert.length > 0) {
+        const { error: upsertErr } = await supabase
+          .from("activities")
+          .upsert(activitiesToUpsert, { onConflict: "strava_id" });
+
+        if (upsertErr) {
+          return new Response(
+            JSON.stringify({
+              error: "Failed to save activities: " + upsertErr.message,
+              synced,
+              total: totalFound,
+              next_before: lastTimestamp,
+              done,
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
         }
+        synced += activitiesToUpsert.length;
       }
 
       if (!done && pagesProcessed < pageLimit) {
         before = lastTimestamp;
-        await sleep(1000);
+        // Shorter sleep for smaller pages
+        await sleep(500);
       }
     }
 
     if (synced === 0 && totalFound > 0 && !fullSync && pagesProcessed === pageLimit) {
       // If we processed some but found no NEW ones, and we hit pageLimit, it's not necessarily an error
-    } else if (synced === 0 && totalFound > 0 && !fullSync) {
-      if (firstError) {
-        return new Response(
-          JSON.stringify({
-            error: "Failed to save activities: " + firstError,
-            synced: 0,
-            total: totalFound,
-            next_before: lastTimestamp,
-            done,
-          }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
     }
 
     return new Response(

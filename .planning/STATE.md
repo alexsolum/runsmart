@@ -18,6 +18,8 @@ progress:
 **Current Phase:** 8 (Insight Reliability)
 **Status:** Decisions finalized, moving to research.
 
+Last activity: 2026-03-12 - Completed quick task 1: debug why strava sync fails; reproduce with chromium MCP and inspect Supabase + Vercel
+
 ## Project Reference
 
 See: .planning/PROJECT.md
@@ -47,6 +49,12 @@ See: .planning/PROJECT.md
 ## Notes
 
 - Milestone v1.1 started. Focus on Strava reliability and deeper analytics.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | debug why strava sync fails; reproduce with chromium MCP and inspect Supabase + Vercel | 2026-03-12 | 577d04c | [1-debug-why-strava-sync-fails-reproduce-wi](./quick/1-debug-why-strava-sync-fails-reproduce-wi/) |
 
 ## Decisions
 

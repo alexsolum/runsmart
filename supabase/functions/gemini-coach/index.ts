@@ -11,7 +11,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const COACH_GUARDRAILS =
@@ -103,16 +103,39 @@ const LONG_TERM_REPLAN_SYSTEM_INSTRUCTION =
   `- Keep recommendations practical and metric.\n\n` +
   `Respond ONLY with a valid JSON object. No markdown fences, no explanation outside the JSON.`;
 
-const INSIGHTS_SYNTHESIS_INSTRUCTION =
-  `You are Marius AI Bakken, an expert endurance running coach. ` +
-  `Provide a high-level summary of the athlete's training state. ` +
-  `Respond with four distinct sections, each using the exact heading followed by a colon:\n` +
-  `1. Mileage Trend:\n` +
-  `2. Intensity Distribution:\n` +
-  `3. Long-Run Progression:\n` +
-  `4. Race Readiness:\n\n` +
-  `Inside each section, provide 2-3 sentences of analysis tied to their data and one actionable recommendation. ` +
-  `Respond in plain Markdown. Use ### for section headers. Do not use JSON wrappers.`;
+const SYNTHESIS_HEADING_SETS = {
+  en: [
+    "Mileage Trend",
+    "Intensity Distribution",
+    "Long-Run Progression",
+    "Race Readiness",
+  ],
+  no: [
+    "Kilometerutvikling",
+    "Intensitetsfordeling",
+    "Langturprogresjon",
+    "Løpsberedskap",
+  ],
+} as const;
+
+function getRequiredHeadings(lang: string | undefined): readonly string[] {
+  return lang === "no" ? SYNTHESIS_HEADING_SETS.no : SYNTHESIS_HEADING_SETS.en;
+}
+
+function buildInsightsSynthesisInstruction(lang: string | undefined): string {
+  const headings = getRequiredHeadings(lang);
+  return (
+    `You are Marius AI Bakken, an expert endurance running coach. ` +
+    `Provide a high-level summary of the athlete's training state. ` +
+    `Respond with four distinct sections, each using the exact heading followed by a colon:\n` +
+    `1. ${headings[0]}:\n` +
+    `2. ${headings[1]}:\n` +
+    `3. ${headings[2]}:\n` +
+    `4. ${headings[3]}:\n\n` +
+    `Inside each section, provide 2-3 sentences of analysis tied to their data and one actionable recommendation. ` +
+    `Respond in plain Markdown. Use ### for section headers. Do not use JSON wrappers.`
+  );
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -137,25 +160,21 @@ async function logAiFailure(
   }
 }
 
-const REQUIRED_HEADINGS = [
-  "Mileage Trend",
-  "Intensity Distribution",
-  "Long-Run Progression",
-  "Race Readiness",
-];
-
 /**
  * Extracts sections using a sliding window regex.
  */
-function pluckSynthesisSections(rawText: string): Record<string, string> {
+function pluckSynthesisSections(
+  rawText: string,
+  lang: string | undefined,
+): Record<string, string> {
   const sections: Record<string, string> = {};
   const cleaned = rawText.replace(/```json|```/g, "").trim();
+  const headings = getRequiredHeadings(lang);
 
-  REQUIRED_HEADINGS.forEach((heading, idx) => {
-    const nextHeading = REQUIRED_HEADINGS[idx + 1];
+  headings.forEach((heading) => {
     // Pattern: (Start or Newline) -> (Optional markdown artifacts) -> Heading -> Colon -> Content
     const regex = new RegExp(
-      `(?:^|\\n)\\s*(?:[#\\-\\s]*)${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*(?:[#\\-\\s]*)(?:${REQUIRED_HEADINGS.join("|")})\\s*:|$)`,
+      `(?:^|\\n)\\s*(?:[#\\-\\s]*)${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*(?:[#\\-\\s]*)(?:${headings.map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s*:|$)`,
       "i",
     );
     const match = cleaned.match(regex);
@@ -170,31 +189,76 @@ function pluckSynthesisSections(rawText: string): Record<string, string> {
 /**
  * Rebuilds the response as clean H3-based Markdown.
  */
-function rebuildSanitizedMarkdown(sections: Record<string, string>): string {
-  return REQUIRED_HEADINGS
+function rebuildSanitizedMarkdown(
+  sections: Record<string, string>,
+  lang: string | undefined,
+): string {
+  return getRequiredHeadings(lang)
     .filter((h) => sections[h])
-    .map((h) => `### ${h}\n${sections[h]}`)
+    .map((h) => `### ${h}:\n${sections[h]}`)
     .join("\n\n");
+}
+
+function trimSynthesisSections(
+  sections: Record<string, string>,
+  lang: string | undefined,
+  maxSectionLength = 320,
+): Record<string, string> {
+  const trimmed: Record<string, string> = {};
+  for (const heading of getRequiredHeadings(lang)) {
+    const content = sections[heading];
+    if (!content) continue;
+    trimmed[heading] = content.length > maxSectionLength
+      ? `${content.slice(0, maxSectionLength).trimEnd()}…`
+      : content;
+  }
+  return trimmed;
 }
 
 function buildFallbackSynthesis(body: RequestBody): string {
   const latestWeek = body.weeklySummary?.[body.weeklySummary.length - 1];
   const previousWeek = body.weeklySummary?.[body.weeklySummary.length - 2];
-  const latestDistance = latestWeek ? `${latestWeek.distance.toFixed(1)}km` : "recent volume";
+  const headings = getRequiredHeadings(body.lang);
+  const latestDistance = latestWeek
+    ? `${latestWeek.distance.toFixed(1)}km`
+    : body.lang === "no"
+    ? "nylig volum"
+    : "recent volume";
   const distanceTrend = latestWeek && previousWeek
-    ? `${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week`
+    ? body.lang === "no"
+      ? `${formatDelta(latestWeek.distance, previousWeek.distance)} fra uke til uke`
+      : `${formatDelta(latestWeek.distance, previousWeek.distance)} week-over-week`
+    : body.lang === "no"
+    ? "stabil progresjon"
     : "stable progression";
-  const latestLongRun = latestWeek ? `${latestWeek.longestRun.toFixed(1)}km` : "your recent long run";
+  const latestLongRun = latestWeek
+    ? `${latestWeek.longestRun.toFixed(1)}km`
+    : body.lang === "no"
+    ? "nylig langtur"
+    : "your recent long run";
   const effortSamples = (body.recentActivities || []).filter((a) => Number.isFinite(a.effort)).length;
   const raceWindow = body.planContext?.daysToRace != null
-    ? `${body.planContext.daysToRace} days to race`
+    ? body.lang === "no"
+      ? `${body.planContext.daysToRace} dager til løp`
+      : `${body.planContext.daysToRace} days to race`
+    : body.lang === "no"
+    ? "gjeldende målhorisont"
     : "your current goal timeline";
 
+  if (body.lang === "no") {
+    return [
+      `### ${headings[0]}:\nDet ukentlige volumet ligger nylig rundt ${latestDistance} med ${distanceTrend}; hold uke-til-uke-endringer kontrollert og prioriter én restitusjonsorientert dag for å ta opp belastningen.`,
+      `### ${headings[1]}:\nDen siste belastningen inneholder ${effortSamples} økter med registrert innsats; hold deg til 1-2 tydelige kvalitetsøkter mens du beskytter det rolige aerobe volumet.`,
+      `### ${headings[2]}:\nLangturene ligger nå rundt ${latestLongRun}; øk varigheten gradvis og legg bare inn korte kvalitetsinnslag på slutten når kroppen fortsatt kjennes frisk.`,
+      `### ${headings[3]}:\nMed ${raceWindow} bygges beredskapen best gjennom konsistens fremfor topper; hold en bærekraftig rytme denne uken og vurder tretthetssignalene før du legger på mer intensitet.`,
+    ].join("\n\n");
+  }
+
   return [
-    `### Mileage Trend\nRecent weekly volume is around ${latestDistance} with ${distanceTrend}; keep weekly load changes controlled and prioritize one recovery-focused day to absorb work.`,
-    `### Intensity Distribution\nCurrent activity load includes ${effortSamples} effort-tagged sessions in the recent window; keep quality to 1-2 purposeful sessions while protecting easy aerobic volume.`,
-    `### Long-Run Progression\nLong-run execution is currently around ${latestLongRun}; progress duration gradually and add only small finish-quality segments when freshness remains high.`,
-    `### Race Readiness\nWith ${raceWindow}, readiness improves most through consistency rather than spikes; hold a sustainable rhythm this week and reassess fatigue markers before adding intensity.`,
+    `### ${headings[0]}:\nRecent weekly volume is around ${latestDistance} with ${distanceTrend}; keep weekly load changes controlled and prioritize one recovery-focused day to absorb work.`,
+    `### ${headings[1]}:\nCurrent activity load includes ${effortSamples} effort-tagged sessions in the recent window; keep quality to 1-2 purposeful sessions while protecting easy aerobic volume.`,
+    `### ${headings[2]}:\nLong-run execution is currently around ${latestLongRun}; progress duration gradually and add only small finish-quality segments when freshness remains high.`,
+    `### ${headings[3]}:\nWith ${raceWindow}, readiness improves most through consistency rather than spikes; hold a sustainable rhythm this week and reassess fatigue markers before adding intensity.`,
   ].join("\n\n");
 }
 
@@ -1190,7 +1254,7 @@ Deno.serve(async (req) => {
     // ── Insights synthesis mode ───────────────────────────────────────────────
     if (mode === "insights_synthesis") {
       const systemInstruction = buildDefaultSystemInstruction(
-        INSIGHTS_SYNTHESIS_INSTRUCTION,
+        buildInsightsSynthesisInstruction(body.lang),
         body.lang,
         dynamicPlaybookAddendum,
         philosophyAddendum,
@@ -1221,10 +1285,10 @@ Deno.serve(async (req) => {
         (p: { thought?: boolean; text?: string }) => !p.thought && p.text,
       )?.text ?? "";
 
-      const sections = pluckSynthesisSections(rawText);
-      const sanitized = rebuildSanitizedMarkdown(sections);
-
-      const hasAllSections = REQUIRED_HEADINGS.every((h) => sanitized.includes(h));
+      const sections = pluckSynthesisSections(rawText, body.lang);
+      const sanitized = rebuildSanitizedMarkdown(trimSynthesisSections(sections, body.lang), body.lang);
+      const requiredHeadings = getRequiredHeadings(body.lang);
+      const hasAllSections = requiredHeadings.every((h) => sanitized.includes(h));
 
       if (!hasAllSections) {
         // Fire and forget logging
@@ -1232,7 +1296,9 @@ Deno.serve(async (req) => {
           .catch(console.error);
       }
 
-      const synthesis = (sanitized.trim() ? sanitized : buildFallbackSynthesis(body)).slice(0, 2000);
+      const synthesis = hasAllSections && sanitized.trim()
+        ? sanitized
+        : buildFallbackSynthesis(body);
 
       return new Response(JSON.stringify({ synthesis }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

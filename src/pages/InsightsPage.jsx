@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { useAppData } from "../context/AppDataContext";
+import { useI18n } from "../i18n/translations.js";
 import { getSupabaseClient } from "../lib/supabaseClient.js";
 import { buildCoachPayload } from "../lib/coachPayload.js";
 import PageContainer from "../components/layout/PageContainer";
@@ -54,12 +55,66 @@ const TOOLTIP_STYLE = {
   boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
 };
 
-const REQUIRED_SYNTHESIS_HEADINGS = [
-  "Mileage Trend",
-  "Intensity Distribution",
-  "Long-Run Progression",
-  "Race Readiness",
-];
+const SYNTHESIS_HEADING_SETS = {
+  en: [
+    "Mileage Trend",
+    "Intensity Distribution",
+    "Long-Run Progression",
+    "Race Readiness",
+  ],
+  no: [
+    "Kilometerutvikling",
+    "Intensitetsfordeling",
+    "Langturprogresjon",
+    "Løpsberedskap",
+  ],
+};
+
+const FITNESS_LEVEL_LABELS = {
+  en: {
+    Building: "Building",
+    Developing: "Developing",
+    Strong: "Strong",
+    Peak: "Peak",
+  },
+  no: {
+    Building: "Bygger",
+    Developing: "Utvikler",
+    Strong: "Sterk",
+    Peak: "Topp",
+  },
+};
+
+const READINESS_LABELS = {
+  en: { fresh: "Fresh", neutral: "Neutral", fatigued: "Fatigued" },
+  no: { fresh: "Frisk", neutral: "Nøytral", fatigued: "Sliten" },
+};
+
+const RISK_LABELS = {
+  en: { high: "High", moderate: "Moderate", low: "Low" },
+  no: { high: "Høy", moderate: "Moderat", low: "Lav" },
+};
+
+const LOAD_STATE_LABELS = {
+  en: {
+    good_form: "Good Form",
+    neutral: "Neutral",
+    accumulating_fatigue: "Accumulating Fatigue",
+    overreaching_risk: "Overreaching Risk",
+    Improving: "Improving",
+    Stable: "Stable",
+    Declining: "Declining",
+  },
+  no: {
+    good_form: "God form",
+    neutral: "Nøytral",
+    accumulating_fatigue: "Opparbeidet tretthet",
+    overreaching_risk: "Risiko for overbelastning",
+    Improving: "Bedres",
+    Stable: "Stabil",
+    Declining: "Synker",
+  },
+};
 
 /**
  * Sanitizes AI synthesis output, stripping JSON artifacts and code fences.
@@ -114,13 +169,20 @@ function sanitizeSynthesisText(input) {
   return { text: text.trim(), isTrusted: false };
 }
 
-function hasRequiredSynthesisHeadings(text) {
+function getHeadingSetsForLanguage(lang) {
+  return lang === "no"
+    ? [SYNTHESIS_HEADING_SETS.no, SYNTHESIS_HEADING_SETS.en]
+    : [SYNTHESIS_HEADING_SETS.en, SYNTHESIS_HEADING_SETS.no];
+}
+
+function hasRequiredSynthesisHeadings(text, lang) {
   if (!text) return false;
-  return REQUIRED_SYNTHESIS_HEADINGS.every((heading) => {
-    // Look for heading followed by a colon, possibly with markdown artifacts
-    const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?(?:#+\\s*)?${heading}\\s*:`, "i");
-    return pattern.test(text);
-  });
+  return getHeadingSetsForLanguage(lang).some((headings) =>
+    headings.every((heading) => {
+      const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*]\\s*)?(?:#+\\s*)?${heading}\\s*:`, "i");
+      return pattern.test(text);
+    }),
+  );
 }
 
 // ── Zone config ────────────────────────────────────────────────────────────
@@ -133,24 +195,60 @@ const ZONE_COLORS = ["#94a3b8", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
 
 const OVERLAY_MESSAGES = {
   good_form: {
-    Improving: "You're in excellent form right now (TSB +{tsb}, improving). This is a prime window for a quality session or long run.",
-    Stable:    "You're in good form (TSB +{tsb}, stable). Training stress is well-controlled — a good time to hit your key sessions.",
-    Declining: "Form is still positive (TSB +{tsb}) but trending down. Normal in a build week — monitor load and protect sleep.",
+    Improving: {
+      en: "You're in excellent form right now (TSB +{tsb}, improving). This is a prime window for a quality session or long run.",
+      no: "Du er i svært god form akkurat nå (TSB +{tsb}, bedres). Dette er et godt vindu for en kvalitetsøkt eller langtur.",
+    },
+    Stable: {
+      en: "You're in good form (TSB +{tsb}, stable). Training stress is well-controlled - a good time to hit your key sessions.",
+      no: "Du er i god form (TSB +{tsb}, stabil). Treningsstresset er godt kontrollert, så dette er et bra tidspunkt for nøkkeløktene dine.",
+    },
+    Declining: {
+      en: "Form is still positive (TSB +{tsb}) but trending down. Normal in a build week - monitor load and protect sleep.",
+      no: "Formen er fortsatt positiv (TSB +{tsb}), men er på vei ned. Det er normalt i en byggeuke, men følg med på belastning og søvn.",
+    },
   },
   neutral: {
-    Improving: "Load and form are balancing out (TSB {tsb}, improving). Stay consistent — fitness is accumulating.",
-    Stable:    "Training load is balanced (TSB {tsb}). Neutral form is normal mid-block — stick to the plan.",
-    Declining: "Form is sliding toward the neutral zone (TSB {tsb}). Consider whether fatigue is planned or unexpected.",
+    Improving: {
+      en: "Load and form are balancing out (TSB {tsb}, improving). Stay consistent - fitness is accumulating.",
+      no: "Belastning og form er i ferd med å balansere seg (TSB {tsb}, bedres). Hold deg jevn - formen bygger seg opp.",
+    },
+    Stable: {
+      en: "Training load is balanced (TSB {tsb}). Neutral form is normal mid-block - stick to the plan.",
+      no: "Treningsbelastningen er i balanse (TSB {tsb}). Nøytral form er normalt midt i en blokk, så hold deg til planen.",
+    },
+    Declining: {
+      en: "Form is sliding toward the neutral zone (TSB {tsb}). Consider whether fatigue is planned or unexpected.",
+      no: "Formen glir mot nøytral sone (TSB {tsb}). Vurder om trettheten er planlagt eller uventet.",
+    },
   },
   accumulating_fatigue: {
-    Improving: "Fatigue is elevated but easing (TSB {tsb}, improving). A recovery day or easy session will accelerate the rebound.",
-    Stable:    "Fatigue is accumulating (TSB {tsb}). Expected in a hard block — keep quality low, volume easy.",
-    Declining: "Fatigue is building and not recovering (TSB {tsb}, declining). Prioritize sleep and consider a rest day.",
+    Improving: {
+      en: "Fatigue is elevated but easing (TSB {tsb}, improving). A recovery day or easy session will accelerate the rebound.",
+      no: "Trettheten er forhøyet, men er på vei ned (TSB {tsb}, bedres). En restitusjonsdag eller rolig økt vil gi raskere respons.",
+    },
+    Stable: {
+      en: "Fatigue is accumulating (TSB {tsb}). Expected in a hard block - keep quality low, volume easy.",
+      no: "Trettheten bygger seg opp (TSB {tsb}). Det er forventet i en hard blokk - hold intensiteten lav og volumet rolig.",
+    },
+    Declining: {
+      en: "Fatigue is building and not recovering (TSB {tsb}, declining). Prioritize sleep and consider a rest day.",
+      no: "Trettheten øker uten å slippe taket (TSB {tsb}, synker). Prioriter søvn og vurder en hviledag.",
+    },
   },
   overreaching_risk: {
-    Improving: "High fatigue, but rebounding (TSB {tsb}, improving). You're coming out of a hard block — protect recovery.",
-    Stable:    "Training stress is very high (TSB {tsb}). Overreaching risk is real — reduce load now.",
-    Declining: "Overreaching risk: TSB at {tsb} and declining. Back off intensity immediately and prioritize recovery.",
+    Improving: {
+      en: "High fatigue, but rebounding (TSB {tsb}, improving). You're coming out of a hard block - protect recovery.",
+      no: "Trettheten er høy, men du er på vei tilbake (TSB {tsb}, bedres). Du kommer ut av en hard blokk, så vern om restitusjonen.",
+    },
+    Stable: {
+      en: "Training stress is very high (TSB {tsb}). Overreaching risk is real - reduce load now.",
+      no: "Treningsstresset er svært høyt (TSB {tsb}). Risikoen for overbelastning er reell, så reduser belastningen nå.",
+    },
+    Declining: {
+      en: "Overreaching risk: TSB at {tsb} and declining. Back off intensity immediately and prioritize recovery.",
+      no: "Risiko for overbelastning: TSB er {tsb} og synker. Slipp opp intensiteten med en gang og prioriter restitusjon.",
+    },
   },
 };
 
@@ -184,19 +282,21 @@ function KpiCard({ label, value, delta, deltaDir, note }) {
   );
 }
 
-function ActivityZoneBreakdown({ activityZones }) {
+function ActivityZoneBreakdown({ activityZones, locale, copy }) {
   return (
     <div className="grid gap-5">
       {activityZones.map((activity) => (
         <div key={activity.id} className="grid gap-1.5">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-slate-800">{activity.name}</span>
-            <span className="text-xs text-slate-400">{fmtDate(activity.date)}</span>
+            <span className="text-xs text-slate-400">
+              {new Date(activity.date).toLocaleDateString(locale, { month: "short", day: "numeric" })}
+            </span>
           </div>
           <div
             className="flex rounded-full overflow-hidden h-3"
             role="img"
-            aria-label={`Zone distribution for ${activity.name}`}
+            aria-label={copy.zoneDistributionAria.replace("{name}", activity.name)}
           >
             {ZONE_KEYS.map((key, zi) => {
               const pct = activity.total > 0 ? (activity[key] / activity.total) * 100 : 0;
@@ -205,7 +305,7 @@ function ActivityZoneBreakdown({ activityZones }) {
                   key={key}
                   className="h-full"
                   style={{ width: `${pct}%`, background: ZONE_COLORS[zi] }}
-                  title={`${ZONE_LABELS[zi]}: ${Math.round(activity[key] / 60)}m (${Math.round(pct)}%)`}
+                  title={`${copy.zoneLabels[zi]}: ${Math.round(activity[key] / 60)}m (${Math.round(pct)}%)`}
                 />
               ) : null;
             })}
@@ -225,19 +325,19 @@ function ActivityZoneBreakdown({ activityZones }) {
   );
 }
 
-function EfficiencyTooltip({ active, payload }) {
+function EfficiencyTooltip({ active, payload, locale, copy }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
       <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-lg text-xs">
         <p className="font-bold text-slate-900 mb-1">{data.name}</p>
-        <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString()}</p>
+        <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString(locale)}</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <span className="text-slate-400">Speed</span>
+          <span className="text-slate-400">{copy.speed}</span>
           <span className="text-right font-mono font-bold text-slate-700">{data.speed.toFixed(1)} km/h</span>
-          <span className="text-slate-400">Avg HR</span>
+          <span className="text-slate-400">{copy.avgHr}</span>
           <span className="text-right font-mono font-bold text-slate-700">{data.hr} bpm</span>
-          <span className="text-slate-400">Efficiency</span>
+          <span className="text-slate-400">{copy.efficiency}</span>
           <span className="text-right font-mono font-bold text-blue-600">{data.y.toFixed(3)}</span>
         </div>
       </div>
@@ -250,6 +350,151 @@ function EfficiencyTooltip({ active, payload }) {
 
 export default function InsightsPage() {
   const { activities, checkins, plans, strava, dailyLogs, trainingBlocks, runnerProfile } = useAppData();
+  const { lang } = useI18n();
+  const locale = lang === "no" ? "nb-NO" : undefined;
+  const copy = useMemo(
+    () =>
+      lang === "no"
+        ? {
+            title: "Treningsanalyse og innsikt",
+            subtitle: "Forstå beredskap, oppdag risiko tidlig, og se effekten av konsistensen din.",
+            filters: {
+              all: "Alle økter",
+              easy: "Aerob",
+              workout: "Kvalitetsøkter",
+              long: "Langturer",
+            },
+            thisWeek: "Denne uken",
+            trainingLoad: "Treningsbelastning",
+            chronicLoad: "Kronisk belastning (CTL)",
+            consistency: "Konsistens",
+            weeksWithRuns: "Uker med løp (siste 8)",
+            readiness: "Beredskap",
+            noDataTitle: "Ingen treningsdata ennå",
+            noDataBody:
+              "Koble til Strava og synkroniser aktivitetene dine for å låse opp treningsbelastning, soneanalyse og beredskapssporing.",
+            connectStrava: "Koble til Strava",
+            trainingLoadTrend: "Trend for treningsbelastning",
+            trainingLoadTrendDesc: "Form (CTL), tretthet (ATL) og overskudd (TSB) de siste 90 dagene.",
+            fitnessLegend: "Form (CTL)",
+            fatigueLegend: "Tretthet (ATL)",
+            formLegend: "Overskudd (TSB)",
+            aerobicEfficiencyTitle: "Trend for aerob effektivitet",
+            aerobicEfficiencyDesc: "Forholdet fart/puls (GAP-normalisert) de siste 150 dagene.",
+            trendGain: "Trendgevinst",
+            trendLine: "Trendlinje",
+            easyAerobic: "Rolig / aerob",
+            moderate: "Moderat",
+            intensity: "Intensitet",
+            speed: "Fart",
+            avgHr: "Snittpuls",
+            efficiency: "Effektivitet",
+            weeklyLoad: "Ukentlig belastning",
+            weeklyLoadDesc: "Rullerende 8-ukersvisning av akkumulerte treningsminutter.",
+            minutes: "Minutter",
+            trainingLoadTooltip: "Treningsbelastning",
+            hrZonesTitle: "Fordeling av pulssoner",
+            hrZonesDesc: "Tid per sone hver uke. Bygg aerob base i Z1-Z2 og hold kontroll på intensiteten i Z3-Z5.",
+            zoneLabels: ["Z1 Restitusjon", "Z2 Aerob", "Z3 Tempo", "Z4 Terskel", "Z5 VO₂maks"],
+            zoneBreakdownTitle: "Sonefordeling per økt",
+            zoneBreakdownDesc: "Siste {count} aktiviteter med pulsdata.",
+            zoneDistributionAria: "Sonefordeling for {name}",
+            fitnessLevel: "Formnivå",
+            fitnessLevelDesc: "Beregnet fra nåværende kronisk belastning (CTL).",
+            fitnessLevelAria: "Formnivå {score} av 100",
+            ctlCompact: "CTL {ctl}",
+            longRunTitle: "Langturprogresjon",
+            longRunDesc: "{latest} km av {target} km mål",
+            longRunAria: "Langturprogresjon {percent} prosent",
+            longRunDistance: "Distanse (km)",
+            elevation: "Høydemeter (m)",
+            longRunEmpty: "Loggfør minst 2 langturer for å se progresjon.",
+            latestCheckin: "Siste innsjekk",
+            formTrend: "Formtrend",
+            riskScore: "Risikoscore",
+            weekOf: "Uke",
+            fatigue: "tretthet",
+            sleep: "søvn",
+            motivation: "motivasjon",
+            niggles: "Småplager",
+            noCheckin: "Ingen innsjekk ennå. Send inn din ukentlige innsjekk for å spore beredskap.",
+            sameAsLastWeek: "Samme som forrige uke",
+            vsLastWeek: "km vs forrige uke",
+            vsFourWeeksAgo: "vs for 4 uker siden",
+            eightWeeks: "uker",
+          }
+        : {
+            title: "Training analysis & insights",
+            subtitle: "Understand readiness, spot risk early, and see the impact of your consistency.",
+            filters: {
+              all: "All Runs",
+              easy: "Aerobic",
+              workout: "Workouts",
+              long: "Long Runs",
+            },
+            thisWeek: "This week",
+            trainingLoad: "Training load",
+            chronicLoad: "Chronic load (CTL)",
+            consistency: "Consistency",
+            weeksWithRuns: "Weeks with runs (last 8)",
+            readiness: "Readiness",
+            noDataTitle: "No training data yet",
+            noDataBody:
+              "Connect Strava and sync your activities to unlock training load charts, zone analysis, and readiness tracking.",
+            connectStrava: "Connect Strava",
+            trainingLoadTrend: "Training load trend",
+            trainingLoadTrendDesc: "Fitness (CTL), Fatigue (ATL), and Form (TSB) over the past 90 days.",
+            fitnessLegend: "Fitness (CTL)",
+            fatigueLegend: "Fatigue (ATL)",
+            formLegend: "Form (TSB)",
+            aerobicEfficiencyTitle: "Aerobic efficiency trend",
+            aerobicEfficiencyDesc: "Speed/HR ratio (GAP normalized) over the past 150 days.",
+            trendGain: "Trend Gain",
+            trendLine: "Trend Line",
+            easyAerobic: "Easy / Aerobic",
+            moderate: "Moderate",
+            intensity: "Intensity",
+            speed: "Speed",
+            avgHr: "Avg HR",
+            efficiency: "Efficiency",
+            weeklyLoad: "Weekly load",
+            weeklyLoadDesc: "Rolling 8-week view of accumulated training minutes.",
+            minutes: "Minutes",
+            trainingLoadTooltip: "Training load",
+            hrZonesTitle: "Heart rate zone distribution",
+            hrZonesDesc: "Time per zone each week. Build Z1-Z2 aerobic base and control Z3-Z5 intensity.",
+            zoneLabels: ["Z1 Recovery", "Z2 Aerobic", "Z3 Tempo", "Z4 Threshold", "Z5 VO₂max"],
+            zoneBreakdownTitle: "Zone breakdown per workout",
+            zoneBreakdownDesc: "Last {count} activities with heart rate data.",
+            zoneDistributionAria: "Zone distribution for {name}",
+            fitnessLevel: "Fitness level",
+            fitnessLevelDesc: "Calculated from current chronic load (CTL).",
+            fitnessLevelAria: "Fitness level {score} out of 100",
+            ctlCompact: "CTL {ctl}",
+            longRunTitle: "Long run progression",
+            longRunDesc: "{latest} km of {target} km target",
+            longRunAria: "Long run progress {percent} percent",
+            longRunDistance: "Distance (km)",
+            elevation: "Elevation (m)",
+            longRunEmpty: "Log 2+ long runs to see progression.",
+            latestCheckin: "Latest check-in",
+            formTrend: "Form trend",
+            riskScore: "Risk score",
+            weekOf: "Week of",
+            fatigue: "fatigue",
+            sleep: "sleep",
+            motivation: "motivation",
+            niggles: "Niggles",
+            noCheckin: "No check-in yet. Submit your weekly check-in below to track readiness.",
+            sameAsLastWeek: "Same as last week",
+            vsLastWeek: "km vs last week",
+            vsFourWeeksAgo: "vs 4 weeks ago",
+            eightWeeks: "wks",
+          },
+    [lang],
+  );
+  const formatShortDate = (value) =>
+    new Date(value).toLocaleDateString(locale, { month: "short", day: "numeric" });
 
   // ── Filters ──────────────────────────────────────────────────────────────
 
@@ -274,11 +519,11 @@ export default function InsightsPage() {
   const longRunPoints = useMemo(
     () =>
       computeLongRuns(activities.activities).map(([weekStart, run]) => ({
-        label: fmtDate(weekStart),
+        label: formatShortDate(weekStart),
         distanceKm: Math.round((run.distance / 1000) * 10) / 10,
         elevation: Math.round(run.elevation || 0),
       })),
-    [activities.activities],
+    [activities.activities, locale],
   );
 
   const weeklyLoadPoints = useMemo(() => {
@@ -296,8 +541,8 @@ export default function InsightsPage() {
     return Array.from(weekly.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-8)
-      .map(([weekStart, load]) => ({ label: fmtDate(weekStart), load: Math.round(load) }));
-  }, [activities.activities]);
+      .map(([weekStart, load]) => ({ label: formatShortDate(weekStart), load: Math.round(load) }));
+  }, [activities.activities, locale]);
 
   const weeklyZones = useMemo(() => computeWeeklyHRZones(activities.activities), [activities.activities]);
   const activityZones = useMemo(() => computeRecentActivityZones(activities.activities), [activities.activities]);
@@ -306,14 +551,14 @@ export default function InsightsPage() {
   const zoneChartData = useMemo(
     () =>
       weeklyZones.map((w) => ({
-        label: fmtDate(w.weekStart),
+        label: formatShortDate(w.weekStart),
         z1: Math.round((w.z1 || 0) / 60),
         z2: Math.round((w.z2 || 0) / 60),
         z3: Math.round((w.z3 || 0) / 60),
         z4: Math.round((w.z4 || 0) / 60),
         z5: Math.round((w.z5 || 0) / 60),
       })),
-    [weeklyZones],
+    [locale, weeklyZones],
   );
 
   // ── Aerobic Efficiency Logic ─────────────────────────────────────────────
@@ -392,7 +637,7 @@ export default function InsightsPage() {
     const distDeltaKm = ((thisWeekDist - lastWeekDist) / 1000).toFixed(1);
     const distDir = thisWeekDist > lastWeekDist ? "up" : thisWeekDist < lastWeekDist ? "down" : "neutral";
     const distDelta =
-      distDir === "neutral" ? "Same as last week" : `${distDir === "up" ? "+" : ""}${distDeltaKm} km vs last week`;
+      distDir === "neutral" ? copy.sameAsLastWeek : `${distDir === "up" ? "+" : ""}${distDeltaKm} ${copy.vsLastWeek}`;
 
     const last8Mondays = Array.from({ length: 8 }, (_, i) => {
       const m = new Date(thisMonday);
@@ -400,7 +645,7 @@ export default function InsightsPage() {
       return m.toISOString().split("T")[0];
     });
     const weeksRun = last8Mondays.filter((w) => weeksWithRuns.has(w)).length;
-    const consistencyFrac = `${weeksRun}/8 wks`;
+    const consistencyFrac = `${weeksRun}/8 ${copy.eightWeeks}`;
 
     const latestTL = trainingLoadSeries.at(-1);
     const ctl4wAgo =
@@ -409,10 +654,16 @@ export default function InsightsPage() {
     const ctlDelta = ctl4wAgo ? Math.round((latestTL.ctl - ctl4wAgo.ctl) * 10) / 10 : null;
     const ctlDir = ctlDelta == null ? "neutral" : ctlDelta > 0 ? "up" : ctlDelta < 0 ? "down" : "neutral";
     const ctlDeltaStr =
-      ctlDelta == null ? null : `${ctlDelta > 0 ? "+" : ""}${ctlDelta} vs 4 weeks ago`;
+      ctlDelta == null ? null : `${ctlDelta > 0 ? "+" : ""}${ctlDelta} ${copy.vsFourWeeksAgo}`;
 
     const tsb = latestTL?.tsb;
-    const readiness = tsb == null ? "—" : tsb > 5 ? "Fresh" : tsb > -5 ? "Neutral" : "Fatigued";
+    const readiness = tsb == null
+      ? "—"
+      : tsb > 5
+      ? READINESS_LABELS[lang].fresh
+      : tsb > -5
+      ? READINESS_LABELS[lang].neutral
+      : READINESS_LABELS[lang].fatigued;
     const tsbStr = tsb == null ? null : `TSB ${tsb > 0 ? "+" : ""}${tsb.toFixed(1)}`;
     const readinessDir = tsb == null ? "neutral" : tsb > 5 ? "up" : tsb > -5 ? "neutral" : "down";
 
@@ -429,13 +680,14 @@ export default function InsightsPage() {
       tsbStr,
       readinessDir,
     };
-  }, [activities.activities, trainingLoadSeries]);
+  }, [activities.activities, trainingLoadSeries, copy, lang]);
 
   const latestLoad = trainingLoadSeries.at(-1);
   const ctl = latestLoad?.ctl ?? 0;
   const fitnessScore = Math.max(0, Math.min(100, Math.round((ctl / 90) * 100)));
-  const fitnessLevel =
+  const fitnessLevelKey =
     ctl < 20 ? "Building" : ctl < 40 ? "Developing" : ctl < 60 ? "Strong" : "Peak";
+  const fitnessLevel = FITNESS_LEVEL_LABELS[lang][fitnessLevelKey];
 
   const targetLongRunKm = useMemo(() => {
     const currentMileage = Number(plans.plans[0]?.current_mileage) || 0;
@@ -452,19 +704,29 @@ export default function InsightsPage() {
 
   const latest = checkins.checkins[0];
   const latestText = latest
-    ? `Week of ${new Date(latest.week_of).toLocaleDateString()}: fatigue ${latest.fatigue}/5, sleep ${latest.sleep_quality}/5, motivation ${latest.motivation}/5${latest.niggles ? ` · Niggles: ${latest.niggles}` : ""}`
-    : "No check-in yet. Submit your weekly check-in below to track readiness.";
+    ? `${copy.weekOf} ${new Date(latest.week_of).toLocaleDateString(locale)}: ${copy.fatigue} ${latest.fatigue}/5, ${copy.sleep} ${latest.sleep_quality}/5, ${copy.motivation} ${latest.motivation}/5${latest.niggles ? ` · ${copy.niggles}: ${latest.niggles}` : ""}`
+    : copy.noCheckin;
 
   const formStat = trainingLoadSeries.at(-1)?.tsb;
   const readiness =
-    formStat == null ? "—" : formStat > 5 ? "Fresh" : formStat > -5 ? "Neutral" : "Fatigued";
+    formStat == null
+      ? "—"
+      : formStat > 5
+      ? READINESS_LABELS[lang].fresh
+      : formStat > -5
+      ? READINESS_LABELS[lang].neutral
+      : READINESS_LABELS[lang].fatigued;
 
   const risk = useMemo(() => {
     const last = trainingLoadSeries.at(-1);
     if (!last) return "—";
     const ratio = last.ctl > 0 ? last.atl / last.ctl : 0;
-    return ratio > 1.5 ? "High" : ratio > 1.2 ? "Moderate" : "Low";
-  }, [trainingLoadSeries]);
+    return ratio > 1.5
+      ? RISK_LABELS[lang].high
+      : ratio > 1.2
+      ? RISK_LABELS[lang].moderate
+      : RISK_LABELS[lang].low;
+  }, [trainingLoadSeries, lang]);
 
   const hasData = activities.activities.length > 0;
   const isLoading = activities.loading;
@@ -474,6 +736,11 @@ export default function InsightsPage() {
   const [synthesis, setSynthesis] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const synthesisFetchedRef = useRef(false);
+
+  useEffect(() => {
+    synthesisFetchedRef.current = false;
+    setSynthesis(null);
+  }, [lang]);
 
   useEffect(() => {
     if (!hasData || synthesisFetchedRef.current) return;
@@ -490,7 +757,7 @@ export default function InsightsPage() {
           activePlan: plans.plans[0] ?? null,
           trainingBlocks,
           runnerProfile,
-          lang: undefined,
+          lang,
           mode: "insights_synthesis",
         });
         const { data, error } = await client.functions.invoke("gemini-coach", {
@@ -498,7 +765,7 @@ export default function InsightsPage() {
         });
         if (!error && data?.synthesis) {
           const { text, isTrusted } = sanitizeSynthesisText(data.synthesis);
-          if (isTrusted || hasRequiredSynthesisHeadings(text)) {
+          if (isTrusted || hasRequiredSynthesisHeadings(text, lang)) {
             setSynthesis(text);
           }
         }
@@ -508,7 +775,7 @@ export default function InsightsPage() {
         setSynthesisLoading(false);
       }
     })();
-  }, [hasData]);
+  }, [activities, checkins, dailyLogs, hasData, lang, plans.plans, runnerProfile, trainingBlocks]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -519,20 +786,20 @@ export default function InsightsPage() {
       <div className="mb-6 flex justify-between items-end gap-4 max-[800px]:flex-col max-[800px]:items-start">
         <div>
           <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">
-            Training analysis &amp; insights
+            {copy.title}
           </h2>
           <p className="m-0 text-sm text-slate-500">
-            Understand readiness, spot risk early, and see the impact of your consistency.
+            {copy.subtitle}
           </p>
         </div>
         
         {/* Filter Strip */}
         <div className="flex bg-slate-100 p-1 rounded-lg gap-1 self-end max-[800px]:self-stretch">
           {[
-            { id: "all", label: "All Runs" },
-            { id: "easy", label: "Aerobic" },
-            { id: "workout", label: "Workouts" },
-            { id: "long", label: "Long Runs" }
+            { id: "all", label: copy.filters.all },
+            { id: "easy", label: copy.filters.easy },
+            { id: "workout", label: copy.filters.workout },
+            { id: "long", label: copy.filters.long }
           ].map(f => (
             <button
               key={f.id}
@@ -597,25 +864,25 @@ export default function InsightsPage() {
         ) : hasData ? (
           <>
             <KpiCard
-              label="This week"
+              label={copy.thisWeek}
               value={`${kpiData.thisWeekKm} km`}
               delta={kpiData.distDelta}
               deltaDir={kpiData.distDir}
             />
             <KpiCard
-              label="Training load"
+              label={copy.trainingLoad}
               value={String(kpiData.ctlValue)}
               delta={kpiData.ctlDeltaStr}
               deltaDir={kpiData.ctlDir}
-              note="Chronic load (CTL)"
+              note={copy.chronicLoad}
             />
             <KpiCard
-              label="Consistency"
+              label={copy.consistency}
               value={kpiData.consistencyFrac}
-              note="Weeks with runs (last 8)"
+              note={copy.weeksWithRuns}
             />
             <KpiCard
-              label="Readiness"
+              label={copy.readiness}
               value={kpiData.readiness}
               delta={kpiData.tsbStr}
               deltaDir={kpiData.readinessDir}
@@ -628,14 +895,13 @@ export default function InsightsPage() {
       {!isLoading && !hasData && (
         <div className="text-center py-20 bg-white rounded-xl border border-slate-100 shadow-sm">
           <div className="text-5xl mb-4">📊</div>
-          <p className="font-semibold text-slate-700 m-0 mb-1 text-base">No training data yet</p>
+          <p className="font-semibold text-slate-700 m-0 mb-1 text-base">{copy.noDataTitle}</p>
           <p className="text-sm text-slate-500 m-0 mb-6 max-w-sm mx-auto">
-            Connect Strava and sync your activities to unlock training load charts, zone analysis,
-            and readiness tracking.
+            {copy.noDataBody}
           </p>
           {strava.startConnect && (
             <Button type="button" onClick={strava.startConnect}>
-              Connect Strava
+              {copy.connectStrava}
             </Button>
           )}
         </div>
@@ -661,10 +927,8 @@ export default function InsightsPage() {
           {trainingLoadSeries.length >= 7 && (
             <Card id="training-load-section">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm font-bold">Training load trend</CardTitle>
-                <CardDescription>
-                  Fitness (CTL), Fatigue (ATL), and Form (TSB) over the past 90 days.
-                </CardDescription>
+                <CardTitle className="text-sm font-bold">{copy.trainingLoadTrend}</CardTitle>
+                <CardDescription>{copy.trainingLoadTrendDesc}</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <ResponsiveContainer width="100%" height={260}>
@@ -681,7 +945,7 @@ export default function InsightsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis
                       dataKey="date"
-                      tickFormatter={fmtDate}
+                      tickFormatter={formatShortDate}
                       interval={13}
                       tick={TICK}
                       axisLine={false}
@@ -691,13 +955,13 @@ export default function InsightsPage() {
                     <Tooltip
                       contentStyle={TOOLTIP_STYLE}
                       formatter={(v, n) => [Number(v).toFixed(1), n]}
-                      labelFormatter={fmtDate}
+                      labelFormatter={formatShortDate}
                     />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                     <Area
                       type="monotone"
                       dataKey="ctl"
-                      name="Fitness (CTL)"
+                      name={copy.fitnessLegend}
                       stroke="#2563eb"
                       strokeWidth={2.5}
                       fill="url(#ctlGrad)"
@@ -707,7 +971,7 @@ export default function InsightsPage() {
                     <Line
                       type="monotone"
                       dataKey="atl"
-                      name="Fatigue (ATL)"
+                      name={copy.fatigueLegend}
                       stroke="#ef4444"
                       strokeWidth={2}
                       dot={false}
@@ -716,7 +980,7 @@ export default function InsightsPage() {
                     <Line
                       type="monotone"
                       dataKey="tsb"
-                      name="Form (TSB)"
+                      name={copy.formLegend}
                       stroke="#16a34a"
                       strokeWidth={2}
                       strokeDasharray="6 3"
@@ -733,14 +997,12 @@ export default function InsightsPage() {
           <Card id="aerobic-efficiency-section">
             <CardHeader className="pb-0 flex flex-row items-start justify-between">
               <div>
-                <CardTitle className="text-sm font-bold">Aerobic efficiency trend</CardTitle>
-                <CardDescription>
-                  Speed/HR ratio (GAP normalized) over the past 150 days.
-                </CardDescription>
+                <CardTitle className="text-sm font-bold">{copy.aerobicEfficiencyTitle}</CardTitle>
+                <CardDescription>{copy.aerobicEfficiencyDesc}</CardDescription>
               </div>
               {aerobicEfficiencyData.points.length >= 2 && (
                 <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg text-right">
-                  <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">Trend Gain</span>
+                  <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">{copy.trendGain}</span>
                   <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                     {Number(aerobicEfficiencyData.gain) > 0 ? "+" : ""}{aerobicEfficiencyData.gain}%
                   </span>
@@ -758,7 +1020,7 @@ export default function InsightsPage() {
                     dataKey="x"
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    tickFormatter={fmtDate}
+                    tickFormatter={formatShortDate}
                     tick={TICK}
                     axisLine={false}
                     tickLine={false}
@@ -770,9 +1032,9 @@ export default function InsightsPage() {
                     axisLine={false} 
                     tickLine={false} 
                   />
-                  <Tooltip content={<EfficiencyTooltip />} />
+                  <Tooltip content={<EfficiencyTooltip locale={locale} copy={copy} />} />
                   <Scatter
-                    name="Efficiency Points"
+                    name={copy.efficiency}
                     data={aerobicEfficiencyData.points}
                     className="max-[600px]:hidden"
                   >
@@ -791,22 +1053,22 @@ export default function InsightsPage() {
                     strokeWidth={3}
                     dot={false}
                     activeDot={false}
-                    name="Trend Line"
+                    name={copy.trendLine}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
               <div className="mt-4 flex items-center justify-center gap-6 text-[11px] text-slate-400 font-medium">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-60" />
-                  <span>Easy / Aerobic</span>
+                  <span>{copy.easyAerobic}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-500 opacity-60" />
-                  <span>Moderate</span>
+                  <span>{copy.moderate}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500 opacity-60" />
-                  <span>Intensity</span>
+                  <span>{copy.intensity}</span>
                 </div>
               </div>
             </CardContent>
@@ -816,9 +1078,11 @@ export default function InsightsPage() {
           {loadState && (
             <div className="coach-adaptation-note" data-testid="load-state-callout">
               <p>
-                <strong>{loadState.stateLabel} · {loadState.trendLabel}</strong>
-                {" — "}
-                {(OVERLAY_MESSAGES[loadState.state]?.[loadState.trendLabel] ?? "")
+                <strong>
+                  {LOAD_STATE_LABELS[lang][loadState.state] ?? loadState.stateLabel} · {LOAD_STATE_LABELS[lang][loadState.trendLabel] ?? loadState.trendLabel}
+                </strong>
+                {" - "}
+                {((OVERLAY_MESSAGES[loadState.state]?.[loadState.trendLabel]?.[lang]) ?? "")
                   .replace("{tsb}", Math.round(loadState.tsb))}
               </p>
             </div>
@@ -830,11 +1094,9 @@ export default function InsightsPage() {
 
               {weeklyLoadPoints.length >= 3 && (
                 <Card id="weekly-load-section">
-                  <CardHeader className="pb-0">
-                    <CardTitle className="text-sm font-bold">Weekly load</CardTitle>
-                    <CardDescription>
-                      Rolling 8-week view of accumulated training minutes.
-                    </CardDescription>
+                <CardHeader className="pb-0">
+                    <CardTitle className="text-sm font-bold">{copy.weeklyLoad}</CardTitle>
+                    <CardDescription>{copy.weeklyLoadDesc}</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4">
                     <ResponsiveContainer width="100%" height={220}>
@@ -857,11 +1119,11 @@ export default function InsightsPage() {
                         />
                         <Tooltip
                           contentStyle={TOOLTIP_STYLE}
-                          formatter={(v) => [`${v} min`, "Training load"]}
+                          formatter={(v) => [`${v} min`, copy.trainingLoadTooltip]}
                         />
                         <Bar
                           dataKey="load"
-                          name="Minutes"
+                          name={copy.minutes}
                           fill="#0ea5e9"
                           radius={[5, 5, 0, 0]}
                           maxBarSize={52}
@@ -874,11 +1136,9 @@ export default function InsightsPage() {
 
               {zoneChartData.length >= 2 && (
                 <Card id="hr-zones-section">
-                  <CardHeader className="pb-0">
-                    <CardTitle className="text-sm font-bold">Heart rate zone distribution</CardTitle>
-                    <CardDescription>
-                      Time per zone each week — build Z1–Z2 aerobic base, control Z3–Z5 intensity.
-                    </CardDescription>
+                <CardHeader className="pb-0">
+                    <CardTitle className="text-sm font-bold">{copy.hrZonesTitle}</CardTitle>
+                    <CardDescription>{copy.hrZonesDesc}</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4">
                     <ResponsiveContainer width="100%" height={220}>
@@ -908,13 +1168,13 @@ export default function InsightsPage() {
                           iconSize={8}
                           wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                         />
-                        <Bar dataKey="z1" name="Z1 Recovery" stackId="z" fill="#94a3b8" />
-                        <Bar dataKey="z2" name="Z2 Aerobic" stackId="z" fill="#22c55e" />
-                        <Bar dataKey="z3" name="Z3 Tempo" stackId="z" fill="#3b82f6" />
-                        <Bar dataKey="z4" name="Z4 Threshold" stackId="z" fill="#f59e0b" />
+                        <Bar dataKey="z1" name={copy.zoneLabels[0]} stackId="z" fill="#94a3b8" />
+                        <Bar dataKey="z2" name={copy.zoneLabels[1]} stackId="z" fill="#22c55e" />
+                        <Bar dataKey="z3" name={copy.zoneLabels[2]} stackId="z" fill="#3b82f6" />
+                        <Bar dataKey="z4" name={copy.zoneLabels[3]} stackId="z" fill="#f59e0b" />
                         <Bar
                           dataKey="z5"
-                          name="Z5 VO₂max"
+                          name={copy.zoneLabels[4]}
                           stackId="z"
                           fill="#ef4444"
                           radius={[4, 4, 0, 0]}
@@ -931,13 +1191,11 @@ export default function InsightsPage() {
           {activityZones.length >= 1 && (
             <Card>
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm font-bold">Zone breakdown per workout</CardTitle>
-                <CardDescription>
-                  Last {activityZones.length} activities with heart rate data.
-                </CardDescription>
+                <CardTitle className="text-sm font-bold">{copy.zoneBreakdownTitle}</CardTitle>
+                <CardDescription>{copy.zoneBreakdownDesc.replace("{count}", activityZones.length)}</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <ActivityZoneBreakdown activityZones={activityZones} />
+                <ActivityZoneBreakdown activityZones={activityZones} locale={locale} copy={copy} />
               </CardContent>
             </Card>
           )}
@@ -948,8 +1206,8 @@ export default function InsightsPage() {
             {/* Fitness level — fitness-meter / fitness-meter__fill classes preserved for tests */}
             <Card id="fitness-level-section">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm font-bold">Fitness level</CardTitle>
-                <CardDescription>Calculated from current chronic load (CTL).</CardDescription>
+                <CardTitle className="text-sm font-bold">{copy.fitnessLevel}</CardTitle>
+                <CardDescription>{copy.fitnessLevelDesc}</CardDescription>
               </CardHeader>
               <CardContent className="pt-5">
                 <div className="flex items-baseline gap-2 mb-3">
@@ -959,7 +1217,7 @@ export default function InsightsPage() {
                 <div
                   className="fitness-meter w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-3"
                   role="img"
-                  aria-label={`Fitness level ${fitnessScore} out of 100`}
+                  aria-label={copy.fitnessLevelAria.replace("{score}", fitnessScore)}
                 >
                   <div
                     className="fitness-meter__fill h-full rounded-full transition-all duration-700"
@@ -977,18 +1235,18 @@ export default function InsightsPage() {
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                      fitnessLevel === "Peak"
+                      fitnessLevelKey === "Peak"
                         ? "bg-blue-100 text-blue-700"
-                        : fitnessLevel === "Strong"
+                        : fitnessLevelKey === "Strong"
                         ? "bg-sky-100 text-sky-700"
-                        : fitnessLevel === "Developing"
+                        : fitnessLevelKey === "Developing"
                         ? "bg-amber-100 text-amber-700"
                         : "bg-slate-100 text-slate-500"
                     }`}
                   >
                     {fitnessLevel}
                   </span>
-                  <span className="text-xs text-slate-400">CTL {Math.round(ctl)}</span>
+                  <span className="text-xs text-slate-400">{copy.ctlCompact.replace("{ctl}", Math.round(ctl))}</span>
                 </div>
               </CardContent>
             </Card>
@@ -999,9 +1257,9 @@ export default function InsightsPage() {
                 <CardHeader className="pb-0">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <CardTitle className="text-sm font-bold">Long run progression</CardTitle>
+                      <CardTitle className="text-sm font-bold">{copy.longRunTitle}</CardTitle>
                       <CardDescription>
-                        {latestLongRunKm.toFixed(1)} km of {targetLongRunKm} km target
+                        {copy.longRunDesc.replace("{latest}", latestLongRunKm.toFixed(1)).replace("{target}", targetLongRunKm)}
                       </CardDescription>
                     </div>
                     <span className="text-2xl font-bold font-mono text-slate-900 shrink-0">
@@ -1013,7 +1271,7 @@ export default function InsightsPage() {
                   <div
                     className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-4"
                     role="img"
-                    aria-label={`Long run progress ${longRunCompletion} percent`}
+                    aria-label={copy.longRunAria.replace("{percent}", longRunCompletion)}
                   >
                     <div
                       className="h-full bg-emerald-500 rounded-full transition-all duration-700"
@@ -1051,7 +1309,7 @@ export default function InsightsPage() {
                       <Bar
                         yAxisId="left"
                         dataKey="distanceKm"
-                        name="Distance (km)"
+                        name={copy.longRunDistance}
                         fill="#3b82f6"
                         radius={[4, 4, 0, 0]}
                         maxBarSize={44}
@@ -1060,7 +1318,7 @@ export default function InsightsPage() {
                         yAxisId="right"
                         type="monotone"
                         dataKey="elevation"
-                        name="Elevation (m)"
+                        name={copy.elevation}
                         stroke="#f59e0b"
                         strokeWidth={2}
                         dot={{ r: 3, fill: "#f59e0b", strokeWidth: 0 }}
@@ -1074,7 +1332,7 @@ export default function InsightsPage() {
               /* Placeholder when not enough long run data */
               <Card id="long-run-section" className="flex items-center justify-center">
                 <CardContent className="text-center py-8 text-slate-400 text-sm">
-                  Log 2+ long runs to see progression.
+                  {copy.longRunEmpty}
                 </CardContent>
               </Card>
             )}
@@ -1086,7 +1344,7 @@ export default function InsightsPage() {
               <div className="grid grid-cols-[1fr_auto] gap-6 items-start max-[600px]:grid-cols-1">
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                    Latest check-in
+                    {copy.latestCheckin}
                   </p>
                   <p className="text-sm text-slate-600 leading-relaxed" id="latest-checkin-text">
                     {latestText}
@@ -1095,7 +1353,7 @@ export default function InsightsPage() {
                 <div className="flex gap-8 max-[600px]:gap-6 shrink-0" id="insight-stats">
                   <div className="text-center">
                     <span className="block text-[11px] text-slate-400 mb-1 uppercase tracking-wide">
-                      Form trend
+                      {copy.formTrend}
                     </span>
                     <strong
                       id="stat-form"
@@ -1116,14 +1374,14 @@ export default function InsightsPage() {
                   </div>
                   <div className="text-center">
                     <span className="block text-[11px] text-slate-400 mb-1 uppercase tracking-wide">
-                      Readiness
+                      {copy.readiness}
                     </span>
                     <strong
                       id="stat-readiness"
                       className={`font-mono text-xl font-bold ${
-                        readiness === "Fresh"
+                        readiness === READINESS_LABELS[lang].fresh
                           ? "text-emerald-600"
-                          : readiness === "Fatigued"
+                          : readiness === READINESS_LABELS[lang].fatigued
                           ? "text-red-500"
                           : "text-slate-700"
                       }`}
@@ -1133,14 +1391,14 @@ export default function InsightsPage() {
                   </div>
                   <div className="text-center">
                     <span className="block text-[11px] text-slate-400 mb-1 uppercase tracking-wide">
-                      Risk score
+                      {copy.riskScore}
                     </span>
                     <strong
                       id="stat-risk"
                       className={`font-mono text-xl font-bold ${
-                        risk === "High"
+                        risk === RISK_LABELS[lang].high
                           ? "text-red-500"
-                          : risk === "Moderate"
+                          : risk === RISK_LABELS[lang].moderate
                           ? "text-amber-600"
                           : "text-emerald-600"
                       }`}

@@ -346,6 +346,12 @@ function EfficiencyTooltip({ active, payload, locale, copy }) {
   return null;
 }
 
+// ── Synthesis cache (module-level, survives navigation, resets on full page reload) ──
+const SYNTHESIS_CACHE = {
+  // keyed by lang: { text: string, cachedAt: number }
+};
+const SYNTHESIS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
@@ -733,13 +739,23 @@ export default function InsightsPage() {
 
   // ── Synthesis callout state ───────────────────────────────────────────────
 
-  const [synthesis, setSynthesis] = useState(null);
+  const [synthesis, setSynthesis] = useState(() => {
+    // Hydrate from module cache on mount if valid
+    const cached = SYNTHESIS_CACHE[lang];
+    if (cached && Date.now() - cached.cachedAt < SYNTHESIS_CACHE_TTL_MS) {
+      return cached.text;
+    }
+    return null;
+  });
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const synthesisFetchedRef = useRef(false);
 
+  // When language changes: restore from cache if valid, otherwise clear and allow fetch
   useEffect(() => {
-    synthesisFetchedRef.current = false;
-    setSynthesis(null);
+    const cached = SYNTHESIS_CACHE[lang];
+    const isValid = cached && Date.now() - cached.cachedAt < SYNTHESIS_CACHE_TTL_MS;
+    synthesisFetchedRef.current = isValid;
+    setSynthesis(isValid ? cached.text : null);
   }, [lang]);
 
   useEffect(() => {
@@ -766,6 +782,8 @@ export default function InsightsPage() {
         if (!error && data?.synthesis) {
           const { text, isTrusted } = sanitizeSynthesisText(data.synthesis);
           if (isTrusted || hasRequiredSynthesisHeadings(text, lang)) {
+            // Store in module-level cache before setting state
+            SYNTHESIS_CACHE[lang] = { text, cachedAt: Date.now() };
             setSynthesis(text);
           }
         }

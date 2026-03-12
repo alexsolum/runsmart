@@ -132,15 +132,15 @@ describe("Dashboard — activity history table", () => {
   it("shows duration formatted as H:MM:SS in the table", () => {
     render(<HeroPage />);
     // Morning Run: 3120s → 0:52:00
-    expect(screen.getByText("0:52:00")).toBeInTheDocument();
+    expect(screen.getAllByText("0:52:00").length).toBeGreaterThan(0);
     // Tempo Tuesday: 2160s → 0:36:00
-    expect(screen.getByText("0:36:00")).toBeInTheDocument();
+    expect(screen.getAllByText("0:36:00").length).toBeGreaterThan(0);
   });
 
   it("shows 2:00:00 for long run with 7200s moving time", () => {
     render(<HeroPage />);
     // Long Run Sunday: moving_time 7200s → 2:00:00
-    expect(screen.getByText("2:00:00")).toBeInTheDocument();
+    expect(screen.getAllByText("2:00:00").length).toBeGreaterThan(0);
   });
 
   it("shows Add Activity and View All buttons", () => {

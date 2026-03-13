@@ -5,7 +5,7 @@ milestone_name: Weekly Planning Intelligence
 current_phase: 10
 status: ready-for-planning
 last_updated: "2026-03-13"
-last_activity: 2026-03-13 - Phase 9 completed
+last_activity: 2026-03-13 - Phase 10 context captured
 progress:
   total_phases: 3
   completed_phases: 1
@@ -19,7 +19,7 @@ progress:
 **Current Phase:** 10 (Recommendation Context)
 **Status:** Ready to plan
 
-Last activity: 2026-03-13 - Phase 9 completed
+Last activity: 2026-03-13 - Phase 10 context captured
 
 ## Project Reference
 
@@ -51,6 +51,8 @@ Resume file: `.planning/ROADMAP.md`
 - Milestone v1.2 started. Focus on weekly planning intelligence inside `Ukeplan`.
 - [Phase 09-ukeplan-ownership]: `WeeklyPlanPage` now owns AI week generation and remaps returned coach dates onto the currently focused week before calling `applyStructuredPlan`.
 - [Phase 09-ukeplan-ownership]: `LongTermPlanPage` no longer owns weekly generation; it stores read-only week intent and dispatches a handoff into `WeeklyPlanPage` through app-level navigation.
+- [Phase 10-recommendation-context]: Weekly recommendations should treat selected week type as directive, target mileage as a strong target, and notes as direct context shown in the `Ukeplan` setup summary.
+- [Phase 10-recommendation-context]: Active admin coaching philosophy should act as a guiding layer with explicit red-line guardrails; selected week intent wins unless a red line would be violated.
 
 ### Quick Tasks Completed
 

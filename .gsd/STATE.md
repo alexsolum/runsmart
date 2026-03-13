@@ -1,15 +1,18 @@
 # GSD State
 
-<!-- Auto-generated. Updated by deriveState(). -->
+**Active Milestone:** M001 — M001
+**Active Slice:** None
+**Phase:** pre-planning
+**Requirements Status:** 0 active · 0 validated · 0 deferred · 0 out of scope
 
-## M001: Strava Sync & Insight Trends
+## Milestone Registry
+- 🔄 **M001:** M001
 
-- Slices: 1/4
--   [x] S00: Quick Wins
--   [ ] S01: Strava Robustness
--   [ ] S02: Advanced Analytics
--   [ ] S03: Insight Reliability
+## Recent Decisions
+- None recorded
 
-## Active Task
+## Blockers
+- None
 
-- [ ] M001-S01-T01: DB Update: Ensure activities table has strava_id (bigint unique) and columns for heart_rate_zone_times and metadata.
+## Next Action
+Plan milestone M001.

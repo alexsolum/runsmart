@@ -127,7 +127,14 @@ function normalizeSelectedWeekIntent(intent, fallbackWeekStart) {
   };
 }
 
+function isWeekVisible(visibleWeeks, weekStart) {
+  return Boolean(weekStart) && visibleWeeks.includes(weekStart);
+}
+
 function WeeklyAiCard({
+  visibleWeeks,
+  selectedWeekStart,
+  onSelectWeek,
   weekStart,
   weekEntries,
   weekIntent,
@@ -157,6 +164,23 @@ function WeeklyAiCard({
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {visibleWeeks.map((visibleWeekStart) => {
+            const isSelected = visibleWeekStart === selectedWeekStart;
+            return (
+              <Button
+                key={visibleWeekStart}
+                type="button"
+                variant={isSelected ? "default" : "outline"}
+                size="sm"
+                className="h-auto px-3 py-1.5 text-xs"
+                onClick={() => onSelectWeek(visibleWeekStart)}
+              >
+                {formatWeekLabel(visibleWeekStart)}
+              </Button>
+            );
+          })}
+        </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Week</p>
@@ -436,6 +460,7 @@ export default function WeeklyPlanPage() {
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [planningStartDate, setPlanningStartDate] = useState(currentMondayIso);
+  const [selectedAiWeekStart, setSelectedAiWeekStart] = useState(currentMondayIso);
   const [addingTo, setAddingTo] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [pageError, setPageError] = useState(null);
@@ -456,6 +481,7 @@ export default function WeeklyPlanPage() {
       const parsed = JSON.parse(raw);
       if (parsed?.weekStart) {
         setPlanningStartDate(parsed.weekStart);
+        setSelectedAiWeekStart(parsed.weekStart);
       }
       if (parsed?.planId) {
         setSelectedPlanId(parsed.planId);
@@ -474,6 +500,12 @@ export default function WeeklyPlanPage() {
     isoDateOffset(planningStartDate, 21),
   ], [planningStartDate]);
 
+  useEffect(() => {
+    if (!isWeekVisible(visibleWeeks, selectedAiWeekStart)) {
+      setSelectedAiWeekStart(planningStartDate);
+    }
+  }, [planningStartDate, selectedAiWeekStart, visibleWeeks]);
+
   const normalizedEntries = useMemo(
     () => workoutEntries.entries.map(normalizeWeeklyEntry),
     [workoutEntries.entries],
@@ -482,24 +514,24 @@ export default function WeeklyPlanPage() {
     () => plans.plans.find((plan) => plan.id === selectedPlanId) ?? null,
     [plans.plans, selectedPlanId],
   );
-  const focusedWeekEntries = useMemo(
-    () => normalizedEntries.filter((entry) => entry.workout_date >= planningStartDate && entry.workout_date <= isoDateOffset(planningStartDate, 6)),
-    [normalizedEntries, planningStartDate],
+  const selectedAiWeekEntries = useMemo(
+    () => normalizedEntries.filter((entry) => entry.workout_date >= selectedAiWeekStart && entry.workout_date <= isoDateOffset(selectedAiWeekStart, 6)),
+    [normalizedEntries, selectedAiWeekStart],
   );
-  const focusedWeekIntent = useMemo(
-    () => getWeekIntent(trainingBlocks.blocks, selectedPlanId, planningStartDate),
-    [trainingBlocks.blocks, selectedPlanId, planningStartDate],
+  const selectedAiWeekIntentFromPlan = useMemo(
+    () => getWeekIntent(trainingBlocks.blocks, selectedPlanId, selectedAiWeekStart),
+    [trainingBlocks.blocks, selectedPlanId, selectedAiWeekStart],
   );
   const selectedWeekIntent = useMemo(() => {
     if (
       handoffIntent &&
       handoffIntent.planId === selectedPlanId &&
-      handoffIntent.weekStart === planningStartDate
+      handoffIntent.weekStart === selectedAiWeekStart
     ) {
-      return normalizeSelectedWeekIntent(handoffIntent, planningStartDate);
+      return normalizeSelectedWeekIntent(handoffIntent, selectedAiWeekStart);
     }
-    return normalizeSelectedWeekIntent(focusedWeekIntent, planningStartDate);
-  }, [focusedWeekIntent, handoffIntent, planningStartDate, selectedPlanId]);
+    return normalizeSelectedWeekIntent(selectedAiWeekIntentFromPlan, selectedAiWeekStart);
+  }, [handoffIntent, selectedAiWeekIntentFromPlan, selectedAiWeekStart, selectedPlanId]);
 
   // Load entries for entire 4-week range
   useEffect(() => {
@@ -510,7 +542,9 @@ export default function WeeklyPlanPage() {
   }, [selectedPlanId, planningStartDate, workoutEntries.loadEntriesForRange]);
 
   const resetToToday = useCallback(() => {
-    setPlanningStartDate(currentMondayIso());
+    const todayMonday = currentMondayIso();
+    setPlanningStartDate(todayMonday);
+    setSelectedAiWeekStart(todayMonday);
     setAddingTo(null);
     setEditingEntry(null);
   }, []);
@@ -583,9 +617,9 @@ export default function WeeklyPlanPage() {
       return;
     }
 
-    if (focusedWeekEntries.length > 0) {
+    if (selectedAiWeekEntries.length > 0) {
       const confirmed = window.confirm(
-        `Replace ${focusedWeekEntries.length} existing workout${focusedWeekEntries.length === 1 ? "" : "s"} in ${formatWeekLabel(planningStartDate)}?`,
+        `Replace ${selectedAiWeekEntries.length} existing workout${selectedAiWeekEntries.length === 1 ? "" : "s"} in ${formatWeekLabel(selectedAiWeekStart)}?`,
       );
       if (!confirmed) return;
     }
@@ -605,7 +639,7 @@ export default function WeeklyPlanPage() {
         lang: "en",
         mode: "default",
       });
-      const targetWeekStart = selectedWeekIntent?.weekStart ?? planningStartDate;
+      const targetWeekStart = selectedWeekIntent?.weekStart ?? selectedAiWeekStart;
       const targetWeekEnd = selectedWeekIntent?.weekEnd ?? isoDateOffset(targetWeekStart, 6);
       const { data, error } = await client.functions.invoke("gemini-coach", {
         body: {
@@ -619,7 +653,7 @@ export default function WeeklyPlanPage() {
       if (error) throw new Error(`Plan generation failed: ${error.message}`);
       if (data?.error) throw new Error(data.error);
 
-      const structuredPlan = normalizeGeneratedStructuredPlan(data?.structured_plan, planningStartDate);
+      const structuredPlan = normalizeGeneratedStructuredPlan(data?.structured_plan, targetWeekStart);
       if (structuredPlan.length === 0) {
         throw new Error("No plan returned from coach.");
       }
@@ -635,8 +669,8 @@ export default function WeeklyPlanPage() {
     activities,
     checkins,
     dailyLogs,
-    focusedWeekEntries.length,
-    planningStartDate,
+    selectedAiWeekEntries.length,
+    selectedAiWeekStart,
     runnerProfile,
     selectedWeekIntent,
     trainingBlocks,
@@ -682,8 +716,11 @@ export default function WeeklyPlanPage() {
 
         {selectedPlanId && (
           <WeeklyAiCard
-            weekStart={planningStartDate}
-            weekEntries={focusedWeekEntries}
+            visibleWeeks={visibleWeeks}
+            selectedWeekStart={selectedAiWeekStart}
+            onSelectWeek={setSelectedAiWeekStart}
+            weekStart={selectedAiWeekStart}
+            weekEntries={selectedAiWeekEntries}
             weekIntent={selectedWeekIntent}
             onGenerate={handleGenerateWeek}
             loading={planGenerationLoading}

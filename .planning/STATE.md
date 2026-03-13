@@ -4,7 +4,7 @@ milestone: v1.2
 milestone_name: Weekly Planning Intelligence
 current_phase: 11
 status: planning
-last_updated: "2026-03-13T16:35:00+01:00"
+last_updated: "2026-03-13T15:54:54.413Z"
 last_activity: 2026-03-13 - Gap plans 10-03 and 10-04 completed; phase 10 verified and phase 11 is next
 progress:
   total_phases: 3
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md
 Phase: 11 (Constraint-Aware Weekly Plans)
 Plan: Planning
 Status: Phase 10 is complete; next work should define day-level weekly constraints, tradeoff explanations, and manual-edit protection
-Resume file: `.planning/ROADMAP.md`
+Resume file: .planning/phases/11-constraint-aware-weekly-plans/11-CONTEXT.md
 
 ## Notes
 

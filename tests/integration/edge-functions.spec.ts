@@ -87,6 +87,12 @@ function buildPlanModePayload() {
         overrideRequiresExplanation: true,
       },
     },
+    weeklyConstraints: {
+      preferredLongRunDay: 'Sat',
+      preferredHardWorkoutDay: 'Tue',
+      commuteDays: ['Fri'],
+      doubleThresholdAllowed: false,
+    },
     dailyLogs: [
       { date: '2026-03-01', sleep_hours: 7.5, sleep_quality: 4, fatigue: 2, mood: 4, stress: 2, training_quality: 4, resting_hr: 50, notes: null },
       { date: '2026-03-02', sleep_hours: 7.0, sleep_quality: 3, fatigue: 3, mood: 4, stress: 3, training_quality: 3, resting_hr: 52, notes: null },
@@ -131,6 +137,12 @@ function assertTaperMileageContract(body: any, targetKm: number, tolerancePct: n
   expect(
     Math.abs(totalKm - targetKm) <= allowedDelta || hasOverrideExplanation,
   ).toBeTruthy();
+}
+
+function assertConstraintExplanationContract(body: any) {
+  const explanationText = `${String(body.coaching_feedback ?? '')}\n${String(body.adaptation_summary ?? '')}`;
+  const mentionsConstraintReasoning = /(constraint|prefer|moved|relaxed|commute|long run|quality session)/i.test(explanationText);
+  expect(mentionsConstraintReasoning).toBeTruthy();
 }
 
 function toIsoDate(value: Date) {
@@ -438,6 +450,7 @@ test.describe('Edge Function - gemini-coach plan contract with philosophy contex
       assertStructuredPlanContract(planBody);
       assertPlanDatesStayInRequestedWeek(planBody, '2026-03-16', '2026-03-22');
       assertTaperMileageContract(planBody, 42, 0.08);
+      assertConstraintExplanationContract(planBody);
     }
   });
 
@@ -468,6 +481,7 @@ test.describe('Edge Function - gemini-coach plan contract with philosophy contex
       assertStructuredPlanContract(planBody);
       assertPlanDatesStayInRequestedWeek(planBody, '2026-03-16', '2026-03-22');
       assertTaperMileageContract(planBody, 42, 0.08);
+      assertConstraintExplanationContract(planBody);
     }
   });
 

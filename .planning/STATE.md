@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Weekly Planning Intelligence
 current_phase: 11
-status: planning
-last_updated: "2026-03-13T15:54:54.413Z"
-last_activity: 2026-03-13 - Gap plans 10-03 and 10-04 completed; phase 10 verified and phase 11 is next
+status: complete
+last_updated: "2026-03-13T18:55:00.000Z"
+last_activity: 2026-03-13 - Phase 11 constraint-aware weekly planning completed and verified
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 3
+  total_plans: 10
+  completed_plans: 10
 ---
 
 
@@ -18,7 +18,7 @@ progress:
 
 **Initialized:** 2026-03-11
 **Current Phase:** 11
-**Status:** Ready to plan
+**Status:** Phase 11 complete
 
 Last activity: 2026-03-13 - Gap plans 10-03 and 10-04 completed; phase 10 verified and phase 11 is next
 
@@ -43,9 +43,9 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 11 (Constraint-Aware Weekly Plans)
-Plan: Planning
-Status: Phase 10 is complete; next work should define day-level weekly constraints, tradeoff explanations, and manual-edit protection
-Resume file: .planning/phases/11-constraint-aware-weekly-plans/11-CONTEXT.md
+Plan: Complete
+Status: Phase 11 verified with automated coverage for weekly constraints, explanation output, and protected-day regeneration
+Resume file: .planning/phases/11-constraint-aware-weekly-plans/11-VERIFICATION.md
 
 ## Notes
 
@@ -58,6 +58,9 @@ Resume file: .planning/phases/11-constraint-aware-weekly-plans/11-CONTEXT.md
 - [Phase 10-recommendation-context]: Plan 10-02 updated `gemini-coach` prompt precedence so selected-week intent outranks philosophy preferences while philosophy red lines remain explicit override-only guardrails.
 - [Phase 10-recommendation-context]: Plan 10-03 split visible-window navigation from AI week selection so any currently visible `Ukeplan` week can be targeted without falling back to `visibleWeeks[0]`.
 - [Phase 10-recommendation-context]: Plan 10-04 added explicit `weekDirective` constraints and edge-function enforcement so taper and near-target mileage weeks cannot drift silently without an override explanation.
+- [Phase 11-constraint-aware-weekly-plans]: `WeeklyPlanPage` now captures optional day-level constraints, surfaces returned adaptation explanations, and pauses regeneration for protected-day review before any overwrite.
+- [Phase 11-constraint-aware-weekly-plans]: `gemini-coach` now consumes `weeklyConstraints` and appends explanation text when long-run or quality-day preferences are relaxed.
+- [Phase 11-constraint-aware-weekly-plans]: `useWorkoutEntries` persists protected planning days in `weekly_plan_day_states`, preserves them by default during AI regeneration, and exposes an explicit force-overwrite path.
 
 ### Quick Tasks Completed
 

@@ -19,16 +19,16 @@ created: 2026-03-13
 |----------|-------|
 | **Framework** | vitest + Playwright |
 | **Config file** | `vitest.config.js`, `playwright.config.ts` |
-| **Quick run command** | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx` |
-| **Full suite command** | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx && npx playwright test tests/integration/edge-functions.spec.ts` |
+| **Quick run command** | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/useWorkoutEntries.test.jsx` |
+| **Full suite command** | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx tests/unit/useWorkoutEntries.test.jsx && npx playwright test tests/integration/edge-functions.spec.ts` |
 | **Estimated runtime** | ~45 seconds |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx`
-- **After every plan wave:** Run `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx && npx playwright test tests/integration/edge-functions.spec.ts`
+- **After every task commit:** Run `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/useWorkoutEntries.test.jsx`
+- **After every plan wave:** Run `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx tests/unit/useWorkoutEntries.test.jsx && npx playwright test tests/integration/edge-functions.spec.ts`
 - **Before `$gsd-verify-work`:** Full suite must be green
 - **Max feedback latency:** 45 seconds
 
@@ -42,12 +42,12 @@ created: 2026-03-13
 | 11-01-02 | 01 | 1 | WCON-01 | unit | `npm test -- --run tests/unit/coachPayload.test.js` | ✅ | ⬜ pending |
 | 11-02-01 | 02 | 2 | WCON-01, WCON-02 | unit | `npm test -- --run tests/unit/gemini-instructions.test.jsx tests/unit/coachPayload.test.js` | ✅ | ⬜ pending |
 | 11-02-02 | 02 | 2 | WCON-02 | integration | `npx playwright test tests/integration/edge-functions.spec.ts` | ✅ | ⬜ pending |
-| 11-03-01 | 03 | 3 | WCON-03 | unit | `npm test -- --run tests/unit/useWorkoutEntries.test.js` | ❌ W0 | ⬜ pending |
-| 11-03-02 | 03 | 3 | WCON-03 | unit | `npm test -- --run tests/unit/useWorkoutEntries.test.js` | ❌ W0 | ⬜ pending |
-| 11-03-03 | 03 | 3 | WCON-03 | component | `npm test -- --run tests/unit/weeklyplan.test.jsx tests/unit/useWorkoutEntries.test.js` | ❌ W0 | ⬜ pending |
-| 11-04-01 | 04 | 4 | WCON-01, WCON-02, WCON-03 | regression | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx tests/unit/useWorkoutEntries.test.js && npx playwright test tests/integration/edge-functions.spec.ts` | ❌ W0 | ⬜ pending |
-| 11-04-02 | 04 | 4 | WCON-01, WCON-02, WCON-03 | regression | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx tests/unit/useWorkoutEntries.test.js && npx playwright test tests/integration/edge-functions.spec.ts` | ❌ W0 | ⬜ pending |
-| 11-04-03 | 04 | 4 | WCON-01, WCON-02, WCON-03 | audit | local inspection of `.planning/phases/11-constraint-aware-weekly-plans/11-VERIFICATION.md` after the executed commands above | ✅ | ⬜ pending |
+| 11-03-01 | 03 | 3 | WCON-03 | unit | `npm test -- --run tests/unit/useWorkoutEntries.test.jsx` | ✅ | ✅ green |
+| 11-03-02 | 03 | 3 | WCON-03 | unit | `npm test -- --run tests/unit/useWorkoutEntries.test.jsx` | ✅ | ✅ green |
+| 11-03-03 | 03 | 3 | WCON-03 | component | `npm test -- --run tests/unit/weeklyplan.test.jsx tests/unit/useWorkoutEntries.test.jsx` | ✅ | ✅ green |
+| 11-04-01 | 04 | 4 | WCON-01, WCON-02, WCON-03 | regression | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx tests/unit/useWorkoutEntries.test.jsx && npx playwright test tests/integration/edge-functions.spec.ts` | ✅ | ✅ green |
+| 11-04-02 | 04 | 4 | WCON-01, WCON-02, WCON-03 | regression | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx tests/unit/gemini-instructions.test.jsx tests/unit/useWorkoutEntries.test.jsx && npx playwright test tests/integration/edge-functions.spec.ts` | ✅ | ✅ green |
+| 11-04-03 | 04 | 4 | WCON-01, WCON-02, WCON-03 | audit | local inspection of `.planning/phases/11-constraint-aware-weekly-plans/11-VERIFICATION.md` after the executed commands above | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -55,8 +55,8 @@ created: 2026-03-13
 
 ## Wave 0 Requirements
 
-- [ ] `tests/unit/useWorkoutEntries.test.js` — add hook-level protection and overwrite-policy tests
-- [ ] Shared test helpers for protected-day metadata fixtures, if current `mockAppData` coverage is insufficient
+- [x] `tests/unit/useWorkoutEntries.test.jsx` — added hook-level protection and overwrite-policy tests
+- [x] `tests/unit/mockAppData.js` — extended with review-preview defaults for page tests
 
 *If none: "Existing infrastructure covers all phase requirements."*
 
@@ -74,11 +74,11 @@ created: 2026-03-13
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 45s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete

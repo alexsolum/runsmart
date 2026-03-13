@@ -55,8 +55,10 @@ const PLAN_SYSTEM_INSTRUCTION =
   `   - "description": string (1-2 sentences describing the workout purpose and execution)\n\n` +
   `Coaching requirements:\n` +
   `- Treat the selected-week recommendation context as the primary tactical directive for dates, training type, target mileage, and notes.\n` +
+  `- Treat structured weeklyConstraints as day-level scheduling preferences for preferred long-run day, preferred hard-workout day, commute days, and whether double threshold is allowed.\n` +
   `- Use published philosophy as a background coaching layer. Philosophy red-line rules may force an override only when following the selected-week directive would violate a non-negotiable guardrail.\n` +
   `- If a guardrail forces an override, explain it in normal coaching language inside coaching_feedback or adaptation_summary.\n` +
+  `- If a requested weekly constraint cannot be satisfied, explain which session moved or which preference was relaxed inside adaptation_summary.\n` +
   `- Respect the athlete's broader plan context and target weekly volume.\n` +
   `- Apply 80/20 polarization: most sessions easy, 1-2 quality sessions per week.\n` +
   `- Include exactly one long run (Sunday preferred, or Saturday if constraints apply).\n` +
@@ -443,6 +445,67 @@ function buildSelectedWeekDirective(body: RequestBody): string {
   ].join("\n");
 }
 
+const WEEKDAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const QUALITY_WORKOUT_TYPES = new Set(["Tempo", "Intervals"]);
+
+function normalizeConstraintWeekday(value: unknown): string | null {
+  if (value == null) return null;
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) return null;
+  const match = WEEKDAY_ORDER.find((day) => day.toLowerCase() === raw);
+  return match ?? null;
+}
+
+function normalizeWeeklyConstraints(body: RequestBody): WeeklyConstraints | null {
+  const raw = body.weeklyConstraints;
+  if (!raw) return null;
+
+  const preferredLongRunDay = normalizeConstraintWeekday(raw.preferredLongRunDay);
+  const preferredHardWorkoutDay = normalizeConstraintWeekday(raw.preferredHardWorkoutDay);
+  const commuteDays = Array.from(
+    new Set((Array.isArray(raw.commuteDays) ? raw.commuteDays : []).map(normalizeConstraintWeekday).filter(Boolean)),
+  ) as string[];
+  const doubleThresholdAllowed = typeof raw.doubleThresholdAllowed === "boolean"
+    ? raw.doubleThresholdAllowed
+    : null;
+
+  if (
+    !preferredLongRunDay &&
+    !preferredHardWorkoutDay &&
+    commuteDays.length === 0 &&
+    doubleThresholdAllowed == null
+  ) {
+    return null;
+  }
+
+  return {
+    preferredLongRunDay,
+    preferredHardWorkoutDay,
+    commuteDays,
+    doubleThresholdAllowed,
+  };
+}
+
+function buildWeeklyConstraintDirective(body: RequestBody): string {
+  const weeklyConstraints = normalizeWeeklyConstraints(body);
+  if (!weeklyConstraints) {
+    return "No day-level weekly constraints provided.";
+  }
+
+  return [
+    `Preferred long-run day: ${weeklyConstraints.preferredLongRunDay ?? "no preference"}`,
+    `Preferred hard-workout day: ${weeklyConstraints.preferredHardWorkoutDay ?? "no preference"}`,
+    `Commute days: ${weeklyConstraints.commuteDays.length ? weeklyConstraints.commuteDays.join(", ") : "none"}`,
+    `Double threshold allowed: ${
+      weeklyConstraints.doubleThresholdAllowed == null
+        ? "no preference"
+        : weeklyConstraints.doubleThresholdAllowed
+        ? "allowed"
+        : "forbidden"
+    }`,
+  ].join("\n");
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface WeeklySummary {
@@ -474,6 +537,13 @@ interface RecommendationContext {
   trainingType: string | null;
   targetMileageKm: number | null;
   notes: string | null;
+}
+
+interface WeeklyConstraints {
+  preferredLongRunDay: string | null;
+  preferredHardWorkoutDay: string | null;
+  commuteDays: string[];
+  doubleThresholdAllowed: boolean | null;
 }
 
 interface Checkin {
@@ -514,6 +584,7 @@ interface RequestBody {
   recentCheckins?: Checkin[];
   planContext: PlanContext | null;
   recommendationContext?: RecommendationContext | null;
+  weeklyConstraints?: WeeklyConstraints | null;
   weekDirective?: {
     weekStart?: string | null;
     weekEnd?: string | null;
@@ -753,6 +824,7 @@ function buildReplanSystemInstruction(
   selectedWeekDirective: string,
   philosophyAddendum: string,
   dynamicAddendum: string,
+  weeklyConstraintDirective?: string,
 ): string {
   const languageLine = lang === "no"
     ? "Primary response language: Norwegian (bokmal)."
@@ -799,6 +871,9 @@ function buildReplanSystemInstruction(
     "",
     "Selected-week directive (primary tactical recommendation contract):",
     selectedWeekDirective,
+    "",
+    "Weekly constraints (day-level scheduling preferences):",
+    weeklyConstraintDirective ?? "No day-level weekly constraints provided.",
     "",
     "Philosophy conflict rule: selected-week direction wins unless a published philosophy red-line or explicit safety guardrail would be violated.",
     "If a red-line override is necessary, keep the week recognizable and explain the override plainly.",
@@ -986,6 +1061,7 @@ function buildPrompt(data: RequestBody): string {
 
 function buildPlanPrompt(data: RequestBody): string {
   const weekDirective = normalizeWeekDirective(data);
+  const weeklyConstraints = normalizeWeeklyConstraints(data);
   const recommendationContext = normalizeRecommendationContext(data);
   const contextLines = buildPrompt(data);
   const weekStart = weekDirective?.weekStart ?? recommendationContext?.weekStart ?? data.targetWeekStart ?? getNextMonday();
@@ -1004,6 +1080,16 @@ function buildPlanPrompt(data: RequestBody): string {
     weekDirective?.trainingType?.toLowerCase() === "taper"
       ? "This is a taper-sensitive week. Keep the week recognizably lighter, avoid unbounded volume growth, and preserve race-freshness intent."
       : "Keep the week's structure aligned with the requested block intent.",
+    weeklyConstraints
+      ? `Weekly constraints: preferred long-run day ${weeklyConstraints.preferredLongRunDay ?? "none"}, preferred hard-workout day ${weeklyConstraints.preferredHardWorkoutDay ?? "none"}, commute days ${weeklyConstraints.commuteDays.length ? weeklyConstraints.commuteDays.join(", ") : "none"}, double threshold ${
+        weeklyConstraints.doubleThresholdAllowed == null
+          ? "not specified"
+          : weeklyConstraints.doubleThresholdAllowed
+          ? "allowed"
+          : "forbidden"
+      }.`
+      : "Weekly constraints: none provided.",
+    "If you move a requested session or relax a weekly constraint, explain it plainly in adaptation_summary.",
     `Output focus:`,
     `- Total weekly km should target ${targetMileage} km.`,
     `- Apply progressive overload appropriate for this athlete's recent training.`,
@@ -1059,6 +1145,58 @@ function hasOverrideExplanation(text: string): boolean {
 
 function roundToTenth(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+function getWeekdayFromIsoDate(isoDate: string): string | null {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return null;
+  return WEEKDAY_ORDER[parsed.getUTCDay() === 0 ? 6 : parsed.getUTCDay() - 1] ?? null;
+}
+
+function describeConstraintOutcome(
+  body: RequestBody,
+  structuredPlan: Record<string, unknown>[],
+): string | null {
+  const weeklyConstraints = normalizeWeeklyConstraints(body);
+  if (!weeklyConstraints) return null;
+
+  const issues: string[] = [];
+  const longRunDay = structuredPlan.find((day) => String(day.workout_type) === "Long Run");
+  const qualityDay = structuredPlan.find((day) => QUALITY_WORKOUT_TYPES.has(String(day.workout_type)));
+
+  if (weeklyConstraints.preferredLongRunDay && longRunDay) {
+    const scheduledDay = getWeekdayFromIsoDate(String(longRunDay.date ?? ""));
+    if (scheduledDay && scheduledDay !== weeklyConstraints.preferredLongRunDay) {
+      issues.push(
+        `Long run moved from ${weeklyConstraints.preferredLongRunDay} to ${scheduledDay} to keep the week balanced.`,
+      );
+    }
+  }
+
+  if (weeklyConstraints.preferredHardWorkoutDay && qualityDay) {
+    const scheduledDay = getWeekdayFromIsoDate(String(qualityDay.date ?? ""));
+    if (scheduledDay && scheduledDay !== weeklyConstraints.preferredHardWorkoutDay) {
+      issues.push(
+        `Primary quality session moved from ${weeklyConstraints.preferredHardWorkoutDay} to ${scheduledDay} to protect the overall load distribution.`,
+      );
+    }
+  }
+
+  if (weeklyConstraints.commuteDays.length > 0) {
+    const conflictDay = structuredPlan.find((day) =>
+      weeklyConstraints.commuteDays.includes(getWeekdayFromIsoDate(String(day.date ?? "")) ?? "") &&
+      ["Tempo", "Intervals", "Long Run"].includes(String(day.workout_type)),
+    );
+    if (conflictDay) {
+      const scheduledDay = getWeekdayFromIsoDate(String(conflictDay.date ?? ""));
+      issues.push(
+        `Commute-day preference could not be fully protected on ${scheduledDay}; the harder session stayed there with reduced complexity.`,
+      );
+    }
+  }
+
+  if (issues.length === 0) return null;
+  return issues.join(" ");
 }
 
 function buildDirectiveFallbackPlan(directive: WeekDirective): Record<string, unknown>[] {
@@ -1276,6 +1414,7 @@ Deno.serve(async (req) => {
         buildSelectedWeekDirective(body),
         philosophyAddendum,
         dynamicPlaybookAddendum,
+        buildWeeklyConstraintDirective(body),
       );
       const horizon = computeLongTermHorizon(body.planContext);
       const userMessage = buildLongTermReplanPrompt(body, horizon);
@@ -1344,6 +1483,7 @@ Deno.serve(async (req) => {
         buildSelectedWeekDirective(body),
         philosophyAddendum,
         dynamicPlaybookAddendum,
+        buildWeeklyConstraintDirective(body),
       );
 
       let contents: Array<{ role: string; parts: Array<{ text: string }> }>;
@@ -1409,7 +1549,7 @@ Deno.serve(async (req) => {
       }
 
       const coachingFeedback = String(result.coaching_feedback || "").slice(0, 1000);
-      const adaptationSummary = String(
+      let adaptationSummary = String(
         result.adaptation_summary || "Adaptation based on available training context.",
       ).slice(0, 600);
       const structuredPlan = validateAndSanitizePlan(
@@ -1418,6 +1558,10 @@ Deno.serve(async (req) => {
         coachingFeedback,
         adaptationSummary,
       );
+      const constraintOutcome = describeConstraintOutcome(body, structuredPlan);
+      if (constraintOutcome && !new RegExp(constraintOutcome.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(adaptationSummary)) {
+        adaptationSummary = `${adaptationSummary} ${constraintOutcome}`.trim().slice(0, 600);
+      }
 
       return new Response(
         JSON.stringify({

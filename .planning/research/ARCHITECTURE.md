@@ -1,48 +1,45 @@
-# Architecture Research
+# Architecture Research — Weekly Planning Intelligence
 
-## Existing Architecture
-- **Auth:** Supabase Auth + Strava OAuth (via `strava-auth` function).
-- **Data:** `activities` table stores raw Strava data + computed metrics.
-- **Sync:** `strava-sync` function (manual trigger) fetches recent activities.
-- **AI:** `gemini-coach` function generates insights.
+## Integration Shape
 
-## Architectural Changes
+The new milestone should converge weekly planning into one pipeline:
 
-### 1. Webhook Ingestion Pipeline
-- **New Edge Function:** `strava-webhook` (Public endpoint).
-  - **GET:** Returns `hub.challenge`.
-  - **POST:** Verifies `owner_id`, logs event to `webhook_events` table (new table), returns 200 OK.
-- **Processing:**
-  - **Option 1 (Client-driven):** `useStrava` hook subscribes to `webhook_events` INSERT. When triggered, client calls `syncActivity(id)` (new method) or refetches all.
-    - *Pros:* Simple, reuses existing client auth/context.
-    - *Cons:* Requires client to be online/active to process the hook. If user isn't on the app, data doesn't update until they open it.
-  - **Option 2 (Server-driven):** Database Trigger on `webhook_events` calls `strava-sync` (or `fetch-activity`) Edge Function via `pg_net` or similar.
-    - *Pros:* Updates happen in background.
-    - *Cons:* More complex setup (pg_net, internal API keys).
-  - **Decision:** Start with **Option 1 (Client-driven)** for v1.1 simplicity, or **Hybrid**: Webhook function attempts to fetch and upsert activity immediately *if* it can do so within 2s (risky), or spawns a background task (Deno `EdgeRuntime.waitUntil`).
-  - **Refined Decision:** Use `EdgeRuntime.waitUntil` in `strava-webhook` to fetch and upsert the activity *after* returning 200 OK. This keeps it server-side and robust.
+1. `Treningsplan` remains the source of macro intent.
+2. `Ukeplan` becomes the source of weekly execution and AI generation.
+3. Admin weekly-planning guidance acts as a global policy layer.
+4. Athlete weekly constraints act as a local policy layer.
+5. Edge Function combines all context into a recommendation payload and returns the proposed week plus rationale.
 
-### 2. Analytics Computation
-- **Location:** Client-side (`src/domain/compute.js`).
-- **Logic:**
-  - `computeEfficiencyTrend(activities)`: Filters for "Run" + "Easy", sorts by date.
-  - Calculates Linear Regression (Slope/Intercept).
-  - Returns series for Recharts.
-- **Performance:** Low impact for < 1000 activities.
+## Suggested Data Flow
 
-### 3. Insight Synthesis Hardening
-- **Location:** `supabase/functions/gemini-coach/index.ts`.
-- **Logic:**
-  - **Prompt:** Enforce "Return ONLY Markdown. Do not use JSON. Do not use code blocks."
-  - **Sanitization:** Regex strip `^```json` and ````$` before parsing.
-  - **Fallback:** If parsing/validation fails, return a safe, pre-canned "Data received, analysis pending..." message or a simple stat-based summary generated in the Edge Function (deterministic).
+- Frontend:
+  - `Ukeplan` page loads weekly entries, block context, active plan, and admin weekly guidance.
+  - Athlete enters weekly preferences before generation.
+- Backend:
+  - Edge Function receives normalized context and resolves recommendation logic.
+  - Returned plan includes both day placements and explanation / conflict notes.
+- Persistence:
+  - Store generated week entries separately from athlete-entered preferences so regeneration does not erase intent.
 
-## Data Model Changes
-- **New Table:** `webhook_events` (audit log).
-  - Columns: `id`, `owner_id`, `object_id`, `object_type`, `aspect_type`, `event_time`, `processed_at`.
-- **Modified Table:** `strava_connections` (add `subscription_id` maybe, but not strictly needed if we use one global subscription).
+## Suggested Build Order
 
-## Integration Points
-- `strava-webhook` -> `activities` table (Upsert).
-- `InsightsPage` -> `computeEfficiencyTrend` -> `Recharts`.
-- `InsightsPage` -> `gemini-coach` (Synthesis).
+1. Move recommendation entry point and page ownership to `Ukeplan`.
+2. Define the unified weekly-planning payload contract.
+3. Add admin weekly-guidance source.
+4. Add athlete weekly-preference source and conflict handling.
+5. Update recommendation output and rationale rendering.
+
+## New vs Modified Areas
+
+- Modified:
+  - `Ukeplan` UI and generation flow
+  - existing AI planning payload / Edge Function
+  - admin guidance model or settings surface
+- New:
+  - weekly preference model
+  - conflict-resolution / rationale contract
+
+## Source Notes
+
+- Final Surge’s calendar model reinforces that planned workouts should live in the execution calendar and sync outward from there: https://support.finalsurge.com/hc/en-us/articles/360053782954-Final-Surge-to-Garmin-Connect-Calendar-Sync-Structured-Workouts-Not-Working
+- TrainingPeaks’ schedule-adjustment guidance supports keeping macro intent stable while reshaping weekly placement around real life: https://www.trainingpeaks.com/blog/customize-your-training-plan/

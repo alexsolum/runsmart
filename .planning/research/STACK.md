@@ -1,43 +1,31 @@
-# Stack Research
+# Stack Research — Weekly Planning Intelligence
 
-## Existing Stack
-- **Frontend:** React + Vite
-- **Backend:** Supabase (PostgreSQL + Edge Functions)
-- **Charts:** Recharts
-- **AI:** Google Gemini (via Edge Function)
+## Recommendation
 
-## New Capabilities & Stack Additions
+No major stack expansion is required for this milestone.
 
-### 1. Robust Strava Integration (Webhooks)
-- **Component:** New Supabase Edge Function `strava-webhook`
-- **Trigger:** External HTTP POST from Strava (requires public endpoint)
-- **Security:**
-  - Verify `hub.verify_token` for subscription setup (GET)
-  - Validate `owner_id` against database for events (POST)
-  - **Constraint:** Must respond 200 OK within 2 seconds. Heavy processing (fetching activity details) must be asynchronous.
-- **Async Pattern:**
-  - **Option A (Simpler):** Just upsert the event into a `webhook_events` table and return 200. Use a separate scheduled function or Database Webhook (pg_net) to process the queue.
-  - **Option B (Direct):** Fire-and-forget background promise in Deno (risky if runtime kills it).
-  - **Recommendation:** Store event in DB `webhook_events`. Use Supabase Realtime (already in use) or a Database Trigger to fetch the new activity data.
+- Reuse the current React + Vite frontend and the existing page split between `Treningsplan` and `Ukeplan`.
+- Reuse Supabase for persistence and the existing Edge Function pattern for AI recommendation generation.
+- Prefer extending current weekly-plan and admin-guidance data flows over introducing a separate planning service.
 
-### 2. Advanced Progress Analytics
-- **Library:** Recharts (Existing)
-- **Implementation:** `ComposedChart` combining `Scatter` (individual runs) and `Line` (trend).
-- **Computation:** Client-side linear regression (Least Squares) in `src/domain/compute.js`.
-  - Input: Array of `{ date, x: metric, y: heartRate }`
-  - Output: Trend line coordinates `[{ x: min, y: start }, { x: max, y: end }]`
-- **Data Source:** `activities` table. Needs rigorous filtering (e.g., "Easy Runs" only, excluding outliers).
+## Likely Additions
 
-### 3. Insight Synthesis Fixes
-- **Stack:** No new libraries.
-- **Pattern:** Strict Prompt Engineering + Output Sanitization (Regex).
-- **Format:** Pure Markdown with enforced H4 headers. No JSON wrappers.
+- Shared weekly-planning payload builder so `Ukeplan` can combine:
+  - long-term block context
+  - target weekly mileage / workout type
+  - admin weekly principles and focus guidance
+  - athlete-specific day constraints
+- Persistent weekly constraint model.
+  - Best fit is either a new `weekly_plan_preferences` table or JSONB attached to the existing weekly plan domain.
+- Clear conflict metadata so the UI can explain when requested constraints cannot all be satisfied.
 
-## Dependencies
-- `recharts`: Already installed.
-- `supabase-js`: Already installed.
-- `Deno` standard library (for Edge Functions): Available in runtime.
+## What Not To Add Yet
 
-## What NOT to add
-- Do not add complex server-side queuing systems (Redis/Bull) â€” overkill. Use Postgres tables as queues if needed.
-- Do not add a statistics library (Simple Statistics or regression-js) unless manual math proves insufficient. Least squares is ~10 lines of code.
+- Do not add a new external orchestration service just for weekly AI planning.
+- Do not add drag-and-drop calendar libraries unless the milestone explicitly grows into heavy visual scheduling.
+- Do not split planning logic across frontend and backend; keep rule assembly and AI prompt building server-side for consistency and security.
+
+## Source Notes
+
+- TrainingPeaks emphasizes adapting weekly structure to real-life schedule while preserving hard/easy spacing and balanced workout distribution: https://www.trainingpeaks.com/blog/customize-your-training-plan/
+- Strava’s schedule examples reinforce repeatable weekly rhythm, rest spacing, and fixed routine anchors: https://stories.strava.com/pt/articles/couch-to-5k-training-plan

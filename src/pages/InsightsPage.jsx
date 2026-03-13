@@ -11,8 +11,7 @@ import {
   computeTrainingLoadState,
   computeWeeklyHRZones,
   computeRecentActivityZones,
-  computeReferenceWorkouts,
-  linearRegression,
+  computeEnduranceEfficiency,
 } from "../domain/compute";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +36,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -324,7 +324,50 @@ function ActivityZoneBreakdown({ activityZones, locale, copy }) {
   );
 }
 
+function formatPaceText(speedKph) {
+  if (!speedKph || speedKph <= 0) return "—";
+  var totalSeconds = 3600 / speedKph;
+  var minutes = Math.floor(totalSeconds / 60);
+  var seconds = Math.round(totalSeconds % 60);
+  if (seconds === 60) {
+    minutes += 1;
+    seconds = 0;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, "0")} min/km`;
+}
+
 function EfficiencyTooltip({ active, payload, locale, copy }) {
+  if (active && payload && payload.length) {
+    const data = payload.find((entry) => entry?.payload?.name)?.payload || payload[0].payload;
+    return (
+      <div className="bg-white border border-slate-100 rounded-lg p-3 shadow-lg text-xs">
+        <p className="font-bold text-slate-900 mb-1">{data.name}</p>
+        <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString(locale)}</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <span className="text-slate-400">{copy.efficiencyFactor}</span>
+          <span className="text-right font-mono font-bold text-slate-700">
+            {data.efficiencyFactor?.toFixed(3) ?? data.y?.toFixed(3) ?? "—"}
+          </span>
+          <span className="text-slate-400">{copy.avgHr}</span>
+          <span className="text-right font-mono font-bold text-blue-600">
+            {Math.round(data.averageHeartRate ?? 0)} bpm
+          </span>
+          <span className="text-slate-400">{data.outputLabel || copy.output}</span>
+          <span className="text-right font-mono font-bold text-slate-700">
+            {data.outputUnit === "watts"
+              ? `${Math.round(data.outputValue)} W`
+              : `${Math.round(data.outputValue)} m/min`}
+          </span>
+          <span className="text-slate-400">{copy.pace}</span>
+          <span className="text-right font-mono font-bold text-slate-700">{formatPaceText(data.speedKph)}</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+function DecouplingTooltip({ active, payload, locale, copy }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -332,16 +375,12 @@ function EfficiencyTooltip({ active, payload, locale, copy }) {
         <p className="font-bold text-slate-900 mb-1">{data.name}</p>
         <p className="text-slate-500 mb-2">{new Date(data.date).toLocaleDateString(locale)}</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <span className="text-slate-400">{copy.avgHr}</span>
-          <span className="text-right font-mono font-bold text-blue-600">{Math.round(data.y)} bpm</span>
-          <span className="text-slate-400">{copy.pace}</span>
-          <span className="text-right font-mono font-bold text-slate-700">
-            {data.speed > 0
-              ? `${Math.floor(60/data.speed)}:${Math.round(((60/data.speed) - Math.floor(60/data.speed)) * 60).toString().padStart(2,"0")} min/km`
-              : "—"}
+          <span className="text-slate-400">{copy.duration}</span>
+          <span className="text-right font-mono font-bold text-slate-700">{Math.round(data.durationMinutes)} min</span>
+          <span className="text-slate-400">{copy.decoupling}</span>
+          <span className={`text-right font-mono font-bold ${data.y <= 5 ? "text-emerald-600" : "text-red-500"}`}>
+            {data.y.toFixed(1)}%
           </span>
-          <span className="text-slate-400">{copy.speed}</span>
-          <span className="text-right font-mono font-bold text-slate-700">{data.speed.toFixed(1)} km/h</span>
         </div>
       </div>
     );
@@ -355,6 +394,12 @@ const SYNTHESIS_CACHE = {
 };
 const SYNTHESIS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+export function __resetInsightsSynthesisCacheForTests() {
+  Object.keys(SYNTHESIS_CACHE).forEach((key) => {
+    delete SYNTHESIS_CACHE[key];
+  });
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
@@ -367,12 +412,6 @@ export default function InsightsPage() {
         ? {
             title: "Treningsanalyse og innsikt",
             subtitle: "Forstå beredskap, oppdag risiko tidlig, og se effekten av konsistensen din.",
-            filters: {
-              all: "Alle økter",
-              easy: "Aerob",
-              workout: "Kvalitetsøkter",
-              long: "Langturer",
-            },
             thisWeek: "Denne uken",
             trainingLoad: "Treningsbelastning",
             chronicLoad: "Kronisk belastning (CTL)",
@@ -388,20 +427,21 @@ export default function InsightsPage() {
             fitnessLegend: "Form (CTL)",
             fatigueLegend: "Tretthet (ATL)",
             formLegend: "Overskudd (TSB)",
-            aerobicEfficiencyTitle: "Aerob utvikling",
-            aerobicEfficiencyDesc: "Snittpuls på løp rundt {referenceKm} km de siste 180 dagene. Fallende linje = bedre form.",
-            noReferenceRuns: "Ikke nok sammenlignbare løp funnet (minst 5 trengs).",
-            trendGain: "Trendgevinst",
-            trendLine: "Trendlinje",
-            easyAerobic: "Rolig / aerob",
-            moderate: "Moderat",
-            intensity: "Intensitet",
-            speed: "Fart",
+            aerobicEfficiencyTitle: "Utholdenhetseffektivitet",
+            aerobicEfficiencyDesc: "Effektivitetsfaktor for flate, aerobe løp og sykkeløkter de siste 365 dagene. 30-dagers snitt glatter ut støy fra varme, søvn og hverdagsbelastning.",
+            aerobicEfficiencyEmpty: "Ingen kvalifiserende aerobe referanseøkter ennå. Trenger minst 30 minutter, moderat puls og relativt flat trasé.",
+            decouplingTitle: "Decoupling vs. varighet",
+            decouplingDesc: "Når Pa:HR holder seg under 5 %, tåler du varigheten aerobt. Høyere tall antyder at motoren slipper opp senere i økta.",
+            decouplingEmpty: "Ingen økter med deldata nok til å beregne Pa:HR ennå.",
+            rollingAverage: "30-dagers snitt",
+            target: "Mål",
             avgHr: "Snittpuls",
             efficiency: "Effektivitet",
-            rStrengthLabels: { strong: "Sterk", moderate: "Moderat", weak: "Svak" },
-            runs: "løp",
+            efficiencyFactor: "Effektivitetsfaktor",
+            output: "Output",
             pace: "Tempo",
+            duration: "Varighet",
+            decoupling: "Pa:HR",
             weeklyLoad: "Ukentlig belastning",
             weeklyLoadDesc: "Rullerende 8-ukersvisning av akkumulerte treningsminutter.",
             minutes: "Minutter",
@@ -439,12 +479,6 @@ export default function InsightsPage() {
         : {
             title: "Training analysis & insights",
             subtitle: "Understand readiness, spot risk early, and see the impact of your consistency.",
-            filters: {
-              all: "All Runs",
-              easy: "Aerobic",
-              workout: "Workouts",
-              long: "Long Runs",
-            },
             thisWeek: "This week",
             trainingLoad: "Training load",
             chronicLoad: "Chronic load (CTL)",
@@ -460,20 +494,21 @@ export default function InsightsPage() {
             fitnessLegend: "Fitness (CTL)",
             fatigueLegend: "Fatigue (ATL)",
             formLegend: "Form (TSB)",
-            aerobicEfficiencyTitle: "Aerobic Development",
-            aerobicEfficiencyDesc: "Average HR on runs around {referenceKm} km over the past 180 days. Falling line = better fitness.",
-            noReferenceRuns: "Not enough comparable runs found (at least 5 needed).",
-            trendGain: "Trend Gain",
-            trendLine: "Trend Line",
-            easyAerobic: "Easy / Aerobic",
-            moderate: "Moderate",
-            intensity: "Intensity",
-            speed: "Speed",
+            aerobicEfficiencyTitle: "Endurance Efficiency",
+            aerobicEfficiencyDesc: "Efficiency factor for flat, aerobic runs and rides over the past 365 days. A 30-day average smooths noise from heat, sleep, and day-to-day stress.",
+            aerobicEfficiencyEmpty: "No qualifying aerobic reference sessions yet. Activities need 30+ minutes, controlled heart rate, and relatively flat terrain.",
+            decouplingTitle: "Decoupling vs. Duration",
+            decouplingDesc: "When Pa:HR stays under 5%, your aerobic durability is holding for that duration. Higher values suggest the engine fades later in the session.",
+            decouplingEmpty: "No sessions with enough split data to calculate Pa:HR yet.",
+            rollingAverage: "30-day average",
+            target: "Target",
             avgHr: "Avg HR",
             efficiency: "Efficiency",
-            rStrengthLabels: { strong: "Strong", moderate: "Moderate", weak: "Weak" },
-            runs: "runs",
+            efficiencyFactor: "Efficiency Factor",
+            output: "Output",
             pace: "Pace",
+            duration: "Duration",
+            decoupling: "Pa:HR",
             weeklyLoad: "Weekly load",
             weeklyLoadDesc: "Rolling 8-week view of accumulated training minutes.",
             minutes: "Minutes",
@@ -512,10 +547,6 @@ export default function InsightsPage() {
   );
   const formatShortDate = (value) =>
     new Date(value).toLocaleDateString(locale, { month: "short", day: "numeric" });
-
-  // ── Filters ──────────────────────────────────────────────────────────────
-
-  const [filterMode, setFilterMode] = useState("easy"); // 'all', 'easy', 'workout', 'long'
 
   // ── Data derivation ──────────────────────────────────────────────────────
 
@@ -580,67 +611,10 @@ export default function InsightsPage() {
 
   // ── Aerobic Efficiency Logic ─────────────────────────────────────────────
 
-  const aerobicEfficiencyData = useMemo(() => {
-    const windowDays = 180;
-    const cutoff = new Date();
-    cutoff.setUTCDate(cutoff.getUTCDate() - windowDays);
-    const recentActivities = activities.activities.filter(
-      a => new Date(a.started_at) >= cutoff
-    );
-
-    const { referenceKm, points: rawPoints } = computeReferenceWorkouts(recentActivities);
-
-    // Apply UI filter on top of reference group
-    let displayPoints = rawPoints;
-    if (filterMode === "workout") {
-      const allHR = rawPoints.map(p => p.hr).filter(Boolean).sort((a, b) => a - b);
-      const maxHR = allHR.length ? allHR[Math.floor(allHR.length * 0.95)] : 190;
-      displayPoints = rawPoints.filter(p => p.hr >= maxHR * 0.85 || p.intensityScore > 75);
-    } else if (filterMode === "long") {
-      displayPoints = rawPoints.filter(p => {
-        const speedMs = p.speed / 3.6;
-        const dur = speedMs > 0 ? p.distance / speedMs : 0;
-        return dur > 4500;
-      });
-    } else if (filterMode === "easy") {
-      const allHR = rawPoints.map(p => p.hr).filter(Boolean).sort((a, b) => a - b);
-      const maxHR = allHR.length ? allHR[Math.floor(allHR.length * 0.95)] : 190;
-      displayPoints = rawPoints.filter(p => p.hr < maxHR * 0.75);
-    }
-
-    const MIN_RUNS = 5;
-    if (displayPoints.length < MIN_RUNS) {
-      return { points: displayPoints, regression: [], gain: 0, gainBpm: 0, r2: "0.00", count: displayPoints.length, rStrength: "weak", referenceKm };
-    }
-
-    const reg = linearRegression(displayPoints);
-    const firstX = displayPoints[0].x;
-    const lastX = displayPoints[displayPoints.length - 1].x;
-    const regressionLine = [
-      { x: firstX, regression: reg.intercept + reg.slope * firstX },
-      { x: lastX, regression: reg.intercept + reg.slope * lastX },
-    ];
-
-    const startY = reg.intercept + reg.slope * firstX;
-    const endY = reg.intercept + reg.slope * lastX;
-    const gainPct = startY !== 0 ? ((endY - startY) / startY) * 100 : 0;
-    const gainBpm = endY - startY; // negative = HR fell = improvement
-
-    const rSquared = reg.rSquared;
-    const count = displayPoints.length;
-    const rStrength = rSquared >= 0.5 ? "strong" : rSquared >= 0.25 ? "moderate" : "weak";
-
-    return {
-      points: displayPoints,
-      regression: regressionLine,
-      gain: gainPct.toFixed(1),
-      gainBpm: gainBpm.toFixed(1),
-      r2: rSquared.toFixed(2),
-      count,
-      rStrength,
-      referenceKm,
-    };
-  }, [activities.activities, filterMode]);
+  const aerobicEfficiencyData = useMemo(
+    () => computeEnduranceEfficiency(activities.activities, { windowDays: 365 }),
+    [activities.activities],
+  );
 
   const kpiData = useMemo(() => {
     const now = new Date();
@@ -768,24 +742,22 @@ export default function InsightsPage() {
 
   // ── Synthesis callout state ───────────────────────────────────────────────
 
-  const [synthesis, setSynthesis] = useState(() => {
-    // Hydrate from module cache on mount if valid
-    const cached = SYNTHESIS_CACHE[lang];
-    if (cached && Date.now() - cached.cachedAt < SYNTHESIS_CACHE_TTL_MS) {
-      return cached.text;
-    }
-    return null;
-  });
+  const [synthesis, setSynthesis] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
   const synthesisFetchedRef = useRef(false);
 
   // When language changes: restore from cache if valid, otherwise clear and allow fetch
   useEffect(() => {
+    if (!hasData) {
+      synthesisFetchedRef.current = false;
+      setSynthesis(null);
+      return;
+    }
     const cached = SYNTHESIS_CACHE[lang];
     const isValid = cached && Date.now() - cached.cachedAt < SYNTHESIS_CACHE_TTL_MS;
     synthesisFetchedRef.current = isValid;
     setSynthesis(isValid ? cached.text : null);
-  }, [lang]);
+  }, [hasData, lang]);
 
   useEffect(() => {
     if (!hasData || synthesisFetchedRef.current) return;
@@ -838,28 +810,6 @@ export default function InsightsPage() {
           <p className="m-0 text-sm text-slate-500">
             {copy.subtitle}
           </p>
-        </div>
-        
-        {/* Filter Strip */}
-        <div className="flex bg-slate-100 p-1 rounded-lg gap-1 self-end max-[800px]:self-stretch">
-          {[
-            { id: "all", label: copy.filters.all },
-            { id: "easy", label: copy.filters.easy },
-            { id: "workout", label: copy.filters.workout },
-            { id: "long", label: copy.filters.long }
-          ].map(f => (
-            <button
-              key={f.id}
-              onClick={() => setFilterMode(f.id)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                filterMode === f.id 
-                ? "bg-white text-blue-600 shadow-sm" 
-                : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -1045,33 +995,30 @@ export default function InsightsPage() {
             <CardHeader className="pb-0 flex flex-row items-start justify-between">
               <div>
                 <CardTitle className="text-sm font-bold">{copy.aerobicEfficiencyTitle}</CardTitle>
-                <CardDescription>
-                  {aerobicEfficiencyData.referenceKm
-                    ? copy.aerobicEfficiencyDesc.replace("{referenceKm}", aerobicEfficiencyData.referenceKm)
-                    : copy.aerobicEfficiencyTitle}
-                </CardDescription>
+                <CardDescription>{copy.aerobicEfficiencyDesc}</CardDescription>
               </div>
-              {aerobicEfficiencyData.points.length >= 5 && (
+              {aerobicEfficiencyData.points.length > 0 && (
                 <div className="bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg text-right">
-                  <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">{copy.trendGain}</span>
-                  <span className={`text-lg font-mono font-bold ${Number(aerobicEfficiencyData.gain) <= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                    {Number(aerobicEfficiencyData.gainBpm) > 0 ? "+" : ""}{aerobicEfficiencyData.gainBpm} bpm
+                  <span className="block text-[10px] text-blue-400 font-bold uppercase tracking-wider">
+                    {copy.rollingAverage}
+                  </span>
+                  <span className="text-lg font-mono font-bold text-slate-900">
+                    {aerobicEfficiencyData.points.at(-1)?.rollingAverage?.toFixed(3) ?? "—"}
                   </span>
                   <span className="block text-[10px] text-slate-400">
-                    {Number(aerobicEfficiencyData.gain) > 0 ? "+" : ""}{aerobicEfficiencyData.gain}%
+                    HR cap {Math.round(aerobicEfficiencyData.maxHeartRate * 0.8)} bpm
                   </span>
-                  <span className="block text-[9px] text-slate-400">
-                    R² {aerobicEfficiencyData.r2} · {copy.rStrengthLabels[aerobicEfficiencyData.rStrength]} · {aerobicEfficiencyData.count} {copy.runs}
-                  </span>
+                  <span className="block text-[9px] text-slate-400">{aerobicEfficiencyData.points.length} pts</span>
                 </div>
               )}
             </CardHeader>
             <CardContent className="pt-6">
-              {aerobicEfficiencyData.points.length < 5 ? (
-                <p className="text-sm text-slate-400 text-center py-12">{copy.noReferenceRuns}</p>
+              {aerobicEfficiencyData.points.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-12">{copy.aerobicEfficiencyEmpty}</p>
               ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart
+                  data={aerobicEfficiencyData.points}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1087,55 +1034,85 @@ export default function InsightsPage() {
                   <YAxis
                     type="number"
                     domain={['auto', 'auto']}
-                    reversed={true}
-                    tickFormatter={(val) => `${Math.round(val)}`}
+                    tickFormatter={(val) => Number(val).toFixed(2)}
                     tick={TICK}
                     axisLine={false}
                     tickLine={false}
                   />
                   <Tooltip content={<EfficiencyTooltip locale={locale} copy={copy} />} />
                   <Scatter
-                    name={copy.efficiency}
+                    name={copy.efficiencyFactor}
                     data={aerobicEfficiencyData.points}
-                    className="max-[600px]:hidden"
                     shape={(props) => {
                       const { cx, cy, fill } = props;
-                      return <circle cx={cx} cy={cy} r={6} fill={fill} fillOpacity={0.75} />;
+                      return <circle cx={cx} cy={cy} r={5} fill={fill} fillOpacity={0.75} />;
                     }}
                   >
                     {aerobicEfficiencyData.points.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={entry.intensityScore > 75 ? "#ef4444" : entry.intensityScore > 40 ? "#f59e0b" : "#22c55e"}
+                        fill={entry.type?.toLowerCase() === "run" ? "#2563eb" : "#059669"}
                       />
                     ))}
                   </Scatter>
                   <Line
-                    data={aerobicEfficiencyData.regression}
-                    dataKey="regression"
-                    stroke="#2563eb"
+                    type="monotone"
+                    dataKey="rollingAverage"
+                    stroke="#0f172a"
                     strokeWidth={3}
                     dot={false}
                     activeDot={false}
-                    name={copy.trendLine}
+                    name={copy.rollingAverage}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
               )}
-              <div className="mt-4 flex items-center justify-center gap-6 text-[11px] text-slate-400 font-medium">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 opacity-60" />
-                  <span>{copy.easyAerobic}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 opacity-60" />
-                  <span>{copy.moderate}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 opacity-60" />
-                  <span>{copy.intensity}</span>
-                </div>
-              </div>
+            </CardContent>
+          </Card>
+
+          <Card id="decoupling-section">
+            <CardHeader className="pb-0">
+              <CardTitle className="text-sm font-bold">{copy.decouplingTitle}</CardTitle>
+              <CardDescription>{copy.decouplingDesc}</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {aerobicEfficiencyData.decouplingPoints.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-12">{copy.decouplingEmpty}</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis
+                      type="number"
+                      dataKey="x"
+                      tickFormatter={(value) => `${Math.round(value)}m`}
+                      tick={TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      name={copy.duration}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="y"
+                      tickFormatter={(value) => `${Math.round(value)}%`}
+                      tick={TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      name={copy.decoupling}
+                    />
+                    <ReferenceLine y={5} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: "5%", position: "insideTopRight", fill: "#f59e0b", fontSize: 11 }} />
+                    <Tooltip content={<DecouplingTooltip locale={locale} copy={copy} />} />
+                    <Scatter data={aerobicEfficiencyData.decouplingPoints} name={copy.decoupling}>
+                      {aerobicEfficiencyData.decouplingPoints.map((entry, index) => (
+                        <Cell
+                          key={`dec-${index}`}
+                          fill={entry.y <= 5 ? "#22c55e" : "#ef4444"}
+                        />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 

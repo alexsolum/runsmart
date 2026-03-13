@@ -18,7 +18,7 @@ progress:
 **Current Phase:** 9 (Ukeplan Ownership)
 **Status:** Phase 9 planned, ready to execute.
 
-Last activity: 2026-03-13 - Phase 9 planned
+Last activity: 2026-03-13 - Plan 09-01 executed
 
 ## Project Reference
 
@@ -41,13 +41,14 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 9 (Ukeplan Ownership)
-Plan: 09-01, 09-02
-Status: Ready to execute
-Resume file: `.planning/phases/09-ukeplan-ownership/09-01-PLAN.md`
+Plan: 09-02 pending
+Status: Executing wave 2
+Resume file: `.planning/phases/09-ukeplan-ownership/09-02-PLAN.md`
 
 ## Notes
 
 - Milestone v1.2 started. Focus on weekly planning intelligence inside `Ukeplan`.
+- [Phase 09-ukeplan-ownership]: `WeeklyPlanPage` now owns AI week generation and remaps returned coach dates onto the currently focused week before calling `applyStructuredPlan`.
 
 ### Quick Tasks Completed
 

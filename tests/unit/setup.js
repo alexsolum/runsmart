@@ -1,4 +1,12 @@
 import "@testing-library/jest-dom";
+import { vi } from "vitest";
+
+vi.stubGlobal("localStorage", {
+  getItem: vi.fn(() => "en"),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+});
 
 // Radix UI uses Pointer Events API methods not implemented in jsdom.
 // Polyfill them so components like Select and Dialog can interact correctly.

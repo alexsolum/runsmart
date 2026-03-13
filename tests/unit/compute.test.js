@@ -402,16 +402,17 @@ describe("computeAerobicEfficiency", () => {
   it("filters out short activities and non-runs", () => {
     const activities = [
       { started_at: "2025-01-01T10:00:00Z", type: "Run", moving_time: 600, distance: 2000, average_heartrate: 140 }, // too short
-      { started_at: "2025-01-01T11:00:00Z", type: "Ride", moving_time: 3600, distance: 30000, average_heartrate: 130 }, // not a run
+      { started_at: "2025-01-01T11:00:00Z", type: "Walk", moving_time: 3600, distance: 30000, average_heartrate: 130 }, // unsupported type
       { started_at: "2025-01-01T12:00:00Z", type: "Run", moving_time: 1800, distance: 5000, average_heartrate: 0 }, // no HR
     ];
     expect(Compute.computeAerobicEfficiency(activities)).toHaveLength(0);
   });
 
   it("calculates efficiency correctly", () => {
+    const startedAt = new Date().toISOString();
     const activities = [
       {
-        started_at: "2025-01-01T10:00:00Z",
+        started_at: startedAt,
         type: "Run",
         moving_time: 1800,
         distance: 5000,
@@ -422,10 +423,9 @@ describe("computeAerobicEfficiency", () => {
     ];
     const result = Compute.computeAerobicEfficiency(activities);
     expect(result).toHaveLength(1);
-    // Speed = 5000 / 1800 = 2.777 m/s
-    // Grade = 0, Factor = 1.0, GAP = 2.777
-    // Efficiency = 2.777 / 150 = 0.0185
-    expect(result[0].y).toBeCloseTo(0.0185, 4);
+    // Speed = 5000 / 1800 = 2.777 m/s = 166.67 m/min
+    // Efficiency = 166.67 / 150 = 1.111
+    expect(result[0].y).toBeCloseTo(1.111, 3);
     expect(result[0].name).toBe("Test Run");
   });
 });
@@ -449,79 +449,74 @@ describe("calculateTrendGain", () => {
   });
 });
 
-describe("computeReferenceWorkouts", () => {
-  // Helper: create a minimal run activity
-  function makeRun(overrides) {
+describe("computeEnduranceEfficiency", () => {
+  function makeSession(index, overrides) {
+    const startedAt = new Date();
+    startedAt.setUTCDate(startedAt.getUTCDate() - index * 7);
     return {
-      id: overrides.id || "run-1",
-      started_at: overrides.started_at || "2025-01-01T10:00:00Z",
-      type: "Run",
-      moving_time: overrides.moving_time !== undefined ? overrides.moving_time : 1800,
-      distance: overrides.distance !== undefined ? overrides.distance : 5000,
-      average_heartrate: overrides.average_heartrate !== undefined ? overrides.average_heartrate : 150,
-      name: overrides.name || "Easy Run",
-      suffer_score: overrides.suffer_score || 0,
+      id: overrides.id || `run-${index}`,
+      started_at: overrides.started_at || startedAt.toISOString(),
+      type: overrides.type || "Run",
+      moving_time: overrides.moving_time !== undefined ? overrides.moving_time : 3600,
+      distance: overrides.distance !== undefined ? overrides.distance : 10000,
+      average_heartrate: overrides.average_heartrate !== undefined ? overrides.average_heartrate : 130,
+      elevation_gain: overrides.elevation_gain !== undefined ? overrides.elevation_gain : 40,
+      average_speed: overrides.average_speed !== undefined ? overrides.average_speed : 2.78,
+      average_watts: overrides.average_watts,
+      max_heartrate: overrides.max_heartrate,
+      name: overrides.name || `Session ${index}`,
+      splits_metric: overrides.splits_metric,
     };
   }
 
-  it("returns { referenceKm: null, points: [] } for empty input", () => {
-    const result = Compute.computeReferenceWorkouts([]);
-    expect(result).toEqual({ referenceKm: null, points: [] });
+  it("returns empty datasets for empty input", () => {
+    const result = Compute.computeEnduranceEfficiency([]);
+    expect(result.points).toEqual([]);
+    expect(result.rollingAverage).toEqual([]);
+    expect(result.decouplingPoints).toEqual([]);
   });
 
-  it("returns referenceKm set but empty points when fewer than 5 qualifying runs", () => {
+  it("filters out steep and high-heart-rate activities", () => {
     const activities = [
-      makeRun({ id: "r1", distance: 5000, started_at: "2025-01-01T10:00:00Z" }),
-      makeRun({ id: "r2", distance: 5100, started_at: "2025-01-08T10:00:00Z" }),
-      makeRun({ id: "r3", distance: 4900, started_at: "2025-01-15T10:00:00Z" }),
+      makeSession(1, { id: "keep-1", average_heartrate: 128, elevation_gain: 40 }),
+      makeSession(2, { id: "keep-2", average_heartrate: 132, elevation_gain: 45 }),
+      makeSession(3, { id: "steep", average_heartrate: 130, elevation_gain: 160 }),
+      makeSession(4, { id: "hard", average_heartrate: 168, elevation_gain: 30 }),
     ];
-    const result = Compute.computeReferenceWorkouts(activities);
-    expect(result.referenceKm).not.toBeNull();
-    expect(result.points).toHaveLength(0);
+    const result = Compute.computeEnduranceEfficiency(activities);
+    expect(result.points.map((point) => point.id).sort()).toEqual(["keep-1", "keep-2"]);
   });
 
-  it("detects modal bin correctly — 6 runs at ~5 km and 2 at ~10 km, modalBin = 4, referenceKm ≈ 4.5", () => {
+  it("calculates efficiency factor and rolling average for qualifying activities", () => {
+    const first = new Date();
+    first.setUTCDate(first.getUTCDate() - 28);
+    const second = new Date();
+    second.setUTCDate(second.getUTCDate() - 14);
+    const third = new Date();
     const activities = [
-      makeRun({ id: "r1", distance: 5000, started_at: "2025-01-01T10:00:00Z" }),
-      makeRun({ id: "r2", distance: 5100, started_at: "2025-01-02T10:00:00Z" }),
-      makeRun({ id: "r3", distance: 4900, started_at: "2025-01-03T10:00:00Z" }),
-      makeRun({ id: "r4", distance: 5050, started_at: "2025-01-04T10:00:00Z" }),
-      makeRun({ id: "r5", distance: 4800, started_at: "2025-01-05T10:00:00Z" }),
-      makeRun({ id: "r6", distance: 5200, started_at: "2025-01-06T10:00:00Z" }),
-      makeRun({ id: "r7", distance: 10000, started_at: "2025-01-07T10:00:00Z" }),
-      makeRun({ id: "r8", distance: 10500, started_at: "2025-01-08T10:00:00Z" }),
+      makeSession(1, { id: "a", started_at: first.toISOString(), average_speed: 2.5, average_heartrate: 125 }),
+      makeSession(2, { id: "b", started_at: second.toISOString(), average_speed: 2.8, average_heartrate: 130 }),
+      makeSession(3, { id: "c", started_at: third.toISOString(), average_speed: 3.0, average_heartrate: 132 }),
     ];
-    const result = Compute.computeReferenceWorkouts(activities);
-    // Modal bin = 5 (floor(5000/1000)), modalCenter_m = (5+0.5)*1000 = 5500
-    // referenceKm = Math.round(5500/100)/10 = 5.5
-    expect(result.referenceKm).toBeCloseTo(5.5, 1);
-    expect(result.points.length).toBeGreaterThanOrEqual(5);
+    const result = Compute.computeEnduranceEfficiency(activities);
+    expect(result.points).toHaveLength(3);
+    expect(result.points[0].efficiencyFactor).toBeCloseTo((2.5 * 60) / 125, 4);
+    expect(result.points[2].rollingAverage).toBeGreaterThan(0);
   });
 
-  it("excludes pace outliers — a run with pace 3x the median is excluded", () => {
-    // 5 normal runs at pace ~5 min/km (300 s/km = speed 1/300 m/s), distance 5000m, time 1500s
-    // 1 outlier run at pace ~15 min/km (900 s/km), same distance
-    const normal = Array.from({ length: 5 }, (_, i) =>
-      makeRun({ id: `r${i}`, distance: 5000, moving_time: 1500, started_at: `2025-01-0${i + 1}T10:00:00Z` })
-    );
-    const outlier = makeRun({ id: "outlier", distance: 5000, moving_time: 4500, started_at: "2025-01-10T10:00:00Z" });
-    const result = Compute.computeReferenceWorkouts([...normal, outlier]);
-    const hasOutlier = result.points.some(p => p.id === "outlier");
-    expect(hasOutlier).toBe(false);
-    expect(result.points.length).toBe(5);
-  });
-
-  it("returned point has y = average_heartrate (not pace)", () => {
-    const activities = Array.from({ length: 6 }, (_, i) =>
-      makeRun({ id: `r${i}`, distance: 5000, moving_time: 1800, average_heartrate: 145 + i, started_at: `2025-01-0${i + 1}T10:00:00Z` })
-    );
-    const result = Compute.computeReferenceWorkouts(activities);
-    expect(result.points.length).toBeGreaterThan(0);
-    result.points.forEach(p => {
-      // y should be the heartrate (145-150 range), not pace (which would be ~6.67 min/km)
-      expect(p.y).toBeGreaterThan(100);
-      expect(p.y).toBeLessThan(220);
-    });
+  it("uses split data to calculate decoupling", () => {
+    const activities = [
+      makeSession(1, {
+        id: "with-splits",
+        splits_metric: [
+          { moving_time: 1800, distance: 5000, average_heartrate: 130 },
+          { moving_time: 1800, distance: 4800, average_heartrate: 138 },
+        ],
+      }),
+    ];
+    const result = Compute.computeEnduranceEfficiency(activities);
+    expect(result.decouplingPoints).toHaveLength(1);
+    expect(result.decouplingPoints[0].y).toBeGreaterThan(0);
   });
 });
 

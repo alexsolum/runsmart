@@ -18,7 +18,7 @@ progress:
 **Current Phase:** 9 (Ukeplan Ownership)
 **Status:** Roadmap approved, ready to plan.
 
-Last activity: 2026-03-13 - Milestone v1.2 roadmap created
+Last activity: 2026-03-13 - Phase 9 context gathered
 
 ## Project Reference
 
@@ -43,6 +43,7 @@ See: .planning/PROJECT.md
 Phase: 9 (Ukeplan Ownership)
 Plan: —
 Status: Ready to plan
+Resume file: `.planning/phases/09-ukeplan-ownership/09-CONTEXT.md`
 
 ## Notes
 

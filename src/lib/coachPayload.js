@@ -166,6 +166,49 @@ function buildWeekDirective(recommendationWeek) {
   };
 }
 
+function normalizeWeekDay(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const match = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].find(
+    (day) => day.toLowerCase() === raw.toLowerCase(),
+  );
+  return match ?? null;
+}
+
+function buildWeeklyConstraints(weeklyConstraints) {
+  if (!weeklyConstraints) return null;
+
+  const preferredLongRunDay = normalizeWeekDay(weeklyConstraints.preferredLongRunDay);
+  const preferredHardWorkoutDay = normalizeWeekDay(weeklyConstraints.preferredHardWorkoutDay);
+  const commuteDays = Array.from(
+    new Set(
+      (Array.isArray(weeklyConstraints.commuteDays) ? weeklyConstraints.commuteDays : [])
+        .map(normalizeWeekDay)
+        .filter(Boolean),
+    ),
+  );
+  const doubleThresholdAllowed = typeof weeklyConstraints.doubleThresholdAllowed === "boolean"
+    ? weeklyConstraints.doubleThresholdAllowed
+    : null;
+
+  if (
+    !preferredLongRunDay &&
+    !preferredHardWorkoutDay &&
+    commuteDays.length === 0 &&
+    doubleThresholdAllowed == null
+  ) {
+    return null;
+  }
+
+  return {
+    preferredLongRunDay,
+    preferredHardWorkoutDay,
+    commuteDays,
+    doubleThresholdAllowed,
+  };
+}
+
 function getRecentDailyLogs(logs, days = 7) {
   const cutoff = new Date(Date.now() - Math.max(days - 1, 0) * 24 * 60 * 60 * 1000);
   return logs
@@ -217,6 +260,7 @@ export async function buildCoachPayload({
   trainingBlocks,
   runnerProfile,
   recommendationWeek,
+  weeklyConstraints,
   lang,
   mode = "default",
 }) {
@@ -237,6 +281,7 @@ export async function buildCoachPayload({
     planContext: buildPlanContext(activePlan, trainingBlocks.blocks ?? []),
     recommendationContext: buildRecommendationContext(recommendationWeek),
     weekDirective: buildWeekDirective(recommendationWeek),
+    weeklyConstraints: buildWeeklyConstraints(weeklyConstraints),
     dailyLogs: getRecentDailyLogs(freshLogs, windows.logDays),
     runnerProfile: runnerProfilePayload,
     lang,

@@ -65,6 +65,21 @@ describe("gemini-coach weekly recommendation context precedence", () => {
     expect(GEMINI_COACH_SOURCE).toMatch(/overrideRequiresExplanation/i);
     expect(GEMINI_COACH_SOURCE).toMatch(/This is a taper-sensitive week/i);
   });
+
+  it("WCON-02: plan mode consumes structured weeklyConstraints alongside the selected-week directive", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Treat structured weeklyConstraints as day-level scheduling preferences/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Preferred long-run day:/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Preferred hard-workout day:/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Commute days:/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Double threshold allowed:/i);
+  });
+
+  it("WCON-02: plan mode requires explanation when a weekly constraint is relaxed or a session moves", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/If a requested weekly constraint cannot be satisfied, explain which session moved or which preference was relaxed inside adaptation_summary/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/If you move a requested session or relax a weekly constraint, explain it plainly in adaptation_summary/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Long run moved from/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Primary quality session moved from/i);
+  });
 });
 
 describe("gemini-coach insights synthesis instruction", () => {

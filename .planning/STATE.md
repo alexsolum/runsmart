@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Strava Sync & Insight Trends
-current_phase: 8
-status: in-progress
-last_updated: "2026-03-11"
+milestone: v1.2
+milestone_name: Weekly Planning Intelligence
+current_phase: null
+status: defining-requirements
+last_updated: "2026-03-13"
 progress:
   total_phases: 3
   completed_phases: 2
@@ -15,10 +15,10 @@ progress:
 # State
 
 **Initialized:** 2026-03-11
-**Current Phase:** 8 (Insight Reliability)
-**Status:** Decisions finalized, moving to research.
+**Current Phase:** Not started (defining requirements)
+**Status:** Defining requirements.
 
-Last activity: 2026-03-13 - Completed quick task 9: Make improvement to chart in innsikt page. I have described the change in docs\\chart_improvement.md
+Last activity: 2026-03-13 - Milestone v1.2 started
 
 ## Project Reference
 
@@ -38,17 +38,15 @@ See: .planning/PROJECT.md
 - Research: `.planning/milestones/v1.0-phases/06-RESEARCH.md`
 - Plan: `.planning/milestones/v1.0-phases/06-PLAN.md`
 
-## Phase Status
+## Current Position
 
-| Phase | Name | Status |
-|-------|------|--------|
-| 6 | Strava Robustness | In-Progress |
-| 7 | Advanced Analytics | Todo |
-| 8 | Insight Reliability | Todo |
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
 
 ## Notes
 
-- Milestone v1.1 started. Focus on Strava reliability and deeper analytics.
+- Milestone v1.2 started. Focus on weekly planning intelligence inside `Ukeplan`.
 
 ### Quick Tasks Completed
 

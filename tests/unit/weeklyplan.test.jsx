@@ -29,6 +29,7 @@ vi.mock("../../src/lib/supabaseClient", () => ({
 import { useAppData } from "../../src/context/AppDataContext";
 import { buildCoachPayload } from "../../src/lib/coachPayload";
 import { getSupabaseClient } from "../../src/lib/supabaseClient";
+import { WEEKLY_PLAN_HANDOFF_KEY } from "../../src/lib/appNavigation";
 
 function currentMondayIso() {
   const d = new Date();
@@ -46,6 +47,7 @@ function isoDateOffset(isoDate, days) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   // Suppress window.confirm calls in delete tests
   vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
 });
@@ -189,6 +191,23 @@ describe("Weekly Plan — AI generation", () => {
     expect(globalThis.confirm).toHaveBeenCalled();
     expect(invoke).not.toHaveBeenCalled();
     expect(applyStructuredPlan).not.toHaveBeenCalled();
+  });
+
+  it("renders handoff intent from Training Plan when present in session storage", () => {
+    window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify({
+      planId: SAMPLE_PLAN.id,
+      weekStart: currentMondayIso(),
+      phase: "Build",
+      targetKm: 64,
+      notes: "Keep the long run steady and the midweek workout controlled.",
+    }));
+
+    useAppData.mockReturnValue(makeAppData());
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(screen.getByText("64 km")).toBeInTheDocument();
+    expect(screen.getByText(/Keep the long run steady/i)).toBeInTheDocument();
   });
 });
 

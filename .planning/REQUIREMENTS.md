@@ -5,8 +5,8 @@
 ## 1. Ukeplan Ownership (UKE)
 `Ukeplan` becomes the single tactical weekly-planning workflow.
 
-- [ ] **UKE-01**: User can generate an AI weekly plan directly from `Ukeplan`.
-- [ ] **UKE-02**: User sees `Treningsplan` provide weekly intent and targets, while `Ukeplan` owns weekly day-by-day generation and editing.
+- [x] **UKE-01**: User can generate an AI weekly plan directly from `Ukeplan`.
+- [x] **UKE-02**: User sees `Treningsplan` provide weekly intent and targets, while `Ukeplan` owns weekly day-by-day generation and editing.
 
 ## 2. Recommendation Context (WREC)
 Weekly recommendations must be grounded in the long-term plan and coaching rules.
@@ -39,8 +39,8 @@ The generated week must fit real life and remain editable.
 ## Traceability
 | Req ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| UKE-01 | 9 | - | Pending |
-| UKE-02 | 9 | - | Pending |
+| UKE-01 | 9 | 09-01 | Complete |
+| UKE-02 | 9 | 09-02 | Complete |
 | WREC-01 | 10 | - | Pending |
 | WREC-02 | 10 | - | Pending |
 | WREC-03 | 10 | - | Pending |

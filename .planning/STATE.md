@@ -2,23 +2,24 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Weekly Planning Intelligence
-current_phase: 9
-status: ready-for-execution
+current_phase: 10
+status: ready-for-planning
 last_updated: "2026-03-13"
+last_activity: 2026-03-13 - Phase 9 completed
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # State
 
 **Initialized:** 2026-03-11
-**Current Phase:** 9 (Ukeplan Ownership)
-**Status:** Phase 9 planned, ready to execute.
+**Current Phase:** 10 (Recommendation Context)
+**Status:** Ready to plan
 
-Last activity: 2026-03-13 - Plan 09-01 executed
+Last activity: 2026-03-13 - Phase 9 completed
 
 ## Project Reference
 
@@ -40,15 +41,16 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 9 (Ukeplan Ownership)
-Plan: 09-02 pending
-Status: Executing wave 2
-Resume file: `.planning/phases/09-ukeplan-ownership/09-02-PLAN.md`
+Phase: 10 (Recommendation Context)
+Plan: —
+Status: Ready to plan
+Resume file: `.planning/ROADMAP.md`
 
 ## Notes
 
 - Milestone v1.2 started. Focus on weekly planning intelligence inside `Ukeplan`.
 - [Phase 09-ukeplan-ownership]: `WeeklyPlanPage` now owns AI week generation and remaps returned coach dates onto the currently focused week before calling `applyStructuredPlan`.
+- [Phase 09-ukeplan-ownership]: `LongTermPlanPage` no longer owns weekly generation; it stores read-only week intent and dispatches a handoff into `WeeklyPlanPage` through app-level navigation.
 
 ### Quick Tasks Completed
 

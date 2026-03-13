@@ -107,9 +107,23 @@ function getWeekIntent(blocks, planId, weekStartIso) {
   if (!matchingBlock) return null;
 
   return {
-    phase: matchingBlock.phase ?? null,
-    targetKm: matchingBlock.target_km ?? null,
+    weekStart: weekStartIso,
+    weekEnd: weekEndIso,
+    trainingType: matchingBlock.phase ?? null,
+    targetMileageKm: matchingBlock.target_km ?? null,
     notes: matchingBlock.notes ?? null,
+  };
+}
+
+function normalizeSelectedWeekIntent(intent, fallbackWeekStart) {
+  if (!intent) return null;
+
+  return {
+    weekStart: intent.weekStart ?? fallbackWeekStart,
+    weekEnd: intent.weekEnd ?? isoDateOffset(intent.weekStart ?? fallbackWeekStart, 6),
+    trainingType: intent.trainingType ?? intent.phase ?? null,
+    targetMileageKm: intent.targetMileageKm ?? intent.targetKm ?? null,
+    notes: intent.notes ?? null,
   };
 }
 
@@ -122,7 +136,7 @@ function WeeklyAiCard({
   error,
 }) {
   const existingCount = weekEntries.length;
-  const targetKm = weekIntent?.targetKm;
+  const targetKm = weekIntent?.targetMileageKm;
 
   return (
     <Card className="mb-5 border-slate-200">
@@ -150,7 +164,7 @@ function WeeklyAiCard({
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Training intent</p>
-            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{weekIntent?.phase ?? "Not set yet"}</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{weekIntent?.trainingType ?? "Not set yet"}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Target volume</p>
@@ -476,19 +490,15 @@ export default function WeeklyPlanPage() {
     () => getWeekIntent(trainingBlocks.blocks, selectedPlanId, planningStartDate),
     [trainingBlocks.blocks, selectedPlanId, planningStartDate],
   );
-  const displayWeekIntent = useMemo(() => {
+  const selectedWeekIntent = useMemo(() => {
     if (
       handoffIntent &&
       handoffIntent.planId === selectedPlanId &&
       handoffIntent.weekStart === planningStartDate
     ) {
-      return {
-        phase: handoffIntent.phase ?? null,
-        targetKm: handoffIntent.targetKm ?? null,
-        notes: handoffIntent.notes ?? null,
-      };
+      return normalizeSelectedWeekIntent(handoffIntent, planningStartDate);
     }
-    return focusedWeekIntent;
+    return normalizeSelectedWeekIntent(focusedWeekIntent, planningStartDate);
   }, [focusedWeekIntent, handoffIntent, planningStartDate, selectedPlanId]);
 
   // Load entries for entire 4-week range
@@ -591,14 +601,17 @@ export default function WeeklyPlanPage() {
         activePlan,
         trainingBlocks,
         runnerProfile,
+        recommendationWeek: selectedWeekIntent,
         lang: "en",
         mode: "default",
       });
+      const targetWeekStart = selectedWeekIntent?.weekStart ?? planningStartDate;
+      const targetWeekEnd = selectedWeekIntent?.weekEnd ?? isoDateOffset(targetWeekStart, 6);
       const { data, error } = await client.functions.invoke("gemini-coach", {
         body: {
           mode: "plan",
-          targetWeekStart: planningStartDate,
-          targetWeekEnd: isoDateOffset(planningStartDate, 6),
+          targetWeekStart,
+          targetWeekEnd,
           ...basePayload,
         },
       });
@@ -625,6 +638,7 @@ export default function WeeklyPlanPage() {
     focusedWeekEntries.length,
     planningStartDate,
     runnerProfile,
+    selectedWeekIntent,
     trainingBlocks,
     workoutEntries,
   ]);
@@ -670,7 +684,7 @@ export default function WeeklyPlanPage() {
           <WeeklyAiCard
             weekStart={planningStartDate}
             weekEntries={focusedWeekEntries}
-            weekIntent={displayWeekIntent}
+            weekIntent={selectedWeekIntent}
             onGenerate={handleGenerateWeek}
             loading={planGenerationLoading}
             error={pageError}

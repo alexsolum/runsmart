@@ -1,46 +1,38 @@
-# Feature Research
+# Feature Research — Weekly Planning Intelligence
 
-## New Features
+## Table Stakes
 
-### 1. Robust Strava Integration
-**Goal:** Reliable, real-time data ingestion without manual intervention or limits.
+- Weekly plan generation starts where the athlete executes the week: `Ukeplan`.
+- Recommendations ingest the parent training block intent for that week.
+- Recommendations respect weekly mileage targets and weekly workout type.
+- Athlete can express day-specific preferences and restrictions.
+- System explains why sessions were placed on specific days.
 
-- **Webhooks (Real-time):**
-  - **Create:** When a user uploads an activity to Strava, it appears in RunSmart within seconds.
-  - **Update:** If a user renames an activity or changes privacy on Strava, RunSmart reflects this.
-  - **Delete:** If a user deletes an activity on Strava, it is removed from RunSmart.
-  - **Deauthorization:** Handle user disconnecting app.
+## Differentiators
 
-- **Unlimited Sync (History):**
-  - **Pagination:** The current 100-activity limit is likely due to fetching only the first page.
-  - **Implementation:** Loop through Strava API pages (`per_page=200`) until no activities remain or a date limit is reached (e.g., 90 days or 1 year).
-  - **Rate Limits:** Respect Strava's 100 requests/15 min and 1000/day limits. Pagination eats into this quickly. Strategy: Only deep sync on initial connect; rely on webhooks thereafter.
+- Admin-defined weekly planning principles that shape every recommendation.
+- Constraint-aware recommendation logic for:
+  - long-run day
+  - hard-workout day
+  - commute / low-availability days
+  - rest-day preferences
+  - double-threshold allowed / forbidden
+- Conflict resolution that preserves the highest-priority rules and tells the athlete what was relaxed.
 
-### 2. Advanced Progress Analytics (Efficiency Trends)
-**Goal:** Visual proof of fitness improvement independent of race results.
+## Anti-Features
 
-- **Metric:** Aerobic Efficiency (EF) = Speed (m/min) / Heart Rate (bpm).
-  - *Alternative:* Pace vs HR directly (scatter plot). "Lower HR at same Pace" or "Faster Pace at same HR".
-- **Chart:**
-  - **X-Axis:** Date (Time).
-  - **Y-Axis:** Efficiency Metric (e.g., "Heart Beats per Km" or "Pace @ 140bpm").
-  - **Data Points:** Individual "Easy Run" activities.
-  - **Trend:** Linear regression line showing improvement (slope).
-- **Filters:**
-  - **Workout Type:** Vital. Only include "Easy/General" runs. Exclude Intervals/Tempos/Races where HR is decoupled by design (drift) or intensity is variable.
-  - **Outliers:** Exclude runs < 20 min or with bad HR data (zeros).
+- Silent overwriting of a manually adjusted week.
+- Hidden rule application with no coaching rationale.
+- Defaulting to dense intensity placement just because mileage is high.
+- Treating `Treningsplan` and `Ukeplan` as separate recommendation sources after the move.
 
-### 3. Insight Synthesis Fixes
-**Goal:** Reliable, clean coaching summary.
+## Complexity Notes
 
-- **Reliability:** The synthesis must appear every time data is sufficient.
-- **Presentation:** Pure text (Markdown). No code blocks, no JSON keys (`{"summary": "..."}`).
-- **Failure Mode:** If AI fails to adhere to format, fallback to a "Simple Summary" (computed locally) or a generic "Training looks consistent" message rather than showing an error or raw JSON.
+- Moving the AI entry point is straightforward.
+- Unifying all planning context into one reliable recommendation payload is medium complexity.
+- Constraint priority, manual edits, and conflict explanation are the main design risks.
 
-## Feature Interactions
-- **Sync -> Analytics:** Webhook updates ensure the Analytics chart is always up-to-date with the latest run.
-- **Analytics -> Insights:** The new efficiency trend should be fed into the AI Coach context for the "Progress" section of the synthesis.
+## Source Notes
 
-## Table Stakes vs Differentiators
-- **Table Stakes:** Syncing all runs (not just 100). Webhooks.
-- **Differentiators:** The Efficiency Trend chart (Strava Premium feature usually, or TrainingPeaks). AI interpretation of that trend ("Your efficiency is improving, meaning base training is working").
+- TrainingPeaks highlights that weekly plans often need to shift around life schedule while keeping hard/easy spacing intact: https://www.trainingpeaks.com/blog/customize-your-training-plan/
+- Strava sample schedules show the value of fixed weekly anchors and consistent routine placement: https://stories.strava.com/pt/articles/couch-to-5k-training-plan

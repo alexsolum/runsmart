@@ -344,6 +344,8 @@ export function makeAppData(overrides = {}) {
       loading: false,
       loadEntriesForWeek: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES),
       loadEntriesForRange: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES),
+      applyStructuredPlan: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES),
+      applyLongTermWeeklyStructure: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES),
       createEntry: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES[0]),
       updateEntry: vi.fn().mockResolvedValue(SAMPLE_WORKOUT_ENTRIES[0]),
       deleteEntry: vi.fn().mockResolvedValue(undefined),

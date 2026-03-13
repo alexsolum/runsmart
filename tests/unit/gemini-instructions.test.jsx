@@ -43,11 +43,28 @@ describe("gemini-coach instruction mandates", () => {
   });
 });
 
+describe("gemini-coach weekly recommendation context precedence", () => {
+  it("WREC-03: plan mode prioritizes selected-week context above philosophy and playbook layers", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Selected-week recommendation context from the app request/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Active published coaching philosophy \(runtime document\)/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Runtime playbook snippets/i);
+  });
+
+  it("WREC-04: plan mode treats philosophy red lines as explicit override-only guardrails", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Philosophy conflict rule: selected-week direction wins unless a published philosophy red-line or explicit safety guardrail would be violated/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/If a red-line override is necessary, keep the week recognizable and explain the override plainly/i);
+  });
+
+  it("WREC-03: plan generation is anchored to the requested target week instead of next Monday fallback copy", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Generate the 7-day plan for the selected week from/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/requested target week start/i);
+  });
+});
+
 describe("gemini-coach insights synthesis instruction", () => {
-  it("INSG-02: enforces plain-text output and forbids JSON/markdown wrappers", () => {
-    expect(GEMINI_COACH_SOURCE).toMatch(/Respond in plain text only/i);
-    expect(GEMINI_COACH_SOURCE).toMatch(/Do not output JSON/i);
-    expect(GEMINI_COACH_SOURCE).toMatch(/Do not output markdown/i);
+  it("INSG-02: enforces sectioned markdown output and forbids JSON wrappers", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Respond in plain Markdown/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Do not use JSON wrappers/i);
   });
 
   it("INSG-02: requires the four locked synthesis section headings", () => {
@@ -57,12 +74,12 @@ describe("gemini-coach insights synthesis instruction", () => {
     expect(GEMINI_COACH_SOURCE).toContain("Race Readiness");
   });
 
-  it("INSG-02: anchors synthesis interpretation to a 10-12 week horizon", () => {
-    expect(GEMINI_COACH_SOURCE).toMatch(/10-12 week horizon/i);
+  it("INSG-02: asks for compact section analysis tied to the training data", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/provide 2-3 sentences of analysis tied to their data/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/one actionable recommendation/i);
   });
 
-  it("INSG-02: synthesis instruction requests a thorough 4-6 sentence paragraph", () => {
-    expect(INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET).toMatch(/4-6 sentences/i);
-    expect(INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET).toMatch(/consistency pattern/i);
+  it("INSG-02: uses explicit section headings followed by a colon", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/exact heading followed by a colon/i);
   });
 });

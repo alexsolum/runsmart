@@ -123,6 +123,34 @@ function buildPlanContext(plan, blocks) {
   };
 }
 
+function buildRecommendationContext(recommendationWeek) {
+  if (!recommendationWeek) return null;
+
+  const weekStart = firstDefined(recommendationWeek.weekStart, recommendationWeek.startDate, recommendationWeek.targetWeekStart);
+  const weekEnd = firstDefined(recommendationWeek.weekEnd, recommendationWeek.endDate, recommendationWeek.targetWeekEnd);
+  const trainingType = firstDefined(recommendationWeek.trainingType, recommendationWeek.phase);
+  const targetMileageKm = numberOrNull(
+    firstDefined(
+      recommendationWeek.targetMileageKm,
+      recommendationWeek.targetKm,
+      recommendationWeek.target_km,
+    ),
+  );
+  const notes = firstDefined(recommendationWeek.notes, recommendationWeek.coachNotes);
+
+  if (!weekStart && !weekEnd && trainingType == null && targetMileageKm == null && notes == null) {
+    return null;
+  }
+
+  return {
+    weekStart: weekStart ?? null,
+    weekEnd: weekEnd ?? (weekStart ? new Date(new Date(`${weekStart}T00:00:00Z`).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : null),
+    trainingType: trainingType ?? null,
+    targetMileageKm,
+    notes: notes ?? null,
+  };
+}
+
 function getRecentDailyLogs(logs, days = 7) {
   const cutoff = new Date(Date.now() - Math.max(days - 1, 0) * 24 * 60 * 60 * 1000);
   return logs
@@ -173,6 +201,7 @@ export async function buildCoachPayload({
   activePlan,
   trainingBlocks,
   runnerProfile,
+  recommendationWeek,
   lang,
   mode = "default",
 }) {
@@ -191,6 +220,7 @@ export async function buildCoachPayload({
     latestCheckin: normalizeCheckin(freshCheckins[0] ?? null),
     recentCheckins: freshCheckins.slice(0, 3).map(normalizeCheckin).filter(Boolean),
     planContext: buildPlanContext(activePlan, trainingBlocks.blocks ?? []),
+    recommendationContext: buildRecommendationContext(recommendationWeek),
     dailyLogs: getRecentDailyLogs(freshLogs, windows.logDays),
     runnerProfile: runnerProfilePayload,
     lang,

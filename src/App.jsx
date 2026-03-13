@@ -14,6 +14,7 @@ import MobilePage from "./pages/MobilePage";
 import AdminPhilosophyPage from "./pages/AdminPhilosophyPage";
 import MobileNavBar from "./components/MobileNavBar";
 import LanguageSwitcher from "./components/LanguageSwitcher";
+import { APP_NAVIGATE_EVENT } from "./lib/appNavigation";
 import {
   LayoutDashboard,
   Calendar,
@@ -97,6 +98,19 @@ function Shell() {
     [activePage, allNavItems],
   );
   const ActiveComponent = activeNavItem.component;
+
+  useEffect(() => {
+    function handleAppNavigate(event) {
+      const pageKey = event?.detail?.pageKey;
+      const mobileTab = event?.detail?.mobileTab;
+      if (pageKey) setActivePage(pageKey);
+      if (mobileTab) setMobileTab(mobileTab);
+      setMenuOpen(false);
+    }
+
+    window.addEventListener(APP_NAVIGATE_EVENT, handleAppNavigate);
+    return () => window.removeEventListener(APP_NAVIGATE_EVENT, handleAppNavigate);
+  }, []);
 
   return (
     <div className="app-shell">

@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
+import { getSupabaseClient } from "../lib/supabaseClient";
+import { buildCoachPayload } from "../lib/coachPayload";
+import { WEEKLY_PLAN_HANDOFF_KEY } from "../lib/appNavigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +55,134 @@ function normalizeWeeklyEntry(entry) {
     description: entry?.description ?? null,
     completed: Boolean(entry?.completed),
   };
+}
+
+function startOfIsoWeek(isoDate) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - day + 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+function normalizeGeneratedStructuredPlan(structuredPlan, targetWeekStart) {
+  const normalizedDays = (Array.isArray(structuredPlan) ? structuredPlan : [])
+    .map((day, index) => {
+      const rawDate = String(day?.date ?? day?.workout_date ?? "").trim();
+      const parsedDate = rawDate ? new Date(`${rawDate}T00:00:00Z`) : null;
+      const resolvedDate = parsedDate && !Number.isNaN(parsedDate.getTime())
+        ? rawDate
+        : isoDateOffset(targetWeekStart, Math.min(index, 6));
+      const sourceWeekStart = startOfIsoWeek(resolvedDate);
+      const dayOffset = Math.max(
+        0,
+        Math.min(
+          6,
+          Math.round((new Date(`${resolvedDate}T00:00:00Z`) - new Date(`${sourceWeekStart}T00:00:00Z`)) / (1000 * 60 * 60 * 24)),
+        ),
+      );
+
+      return {
+        workout_date: isoDateOffset(targetWeekStart, dayOffset),
+        workout_type: String(day?.workout_type ?? "Easy"),
+        distance_km: day?.distance_km ?? null,
+        duration_min: day?.duration_min ?? null,
+        description: day?.description ?? null,
+      };
+    })
+    .filter((day) => day.workout_type);
+
+  return normalizedDays;
+}
+
+function getWeekIntent(blocks, planId, weekStartIso) {
+  const weekEndIso = isoDateOffset(weekStartIso, 6);
+  const matchingBlock = (blocks ?? []).find(
+    (block) =>
+      block.plan_id === planId &&
+      block.start_date <= weekEndIso &&
+      block.end_date >= weekStartIso,
+  );
+
+  if (!matchingBlock) return null;
+
+  return {
+    weekStart: weekStartIso,
+    weekEnd: weekEndIso,
+    trainingType: matchingBlock.phase ?? null,
+    targetMileageKm: matchingBlock.target_km ?? null,
+    notes: matchingBlock.notes ?? null,
+  };
+}
+
+function normalizeSelectedWeekIntent(intent, fallbackWeekStart) {
+  if (!intent) return null;
+
+  return {
+    weekStart: intent.weekStart ?? fallbackWeekStart,
+    weekEnd: intent.weekEnd ?? isoDateOffset(intent.weekStart ?? fallbackWeekStart, 6),
+    trainingType: intent.trainingType ?? intent.phase ?? null,
+    targetMileageKm: intent.targetMileageKm ?? intent.targetKm ?? null,
+    notes: intent.notes ?? null,
+  };
+}
+
+function WeeklyAiCard({
+  weekStart,
+  weekEntries,
+  weekIntent,
+  onGenerate,
+  loading,
+  error,
+}) {
+  const existingCount = weekEntries.length;
+  const targetKm = weekIntent?.targetMileageKm;
+
+  return (
+    <Card className="mb-5 border-slate-200">
+      <CardHeader className="pb-2 px-4 pt-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">AI week setup</p>
+            <h3 className="m-0 mt-1 text-base font-bold text-slate-900">Plan {formatWeekLabel(weekStart)}</h3>
+            <p className="m-0 mt-1 text-sm text-slate-500">
+              {existingCount === 0
+                ? "Start this week with an AI-generated structure, then edit sessions directly in the grid."
+                : `This week already has ${existingCount} workout${existingCount === 1 ? "" : "s"}. Generating again will replace them after confirmation.`}
+            </p>
+          </div>
+          <Button type="button" onClick={onGenerate} disabled={loading} className="self-start">
+            {loading ? "Generating…" : existingCount === 0 ? "Generate AI Week" : "Replace With AI Week"}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Week</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{formatWeekLabel(weekStart)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Training intent</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{weekIntent?.trainingType ?? "Not set yet"}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Target volume</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">
+              {targetKm != null ? `${Number(targetKm).toFixed(0)} km` : "Use plan context"}
+            </p>
+          </div>
+        </div>
+        {weekIntent?.notes && (
+          <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Coach note</p>
+            <p className="m-0 mt-1 text-sm text-slate-600">{weekIntent.notes}</p>
+          </div>
+        )}
+        {error && <p className="m-0 mt-3 text-sm text-red-600">{error}</p>}
+      </CardContent>
+    </Card>
+  );
 }
 
 // ── Workout type badge styles ─────────────────────────────────────────────────
@@ -301,13 +432,15 @@ function WeekSection({ weekStart, allEntries, addingTo, editingEntry, onAdd, onC
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function WeeklyPlanPage() {
-  const { plans, workoutEntries } = useAppData();
+  const { plans, workoutEntries, activities, dailyLogs, checkins, trainingBlocks, runnerProfile } = useAppData();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [planningStartDate, setPlanningStartDate] = useState(currentMondayIso);
   const [addingTo, setAddingTo] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [pageError, setPageError] = useState(null);
+  const [planGenerationLoading, setPlanGenerationLoading] = useState(false);
+  const [handoffIntent, setHandoffIntent] = useState(null);
 
   // Auto-select first plan
   useEffect(() => {
@@ -315,6 +448,23 @@ export default function WeeklyPlanPage() {
       setSelectedPlanId(plans.plans[0].id);
     }
   }, [plans.plans, selectedPlanId]);
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(WEEKLY_PLAN_HANDOFF_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.weekStart) {
+        setPlanningStartDate(parsed.weekStart);
+      }
+      if (parsed?.planId) {
+        setSelectedPlanId(parsed.planId);
+      }
+      setHandoffIntent(parsed);
+    } catch {
+      window.sessionStorage.removeItem(WEEKLY_PLAN_HANDOFF_KEY);
+    }
+  }, []);
 
   // 4-week visible window
   const visibleWeeks = useMemo(() => [
@@ -328,6 +478,28 @@ export default function WeeklyPlanPage() {
     () => workoutEntries.entries.map(normalizeWeeklyEntry),
     [workoutEntries.entries],
   );
+  const activePlan = useMemo(
+    () => plans.plans.find((plan) => plan.id === selectedPlanId) ?? null,
+    [plans.plans, selectedPlanId],
+  );
+  const focusedWeekEntries = useMemo(
+    () => normalizedEntries.filter((entry) => entry.workout_date >= planningStartDate && entry.workout_date <= isoDateOffset(planningStartDate, 6)),
+    [normalizedEntries, planningStartDate],
+  );
+  const focusedWeekIntent = useMemo(
+    () => getWeekIntent(trainingBlocks.blocks, selectedPlanId, planningStartDate),
+    [trainingBlocks.blocks, selectedPlanId, planningStartDate],
+  );
+  const selectedWeekIntent = useMemo(() => {
+    if (
+      handoffIntent &&
+      handoffIntent.planId === selectedPlanId &&
+      handoffIntent.weekStart === planningStartDate
+    ) {
+      return normalizeSelectedWeekIntent(handoffIntent, planningStartDate);
+    }
+    return normalizeSelectedWeekIntent(focusedWeekIntent, planningStartDate);
+  }, [focusedWeekIntent, handoffIntent, planningStartDate, selectedPlanId]);
 
   // Load entries for entire 4-week range
   useEffect(() => {
@@ -403,6 +575,74 @@ export default function WeeklyPlanPage() {
     [workoutEntries],
   );
 
+  const handleGenerateWeek = useCallback(async () => {
+    if (!activePlan?.id) return;
+    const client = getSupabaseClient();
+    if (!client) {
+      setPageError("Supabase is not configured.");
+      return;
+    }
+
+    if (focusedWeekEntries.length > 0) {
+      const confirmed = window.confirm(
+        `Replace ${focusedWeekEntries.length} existing workout${focusedWeekEntries.length === 1 ? "" : "s"} in ${formatWeekLabel(planningStartDate)}?`,
+      );
+      if (!confirmed) return;
+    }
+
+    setPlanGenerationLoading(true);
+    setPageError(null);
+
+    try {
+      const basePayload = await buildCoachPayload({
+        activities,
+        dailyLogs,
+        checkins,
+        activePlan,
+        trainingBlocks,
+        runnerProfile,
+        recommendationWeek: selectedWeekIntent,
+        lang: "en",
+        mode: "default",
+      });
+      const targetWeekStart = selectedWeekIntent?.weekStart ?? planningStartDate;
+      const targetWeekEnd = selectedWeekIntent?.weekEnd ?? isoDateOffset(targetWeekStart, 6);
+      const { data, error } = await client.functions.invoke("gemini-coach", {
+        body: {
+          mode: "plan",
+          targetWeekStart,
+          targetWeekEnd,
+          ...basePayload,
+        },
+      });
+
+      if (error) throw new Error(`Plan generation failed: ${error.message}`);
+      if (data?.error) throw new Error(data.error);
+
+      const structuredPlan = normalizeGeneratedStructuredPlan(data?.structured_plan, planningStartDate);
+      if (structuredPlan.length === 0) {
+        throw new Error("No plan returned from coach.");
+      }
+
+      await workoutEntries.applyStructuredPlan(activePlan.id, structuredPlan);
+    } catch (err) {
+      setPageError(err.message || "Failed to generate weekly plan.");
+    } finally {
+      setPlanGenerationLoading(false);
+    }
+  }, [
+    activePlan,
+    activities,
+    checkins,
+    dailyLogs,
+    focusedWeekEntries.length,
+    planningStartDate,
+    runnerProfile,
+    selectedWeekIntent,
+    trainingBlocks,
+    workoutEntries,
+  ]);
+
   return (
     <PageContainer>
       <div className="w-full max-w-screen-xl mx-auto overflow-x-hidden">
@@ -439,6 +679,17 @@ export default function WeeklyPlanPage() {
             </div>
           </div>
         </div>
+
+        {selectedPlanId && (
+          <WeeklyAiCard
+            weekStart={planningStartDate}
+            weekEntries={focusedWeekEntries}
+            weekIntent={selectedWeekIntent}
+            onGenerate={handleGenerateWeek}
+            loading={planGenerationLoading}
+            error={pageError}
+          />
+        )}
 
         {/* Four-week rolling view */}
         {!selectedPlanId ? (

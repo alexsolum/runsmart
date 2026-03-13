@@ -1,32 +1,46 @@
-# Pitfalls Research
+# Pitfalls Research — Weekly Planning Intelligence
 
-## Strava Integration
-- **Rate Limits:** 100 req/15 min is tight.
-  - *Risk:* A "Deep Sync" (all history) for a user with 2,000 activities uses 20 requests. 5 users doing this simultaneously hits the app limit.
-  - *Mitigation:* Implement incremental sync using `after` parameter. Only fetch full history on explicit user request.
-- **Webhook Timeouts:** Strava requires < 2s response.
-  - *Risk:* Fetching activity details inside the main handler thread will timeout.
-  - *Mitigation:* Use `EdgeRuntime.waitUntil` for async processing. Return 200 OK immediately.
-- **Duplicate Events:** Strava might retry webhooks.
-  - *Mitigation:* Idempotent upsert logic (`ON CONFLICT (strava_id) DO UPDATE`).
+## Main Risks
 
-## Analytics & Trends
-- **Data Quality:** "Garbage in, garbage out."
-  - *Risk:* Including warmups, cooldowns, or treadmill runs (bad pace data) in efficiency trend.
-  - *Mitigation:* Filter aggressively: `type === "Run"`, `manual === false`, `avg_heartrate > 0`, `distance > 2km`.
-- **Seasonality:** Pace/HR decouples in heat/humidity.
-  - *Risk:* User sees "declining fitness" in summer when it's just heat drift.
-  - *Mitigation:* AI insight should contextually mention temperature impact if weather data is available (unlikely for MVP), or generic disclaimer text.
+### 1. Split-Brain Planning
 
-## Insight Synthesis
-- **Format Leakage:** LLMs love Markdown code blocks (` ```markdown `).
-  - *Risk:* The UI renders the code block syntax instead of the formatted text.
-  - *Mitigation:* Regex strip `^```(markdown|json)?` and trailing ````$`.
-- **Validation Failure:**
-  - *Risk:* Strict validation rejects a perfectly good response because of a missing header.
-  - *Mitigation:* Relaxed validation (warn, don't fail). Or render "Raw" text in a `<pre>` block only in dev mode for debugging.
+If `Treningsplan` still appears to generate the week while `Ukeplan` also generates the week, users will not know which surface is authoritative.
 
-## General
-- **Security:** Public webhook endpoint exposure.
-  - *Risk:* malicious actors flooding the endpoint.
-  - *Mitigation:* Verify `hub.verify_token` (GET) and `owner_id` check (POST).
+Prevention:
+- Make `Ukeplan` the only weekly-generation entry point.
+- Keep `Treningsplan` focused on macro structure and weekly intent.
+
+### 2. Constraint Collisions
+
+Real schedules conflict quickly: long run on Sunday, hard session Wednesday, commute Monday/Tuesday, no double-threshold, mileage target unchanged.
+
+Prevention:
+- Introduce explicit priority ordering.
+- Return conflict explanations instead of silently violating rules.
+
+### 3. Manual Edit Loss
+
+If regeneration overwrites athlete-edited days, trust in the planner will drop fast.
+
+Prevention:
+- Preserve manual edits or require explicit confirmation before replacing them.
+- Distinguish user-authored vs AI-authored entries.
+
+### 4. Vague Admin Guidance
+
+Broad admin text can become prompt noise and produce unstable recommendations.
+
+Prevention:
+- Store admin guidance in structured buckets: focus, principles, red lines, preferred workout spacing.
+
+### 5. Over-Optimized Weeks
+
+An AI planner can satisfy mileage and workout count while producing a week that is technically valid but practically miserable.
+
+Prevention:
+- Keep athlete-first guardrails visible: hard/easy spacing, commute-aware days, recovery protection, no intensity bunching.
+
+## Source Notes
+
+- TrainingPeaks warns against bunching hard work and breaking hard/easy balance when adapting a week: https://www.trainingpeaks.com/blog/customize-your-training-plan/
+- Strava’s ultra planning example shows how schedule-aware weekly anchoring matters when balancing work and recovery: https://stories.strava.com/ru/articles/so-you-entered-your-first-ultramarathon

@@ -2,24 +2,25 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Weekly Planning Intelligence
-current_phase: 10
-status: verifying
-last_updated: "2026-03-13"
-last_activity: 2026-03-13 - Plans 10-01 and 10-02 completed; phase 10 ready for verification
+current_phase: 11
+status: planning
+last_updated: "2026-03-13T16:35:00+01:00"
+last_activity: 2026-03-13 - Gap plans 10-03 and 10-04 completed; phase 10 verified and phase 11 is next
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
 ---
+
 
 # State
 
 **Initialized:** 2026-03-11
-**Current Phase:** 10 (Recommendation Context)
-**Status:** Verifying
+**Current Phase:** 11
+**Status:** Ready to plan
 
-Last activity: 2026-03-13 - Plans 10-01 and 10-02 completed; phase 10 ready for verification
+Last activity: 2026-03-13 - Gap plans 10-03 and 10-04 completed; phase 10 verified and phase 11 is next
 
 ## Project Reference
 
@@ -41,10 +42,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 10 (Recommendation Context)
-Plan: Verification
-Status: Both execution plans complete; verify phase goal before closing phase 10
-Resume file: `.planning/phases/10-recommendation-context/10-VERIFICATION.md`
+Phase: 11 (Constraint-Aware Weekly Plans)
+Plan: Planning
+Status: Phase 10 is complete; next work should define day-level weekly constraints, tradeoff explanations, and manual-edit protection
+Resume file: `.planning/ROADMAP.md`
 
 ## Notes
 
@@ -55,6 +56,8 @@ Resume file: `.planning/phases/10-recommendation-context/10-VERIFICATION.md`
 - [Phase 10-recommendation-context]: Active admin coaching philosophy should act as a guiding layer with explicit red-line guardrails; selected week intent wins unless a red line would be violated.
 - [Phase 10-recommendation-context]: Plan 10-01 established a normalized `recommendationContext` contract from `WeeklyPlanPage` through `buildCoachPayload`, including selected week dates, training type, mileage target, and notes.
 - [Phase 10-recommendation-context]: Plan 10-02 updated `gemini-coach` prompt precedence so selected-week intent outranks philosophy preferences while philosophy red lines remain explicit override-only guardrails.
+- [Phase 10-recommendation-context]: Plan 10-03 split visible-window navigation from AI week selection so any currently visible `Ukeplan` week can be targeted without falling back to `visibleWeeks[0]`.
+- [Phase 10-recommendation-context]: Plan 10-04 added explicit `weekDirective` constraints and edge-function enforcement so taper and near-target mileage weeks cannot drift silently without an override explanation.
 
 ### Quick Tasks Completed
 

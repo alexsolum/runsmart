@@ -39,8 +39,11 @@ created: 2026-03-13
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 10-01-01 | 01 | 1 | WREC-01, WREC-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx` | ✅ | ⬜ pending |
-| 10-02-01 | 02 | 2 | WREC-03, WREC-04 | unit | `npm test -- --run tests/unit/gemini-instructions.test.jsx` | ✅ | ⬜ pending |
-| 10-02-02 | 02 | 2 | WREC-01, WREC-02, WREC-03, WREC-04 | integration | `npm test -- --run tests/integration/edge-functions.spec.ts` | ✅ | ⬜ pending |
+| 10-01-02 | 01 | 1 | WREC-01, WREC-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx` | ✅ | ⬜ pending |
+| 10-01-03 | 01 | 1 | WREC-01, WREC-02 | unit | `npm test -- --run tests/unit/coachPayload.test.js tests/unit/weeklyplan.test.jsx` | ✅ | ⬜ pending |
+| 10-02-01 | 02 | 2 | WREC-01, WREC-02, WREC-03, WREC-04 | unit + integration | `npm test -- --run tests/unit/gemini-instructions.test.jsx tests/integration/edge-functions.spec.ts` | ✅ | ⬜ pending |
+| 10-02-02 | 02 | 2 | WREC-03, WREC-04 | unit | `npm test -- --run tests/unit/gemini-instructions.test.jsx` | ✅ | ⬜ pending |
+| 10-02-03 | 02 | 2 | WREC-01, WREC-02, WREC-03, WREC-04 | integration + unit | `npm test -- --run tests/unit/weeklyplan.test.jsx tests/integration/edge-functions.spec.ts` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

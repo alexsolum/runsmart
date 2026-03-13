@@ -57,7 +57,28 @@ describe("gemini-coach weekly recommendation context precedence", () => {
 
   it("WREC-03: plan generation is anchored to the requested target week instead of next Monday fallback copy", () => {
     expect(GEMINI_COACH_SOURCE).toMatch(/Generate the 7-day plan for the selected week from/i);
-    expect(GEMINI_COACH_SOURCE).toMatch(/requested target week start/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Mileage is a hard constraint/i);
+  });
+
+  it("WREC-04: hard selected-week contract requires explicit override rationale for mileage drift", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Hard constraint flags: training type/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/overrideRequiresExplanation/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/This is a taper-sensitive week/i);
+  });
+
+  it("WCON-02: plan mode consumes structured weeklyConstraints alongside the selected-week directive", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Treat structured weeklyConstraints as day-level scheduling preferences/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Preferred long-run day:/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Preferred hard-workout day:/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Commute days:/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Double threshold allowed:/i);
+  });
+
+  it("WCON-02: plan mode requires explanation when a weekly constraint is relaxed or a session moves", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/If a requested weekly constraint cannot be satisfied, explain which session moved or which preference was relaxed inside adaptation_summary/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/If you move a requested session or relax a weekly constraint, explain it plainly in adaptation_summary/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Long run moved from/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Primary quality session moved from/i);
   });
 });
 

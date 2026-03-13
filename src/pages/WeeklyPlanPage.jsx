@@ -3,6 +3,7 @@ import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { buildCoachPayload } from "../lib/coachPayload";
+import { WEEKLY_PLAN_HANDOFF_KEY } from "../lib/appNavigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -425,6 +426,7 @@ export default function WeeklyPlanPage() {
   const [editingEntry, setEditingEntry] = useState(null);
   const [pageError, setPageError] = useState(null);
   const [planGenerationLoading, setPlanGenerationLoading] = useState(false);
+  const [handoffIntent, setHandoffIntent] = useState(null);
 
   // Auto-select first plan
   useEffect(() => {
@@ -432,6 +434,23 @@ export default function WeeklyPlanPage() {
       setSelectedPlanId(plans.plans[0].id);
     }
   }, [plans.plans, selectedPlanId]);
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(WEEKLY_PLAN_HANDOFF_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.weekStart) {
+        setPlanningStartDate(parsed.weekStart);
+      }
+      if (parsed?.planId) {
+        setSelectedPlanId(parsed.planId);
+      }
+      setHandoffIntent(parsed);
+    } catch {
+      window.sessionStorage.removeItem(WEEKLY_PLAN_HANDOFF_KEY);
+    }
+  }, []);
 
   // 4-week visible window
   const visibleWeeks = useMemo(() => [
@@ -457,6 +476,20 @@ export default function WeeklyPlanPage() {
     () => getWeekIntent(trainingBlocks.blocks, selectedPlanId, planningStartDate),
     [trainingBlocks.blocks, selectedPlanId, planningStartDate],
   );
+  const displayWeekIntent = useMemo(() => {
+    if (
+      handoffIntent &&
+      handoffIntent.planId === selectedPlanId &&
+      handoffIntent.weekStart === planningStartDate
+    ) {
+      return {
+        phase: handoffIntent.phase ?? null,
+        targetKm: handoffIntent.targetKm ?? null,
+        notes: handoffIntent.notes ?? null,
+      };
+    }
+    return focusedWeekIntent;
+  }, [focusedWeekIntent, handoffIntent, planningStartDate, selectedPlanId]);
 
   // Load entries for entire 4-week range
   useEffect(() => {
@@ -637,7 +670,7 @@ export default function WeeklyPlanPage() {
           <WeeklyAiCard
             weekStart={planningStartDate}
             weekEntries={focusedWeekEntries}
-            weekIntent={focusedWeekIntent}
+            weekIntent={displayWeekIntent}
             onGenerate={handleGenerateWeek}
             loading={planGenerationLoading}
             error={pageError}

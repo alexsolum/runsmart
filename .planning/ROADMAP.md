@@ -17,9 +17,10 @@
 
 ### Phase 9: Ukeplan Ownership
 **Goal:** Make `Ukeplan` the single tactical weekly-planning surface while `Treningsplan` remains the source of weekly intent.
+**Status:** Complete (2026-03-13)
 **Requirements:**
-- [ ] **UKE-01**: User can generate an AI weekly plan directly from `Ukeplan`.
-- [ ] **UKE-02**: User sees `Treningsplan` provide weekly intent and targets, while `Ukeplan` owns weekly day-by-day generation and editing.
+- [x] **UKE-01**: User can generate an AI weekly plan directly from `Ukeplan`.
+- [x] **UKE-02**: User sees `Treningsplan` provide weekly intent and targets, while `Ukeplan` owns weekly day-by-day generation and editing.
 
 **Success Criteria:**
 1. User can start AI weekly generation from `Ukeplan` without going through `Treningsplan`.

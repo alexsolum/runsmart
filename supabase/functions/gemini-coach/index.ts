@@ -1248,6 +1248,64 @@ function buildDirectiveFallbackPlan(directive: WeekDirective): Record<string, un
   });
 }
 
+function buildGenericFallbackPlan(body: RequestBody): Record<string, unknown>[] {
+  const weekStart = body.targetWeekStart ?? getNextMonday();
+  const weekEnd = body.targetWeekEnd ?? buildTargetWeekDates(weekStart)[6];
+  const targetMileage = getNumericWithinBounds(body.planContext?.targetMileage, 45, 0, 250);
+
+  return buildDirectiveFallbackPlan({
+    weekStart,
+    weekEnd,
+    trainingType: body.recommendationContext?.trainingType ?? body.planContext?.phase ?? "Build",
+    targetMileageKm: targetMileage,
+    notes:
+      body.recommendationContext?.notes ??
+      "Fallback weekly structure generated after malformed AI output.",
+    constraints: {
+      enforceTrainingType: false,
+      enforceTargetMileage: false,
+      mileageTolerancePct: 0.1,
+      overrideRequiresExplanation: false,
+    },
+  });
+}
+
+function buildPlanParseFailureFallback(
+  body: RequestBody,
+  rawText: string,
+): {
+  coaching_feedback: string;
+  adaptation_summary: string;
+  structured_plan: Record<string, unknown>[];
+  used_ai_fallback: boolean;
+} {
+  const weekDirective = normalizeWeekDirective(body);
+  const structuredPlan = weekDirective
+    ? buildDirectiveFallbackPlan(weekDirective)
+    : buildGenericFallbackPlan(body);
+
+  const fallbackFeedback =
+    "The AI weekly plan response was malformed, so a safe fallback week was generated from your selected dates, recent load, and current planning context.";
+  let adaptationSummary =
+    "This fallback keeps the week structured and conservative rather than failing the planning flow. Review the generated sessions before applying major changes.";
+
+  const constraintOutcome = describeConstraintOutcome(body, structuredPlan);
+  if (constraintOutcome) {
+    adaptationSummary = `${adaptationSummary} ${constraintOutcome}`.trim().slice(0, 600);
+  }
+
+  const extractedCoachingFeedback = rawText.match(/"coaching_feedback"\s*:\s*"([^"]{20,400})/i)?.[1]
+    ?.replace(/\\"/g, "\"")
+    ?.trim();
+
+  return {
+    coaching_feedback: (extractedCoachingFeedback || fallbackFeedback).slice(0, 1000),
+    adaptation_summary: adaptationSummary,
+    structured_plan: structuredPlan,
+    used_ai_fallback: true,
+  };
+}
+
 function validateAndSanitizePlan(
   plan: Record<string, unknown>[],
   body: RequestBody,
@@ -1508,7 +1566,11 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents,
-          generationConfig: { temperature: 0.6, maxOutputTokens: 4096 },
+          generationConfig: {
+            temperature: 0.6,
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json",
+          },
         }),
       });
 
@@ -1538,14 +1600,20 @@ Deno.serve(async (req) => {
         coaching_feedback?: string;
         adaptation_summary?: string;
         structured_plan?: Record<string, unknown>[];
+        used_ai_fallback?: boolean;
       };
       try {
         result = JSON.parse(stripMarkdownFences(rawText));
       } catch {
-        return new Response(
-          JSON.stringify({ error: "Failed to parse plan from Gemini", raw: rawText.slice(0, 300) }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        console.error("Failed to parse plan from Gemini:", rawText.slice(0, 300));
+        await logAiFailure(
+          supabase,
+          user.id,
+          mode,
+          rawText.slice(0, 4000),
+          "failed_to_parse_plan_response",
         );
+        result = buildPlanParseFailureFallback(body, rawText);
       }
 
       const coachingFeedback = String(result.coaching_feedback || "").slice(0, 1000);
@@ -1568,6 +1636,7 @@ Deno.serve(async (req) => {
           coaching_feedback: coachingFeedback,
           adaptation_summary: adaptationSummary,
           structured_plan: structuredPlan,
+          used_ai_fallback: Boolean(result.used_ai_fallback),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );

@@ -80,6 +80,13 @@ describe("gemini-coach weekly recommendation context precedence", () => {
     expect(GEMINI_COACH_SOURCE).toMatch(/Long run moved from/i);
     expect(GEMINI_COACH_SOURCE).toMatch(/Primary quality session moved from/i);
   });
+
+  it("WCON-03: malformed plan JSON falls back to a safe structured week instead of returning a hard parse failure", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/responseMimeType:\s*"application\/json"/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/buildPlanParseFailureFallback/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/used_ai_fallback:\s*true/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/failed_to_parse_plan_response/i);
+  });
 });
 
 describe("gemini-coach insights synthesis instruction", () => {

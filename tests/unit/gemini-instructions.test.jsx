@@ -57,7 +57,13 @@ describe("gemini-coach weekly recommendation context precedence", () => {
 
   it("WREC-03: plan generation is anchored to the requested target week instead of next Monday fallback copy", () => {
     expect(GEMINI_COACH_SOURCE).toMatch(/Generate the 7-day plan for the selected week from/i);
-    expect(GEMINI_COACH_SOURCE).toMatch(/requested target week start/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/Mileage is a hard constraint/i);
+  });
+
+  it("WREC-04: hard selected-week contract requires explicit override rationale for mileage drift", () => {
+    expect(GEMINI_COACH_SOURCE).toMatch(/Hard constraint flags: training type/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/overrideRequiresExplanation/i);
+    expect(GEMINI_COACH_SOURCE).toMatch(/This is a taper-sensitive week/i);
   });
 });
 

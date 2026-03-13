@@ -106,4 +106,38 @@ describe("buildCoachPayload synthesis windows", () => {
     expect(payload.recentActivities).toHaveLength(7);
     expect(payload.dailyLogs).toHaveLength(7);
   });
+
+  it("returns a normalized recommendationContext when a focused week is provided", async () => {
+    const payload = await buildCoachPayload({
+      ...makeInput(),
+      activePlan: {
+        id: "plan-1",
+        race_date: "2026-06-01",
+        current_mileage: 55,
+      },
+      trainingBlocks: { blocks: [] },
+      recommendationWeek: {
+        weekStart: "2026-03-16",
+        trainingType: "Build",
+        targetKm: 68,
+        notes: "Protect the long run after travel.",
+      },
+    });
+
+    expect(payload.recommendationContext).toEqual({
+      weekStart: "2026-03-16",
+      weekEnd: "2026-03-22",
+      trainingType: "Build",
+      targetMileageKm: 68,
+      notes: "Protect the long run after travel.",
+    });
+  });
+
+  it("keeps recommendationContext null when no focused week is provided", async () => {
+    const payload = await buildCoachPayload({
+      ...makeInput(),
+    });
+
+    expect(payload.recommendationContext).toBeNull();
+  });
 });

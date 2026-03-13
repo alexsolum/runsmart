@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Weekly Planning Intelligence
-current_phase: 11
-status: complete
-last_updated: "2026-03-13T18:55:00.000Z"
-last_activity: 2026-03-13 - Phase 11 constraint-aware weekly planning completed and verified
+milestone: null
+milestone_name: null
+current_phase: null
+status: ready_for_next_milestone
+last_updated: "2026-03-13T22:35:00.000Z"
+last_activity: 2026-03-13 - Milestone v1.2 archived after audit with accepted tech debt
 progress:
   total_phases: 3
   completed_phases: 3
@@ -17,10 +17,10 @@ progress:
 # State
 
 **Initialized:** 2026-03-11
-**Current Phase:** 11
-**Status:** Phase 11 complete
+**Current Phase:** None
+**Status:** Milestone v1.2 archived
 
-Last activity: 2026-03-13 - Gap plans 10-03 and 10-04 completed; phase 10 verified and phase 11 is next
+Last activity: 2026-03-13 - Milestone v1.2 archived after audit with accepted tech debt
 
 ## Project Reference
 
@@ -33,8 +33,8 @@ See: .planning/PROJECT.md
 - Project: `.planning/PROJECT.md`
 - Config: `.planning/config.json`
 - Research: `.planning/research/`
-- Requirements: `.planning/REQUIREMENTS.md`
 - Roadmap: `.planning/ROADMAP.md`
+- Milestones: `.planning/milestones/`
 - Codebase map: `.planning/codebase/`
 - Context: `.planning/milestones/v1.0-phases/06-CONTEXT.md`
 - Research: `.planning/milestones/v1.0-phases/06-RESEARCH.md`
@@ -42,25 +42,19 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 11 (Constraint-Aware Weekly Plans)
-Plan: Complete
-Status: Phase 11 verified with automated coverage for weekly constraints, explanation output, and protected-day regeneration
-Resume file: .planning/phases/11-constraint-aware-weekly-plans/11-VERIFICATION.md
+Phase: None
+Plan: Milestone complete
+Status: Ready to define the next milestone
+Resume file: .planning/PROJECT.md
 
 ## Notes
 
-- Milestone v1.2 started. Focus on weekly planning intelligence inside `Ukeplan`.
-- [Phase 09-ukeplan-ownership]: `WeeklyPlanPage` now owns AI week generation and remaps returned coach dates onto the currently focused week before calling `applyStructuredPlan`.
-- [Phase 09-ukeplan-ownership]: `LongTermPlanPage` no longer owns weekly generation; it stores read-only week intent and dispatches a handoff into `WeeklyPlanPage` through app-level navigation.
-- [Phase 10-recommendation-context]: Weekly recommendations should treat selected week type as directive, target mileage as a strong target, and notes as direct context shown in the `Ukeplan` setup summary.
-- [Phase 10-recommendation-context]: Active admin coaching philosophy should act as a guiding layer with explicit red-line guardrails; selected week intent wins unless a red line would be violated.
-- [Phase 10-recommendation-context]: Plan 10-01 established a normalized `recommendationContext` contract from `WeeklyPlanPage` through `buildCoachPayload`, including selected week dates, training type, mileage target, and notes.
-- [Phase 10-recommendation-context]: Plan 10-02 updated `gemini-coach` prompt precedence so selected-week intent outranks philosophy preferences while philosophy red lines remain explicit override-only guardrails.
-- [Phase 10-recommendation-context]: Plan 10-03 split visible-window navigation from AI week selection so any currently visible `Ukeplan` week can be targeted without falling back to `visibleWeeks[0]`.
-- [Phase 10-recommendation-context]: Plan 10-04 added explicit `weekDirective` constraints and edge-function enforcement so taper and near-target mileage weeks cannot drift silently without an override explanation.
-- [Phase 11-constraint-aware-weekly-plans]: `WeeklyPlanPage` now captures optional day-level constraints, surfaces returned adaptation explanations, and pauses regeneration for protected-day review before any overwrite.
-- [Phase 11-constraint-aware-weekly-plans]: `gemini-coach` now consumes `weeklyConstraints` and appends explanation text when long-run or quality-day preferences are relaxed.
-- [Phase 11-constraint-aware-weekly-plans]: `useWorkoutEntries` persists protected planning days in `weekly_plan_day_states`, preserves them by default during AI regeneration, and exposes an explicit force-overwrite path.
+- Milestone v1.2 archived. Start the next milestone with `$gsd-new-milestone`.
+- Current shipped weekly-planning model:
+  - `Ukeplan` owns AI week generation and editing.
+  - `Treningsplan` supplies read-only weekly intent and handoff context.
+  - Selected-week context and admin philosophy flow through the secure weekly planning path.
+  - Weekly constraints and protected-day overwrite review are part of the shipped planner behavior.
 
 ### Quick Tasks Completed
 

@@ -131,6 +131,19 @@ describe("buildCoachPayload synthesis windows", () => {
       targetMileageKm: 68,
       notes: "Protect the long run after travel.",
     });
+    expect(payload.weekDirective).toEqual({
+      weekStart: "2026-03-16",
+      weekEnd: "2026-03-22",
+      trainingType: "Build",
+      targetMileageKm: 68,
+      notes: "Protect the long run after travel.",
+      constraints: {
+        enforceTrainingType: true,
+        enforceTargetMileage: true,
+        mileageTolerancePct: 0.1,
+        overrideRequiresExplanation: true,
+      },
+    });
   });
 
   it("keeps recommendationContext null when no focused week is provided", async () => {
@@ -139,5 +152,6 @@ describe("buildCoachPayload synthesis windows", () => {
     });
 
     expect(payload.recommendationContext).toBeNull();
+    expect(payload.weekDirective).toBeNull();
   });
 });

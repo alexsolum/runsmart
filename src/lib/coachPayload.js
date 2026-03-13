@@ -151,6 +151,21 @@ function buildRecommendationContext(recommendationWeek) {
   };
 }
 
+function buildWeekDirective(recommendationWeek) {
+  const recommendationContext = buildRecommendationContext(recommendationWeek);
+  if (!recommendationContext) return null;
+
+  return {
+    ...recommendationContext,
+    constraints: {
+      enforceTrainingType: recommendationContext.trainingType != null,
+      enforceTargetMileage: recommendationContext.targetMileageKm != null,
+      mileageTolerancePct: recommendationContext.trainingType?.toLowerCase() === "taper" ? 0.08 : 0.1,
+      overrideRequiresExplanation: true,
+    },
+  };
+}
+
 function getRecentDailyLogs(logs, days = 7) {
   const cutoff = new Date(Date.now() - Math.max(days - 1, 0) * 24 * 60 * 60 * 1000);
   return logs
@@ -221,6 +236,7 @@ export async function buildCoachPayload({
     recentCheckins: freshCheckins.slice(0, 3).map(normalizeCheckin).filter(Boolean),
     planContext: buildPlanContext(activePlan, trainingBlocks.blocks ?? []),
     recommendationContext: buildRecommendationContext(recommendationWeek),
+    weekDirective: buildWeekDirective(recommendationWeek),
     dailyLogs: getRecentDailyLogs(freshLogs, windows.logDays),
     runnerProfile: runnerProfilePayload,
     lang,

@@ -370,17 +370,76 @@ function normalizeRecommendationContext(body: {
   };
 }
 
-function buildSelectedWeekDirective(body: RequestBody): string {
+interface WeekDirectiveConstraints {
+  enforceTrainingType?: boolean | null;
+  enforceTargetMileage?: boolean | null;
+  mileageTolerancePct?: number | null;
+  overrideRequiresExplanation?: boolean | null;
+}
+
+interface WeekDirective {
+  weekStart: string | null;
+  weekEnd: string | null;
+  trainingType: string | null;
+  targetMileageKm: number | null;
+  notes: string | null;
+  constraints: {
+    enforceTrainingType: boolean;
+    enforceTargetMileage: boolean;
+    mileageTolerancePct: number;
+    overrideRequiresExplanation: boolean;
+  };
+}
+
+function normalizeWeekDirective(body: RequestBody): WeekDirective | null {
   const recommendationContext = normalizeRecommendationContext(body);
-  if (!recommendationContext) {
+  const rawDirective = body.weekDirective;
+
+  if (!recommendationContext && !rawDirective) {
+    return null;
+  }
+
+  const weekStart = rawDirective?.weekStart ?? recommendationContext?.weekStart ?? null;
+  const weekStartDate = parseIsoDate(weekStart ?? undefined);
+  const defaultWeekEnd = weekStartDate ? toIsoDate(addDaysUtc(weekStartDate, 6)) : null;
+  const weekEnd = rawDirective?.weekEnd ?? recommendationContext?.weekEnd ?? defaultWeekEnd;
+  const weekEndDate = parseIsoDate(weekEnd ?? undefined);
+  const trainingType = rawDirective?.trainingType ?? recommendationContext?.trainingType ?? null;
+  const targetMileageKm = Number(rawDirective?.targetMileageKm ?? recommendationContext?.targetMileageKm);
+  const constraints = rawDirective?.constraints ?? {};
+  const trainingTypeLower = String(trainingType ?? "").trim().toLowerCase();
+  const defaultTolerance = trainingTypeLower === "taper" ? 0.08 : 0.1;
+
+  return {
+    weekStart: weekStartDate ? toIsoDate(weekStartDate) : weekStart,
+    weekEnd: weekEndDate ? toIsoDate(weekEndDate) : weekEnd,
+    trainingType,
+    targetMileageKm: Number.isFinite(targetMileageKm) ? targetMileageKm : null,
+    notes: rawDirective?.notes ?? recommendationContext?.notes ?? null,
+    constraints: {
+      enforceTrainingType: constraints?.enforceTrainingType ?? Boolean(trainingType),
+      enforceTargetMileage: constraints?.enforceTargetMileage ?? Number.isFinite(targetMileageKm),
+      mileageTolerancePct: Number.isFinite(Number(constraints?.mileageTolerancePct))
+        ? Math.min(0.25, Math.max(0.03, Number(constraints?.mileageTolerancePct)))
+        : defaultTolerance,
+      overrideRequiresExplanation: constraints?.overrideRequiresExplanation ?? true,
+    },
+  };
+}
+
+function buildSelectedWeekDirective(body: RequestBody): string {
+  const weekDirective = normalizeWeekDirective(body);
+  if (!weekDirective) {
     return "No selected-week recommendation context provided; rely on broader plan context only.";
   }
 
   return [
-    `Target week: ${recommendationContext.weekStart ?? "unknown"} to ${recommendationContext.weekEnd ?? "unknown"}`,
-    `Selected week type: ${recommendationContext.trainingType ?? "not specified"}`,
-    `Selected target mileage: ${recommendationContext.targetMileageKm ?? "not specified"} km`,
-    `Selected notes: ${recommendationContext.notes ?? "none"}`,
+    `Target week: ${weekDirective.weekStart ?? "unknown"} to ${weekDirective.weekEnd ?? "unknown"}`,
+    `Selected week type: ${weekDirective.trainingType ?? "not specified"}`,
+    `Selected target mileage: ${weekDirective.targetMileageKm ?? "not specified"} km`,
+    `Selected notes: ${weekDirective.notes ?? "none"}`,
+    `Hard constraint flags: training type ${weekDirective.constraints.enforceTrainingType ? "enforced" : "advisory"}, target mileage ${weekDirective.constraints.enforceTargetMileage ? `enforced within ${Math.round(weekDirective.constraints.mileageTolerancePct * 100)}%` : "advisory"}`,
+    `Override explanation required: ${weekDirective.constraints.overrideRequiresExplanation ? "yes" : "no"}`,
   ].join("\n");
 }
 
@@ -455,6 +514,14 @@ interface RequestBody {
   recentCheckins?: Checkin[];
   planContext: PlanContext | null;
   recommendationContext?: RecommendationContext | null;
+  weekDirective?: {
+    weekStart?: string | null;
+    weekEnd?: string | null;
+    trainingType?: string | null;
+    targetMileageKm?: number | null;
+    notes?: string | null;
+    constraints?: WeekDirectiveConstraints | null;
+  } | null;
   targetWeekStart?: string;
   targetWeekEnd?: string;
   dailyLogs: DailyLog[];
@@ -918,18 +985,25 @@ function buildPrompt(data: RequestBody): string {
 }
 
 function buildPlanPrompt(data: RequestBody): string {
+  const weekDirective = normalizeWeekDirective(data);
   const recommendationContext = normalizeRecommendationContext(data);
   const contextLines = buildPrompt(data);
-  const weekStart = recommendationContext?.weekStart ?? data.targetWeekStart ?? getNextMonday();
-  const weekEnd = recommendationContext?.weekEnd ?? data.targetWeekEnd ?? toIsoDate(addDaysUtc(parseIsoDate(weekStart) ?? parseIsoDate(getNextMonday())!, 6));
-  const targetMileage = recommendationContext?.targetMileageKm ?? data.planContext?.targetMileage ?? "appropriate volume";
+  const weekStart = weekDirective?.weekStart ?? recommendationContext?.weekStart ?? data.targetWeekStart ?? getNextMonday();
+  const weekEnd = weekDirective?.weekEnd ?? recommendationContext?.weekEnd ?? data.targetWeekEnd ?? toIsoDate(addDaysUtc(parseIsoDate(weekStart) ?? parseIsoDate(getNextMonday())!, 6));
+  const targetMileage = weekDirective?.targetMileageKm ?? recommendationContext?.targetMileageKm ?? data.planContext?.targetMileage ?? "appropriate volume";
   return [
     contextLines,
     `Generate the 7-day plan for the selected week from ${weekStart} to ${weekEnd}.`,
     `The plan MUST cover exactly 7 consecutive days (Monday through Sunday).`,
-    recommendationContext
-      ? `Selected-week directive: training type ${recommendationContext.trainingType ?? "not specified"}, target volume ${recommendationContext.targetMileageKm ?? "not specified"} km, notes: ${recommendationContext.notes ?? "none"}.`
+    weekDirective
+      ? `Selected-week directive: training type ${weekDirective.trainingType ?? "not specified"}, target volume ${weekDirective.targetMileageKm ?? "not specified"} km, notes: ${weekDirective.notes ?? "none"}.`
       : "Selected-week directive: not provided; fall back to the broader plan context.",
+    weekDirective?.constraints.enforceTargetMileage
+      ? `Mileage is a hard constraint. Stay within ${Math.round(weekDirective.constraints.mileageTolerancePct * 100)}% of ${weekDirective.targetMileageKm} km unless a safety or philosophy red-line override is explicitly explained.`
+      : "Mileage may flex based on broader coaching context.",
+    weekDirective?.trainingType?.toLowerCase() === "taper"
+      ? "This is a taper-sensitive week. Keep the week recognizably lighter, avoid unbounded volume growth, and preserve race-freshness intent."
+      : "Keep the week's structure aligned with the requested block intent.",
     `Output focus:`,
     `- Total weekly km should target ${targetMileage} km.`,
     `- Apply progressive overload appropriate for this athlete's recent training.`,
@@ -964,17 +1038,106 @@ function stripMarkdownFences(text: string): string {
 
 const VALID_WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
 
-function validateAndSanitizePlan(plan: Record<string, unknown>[]): Record<string, unknown>[] {
-  return plan
-    .filter((day) => day.date && day.workout_type)
-    .map((day) => ({
-      date: String(day.date),
-      workout_type: VALID_WORKOUT_TYPES.includes(String(day.workout_type)) ? day.workout_type : "Easy",
-      distance_km: Number(day.distance_km) || 0,
-      duration_min: Math.round(Number(day.duration_min)) || 0,
-      description: String(day.description || "").slice(0, 300),
-    }))
-    .slice(0, 7);
+function buildTargetWeekDates(targetWeekStart: string | undefined): string[] {
+  const parsedStart = parseIsoDate(targetWeekStart ?? undefined) ?? parseIsoDate(getNextMonday())!;
+  return Array.from({ length: 7 }, (_, index) => toIsoDate(addDaysUtc(parsedStart, index)));
+}
+
+function normalizePlanDay(day: Record<string, unknown>, date: string): Record<string, unknown> {
+  return {
+    date,
+    workout_type: VALID_WORKOUT_TYPES.includes(String(day.workout_type)) ? day.workout_type : "Easy",
+    distance_km: Number(day.distance_km) || 0,
+    duration_min: Math.round(Number(day.duration_min)) || 0,
+    description: String(day.description || "").slice(0, 300),
+  };
+}
+
+function hasOverrideExplanation(text: string): boolean {
+  return /(override|guardrail|safety|red-line|red line|because|due to|to avoid|protect)/i.test(text);
+}
+
+function roundToTenth(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function buildDirectiveFallbackPlan(directive: WeekDirective): Record<string, unknown>[] {
+  const dates = buildTargetWeekDates(directive.weekStart ?? undefined);
+  const targetMileage = Math.max(0, directive.targetMileageKm ?? 0);
+  const isTaper = String(directive.trainingType ?? "").trim().toLowerCase() === "taper";
+  const workoutTypes = isTaper
+    ? ["Rest", "Easy", "Tempo", "Rest", "Easy", "Recovery", "Long Run"]
+    : ["Recovery", "Easy", "Tempo", "Rest", "Easy", "Intervals", "Long Run"];
+  const distanceWeights = isTaper
+    ? [0, 0.14, 0.18, 0, 0.16, 0.2, 0.32]
+    : [0.08, 0.16, 0.18, 0, 0.16, 0.17, 0.25];
+
+  return dates.map((date, index) => {
+    const workoutType = workoutTypes[index];
+    const distanceKm = workoutType === "Rest"
+      ? 0
+      : roundToTenth(targetMileage * distanceWeights[index]);
+    const durationMin = workoutType === "Rest" ? 0 : Math.max(30, Math.round(distanceKm * 6));
+    const description = isTaper
+      ? (
+        workoutType === "Tempo"
+          ? "Controlled taper quality session. Keep the rhythm sharp without adding excess fatigue."
+          : workoutType === "Long Run"
+          ? "Reduced long run to preserve freshness while keeping endurance touchpoints."
+          : workoutType === "Rest"
+          ? "Full recovery day to absorb training and protect taper intent."
+          : "Easy aerobic support run that stays within the taper-week volume target."
+      )
+      : (
+        workoutType === "Tempo" || workoutType === "Intervals"
+          ? "Primary quality session for the week with controlled intensity and clear recovery around it."
+          : workoutType === "Long Run"
+          ? "Long run anchored to the week's directive without forcing an unsafe mileage spike."
+          : workoutType === "Rest"
+          ? "Rest day to absorb training and maintain sustainable progression."
+          : "Easy aerobic volume supporting durability and weekly consistency."
+      );
+
+    return {
+      date,
+      workout_type: workoutType,
+      distance_km: distanceKm,
+      duration_min: durationMin,
+      description: directive.notes
+        ? `${description} ${String(directive.notes).slice(0, 140)}`
+        : description,
+    };
+  });
+}
+
+function validateAndSanitizePlan(
+  plan: Record<string, unknown>[],
+  body: RequestBody,
+  coachingFeedback: string,
+  adaptationSummary: string,
+): Record<string, unknown>[] {
+  const weekDirective = normalizeWeekDirective(body);
+  const targetDates = buildTargetWeekDates(weekDirective?.weekStart ?? body.targetWeekStart);
+  const normalized = targetDates.map((date, index) => {
+    const day = plan[index] ?? {};
+    return normalizePlanDay(day, date);
+  });
+
+  if (!weekDirective || !weekDirective.constraints.enforceTargetMileage || weekDirective.targetMileageKm == null) {
+    return normalized;
+  }
+
+  const weeklyKm = normalized.reduce((sum, day) => sum + Number(day.distance_km || 0), 0);
+  const allowedDelta = weekDirective.targetMileageKm * weekDirective.constraints.mileageTolerancePct;
+  const withinTarget = Math.abs(weeklyKm - weekDirective.targetMileageKm) <= allowedDelta;
+  const explanationText = `${coachingFeedback}\n${adaptationSummary}`;
+  const explanationOk = !weekDirective.constraints.overrideRequiresExplanation || hasOverrideExplanation(explanationText);
+
+  if (withinTarget || explanationOk) {
+    return normalized;
+  }
+
+  return buildDirectiveFallbackPlan(weekDirective);
 }
 
 function getNumericWithinBounds(
@@ -1245,13 +1408,16 @@ Deno.serve(async (req) => {
         );
       }
 
-      const structuredPlan = validateAndSanitizePlan(
-        Array.isArray(result.structured_plan) ? result.structured_plan : [],
-      );
       const coachingFeedback = String(result.coaching_feedback || "").slice(0, 1000);
       const adaptationSummary = String(
         result.adaptation_summary || "Adaptation based on available training context.",
       ).slice(0, 600);
+      const structuredPlan = validateAndSanitizePlan(
+        Array.isArray(result.structured_plan) ? result.structured_plan : [],
+        body,
+        coachingFeedback,
+        adaptationSummary,
+      );
 
       return new Response(
         JSON.stringify({

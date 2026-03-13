@@ -18,7 +18,7 @@ progress:
 **Current Phase:** 8 (Insight Reliability)
 **Status:** Decisions finalized, moving to research.
 
-Last activity: 2026-03-12 - Completed quick task 8: Fix avg pace KPI (average_pace not average_speed) + Alle løp paginated tab with HR zone bar
+Last activity: 2026-03-13 - Completed quick task 9: Make improvement to chart in innsikt page. I have described the change in docs\\chart_improvement.md
 
 ## Project Reference
 
@@ -62,6 +62,7 @@ See: .planning/PROJECT.md
 | 6 | Improve aerobic efficiency chart: pace (min/km) Y-axis, HR-based classification, inverted axis, larger dots | 2026-03-12 | 32c19cd | [6-improve-aerobic-efficiency-trend-chart-m](./quick/6-improve-aerobic-efficiency-trend-chart-m/) |
 | 7 | Rework aerobic efficiency chart to reference-workout HR tracking (computeReferenceWorkouts, bpm Y-axis, empty state) | 2026-03-12 | 1827f65 | [7-rework-aerobic-efficiency-chart-to-use-r](./quick/7-rework-aerobic-efficiency-chart-to-use-r/) |
 | 8 | Fix avg pace KPI on dashboard and add Alle løp paginated activity tab with HR zone bar | 2026-03-12 | a42ba8b | [8-fix-avg-pace-kpi-on-dashboard-and-add-pa](./quick/8-fix-avg-pace-kpi-on-dashboard-and-add-pa/) |
+| 9 | Make improvement to chart in innsikt page. I have described the change in docs\\chart_improvement.md | 2026-03-13 | c8d4d32 | [9-make-improvement-to-chart-in-innsikt-pag](./quick/9-make-improvement-to-chart-in-innsikt-pag/) |
 
 ## Decisions
 
@@ -84,3 +85,4 @@ See: .planning/PROJECT.md
 - [quick-6]: maxHR = 95th-percentile of all activity average_heartrate values (fallback 190); easy filter HR<75%, workout HR>=85% or intensityScore>75, long duration>4500s AND HR<85%; trend-gain badge inverted for pace (negative=faster=green)
 - [quick-7]: Modal bin = Math.floor(distance_m/1000); modalCenter = (bin+0.5)*1000; candidates ±15%; pace outliers ±20% excluded; minimum 5 runs for chart display; trend badge shows bpm delta (negative=green) + % change
 - [quick-8]: avgPaceSpm filters to Run/Walk only; average_pace (s/km) preferred, fallback computed from moving_time/distance; fmtPaceDisplay now takes s/km directly; Alle løp tab shows all activities (unfiltered by date range) sorted newest-first
+- [quick-9]: endurance efficiency uses flat aerobic runs/rides only (30+ min, <=50 m per 5 km, avg HR <= 80% inferred max HR); Pa:HR chart only renders for activities with split-level data; synthesis cache no longer hydrates when the current page has no activity data

@@ -19,9 +19,9 @@ Weekly recommendations must be grounded in the long-term plan and coaching rules
 ## 3. Weekly Constraints & Safety (WCON)
 The generated week must fit real life and remain editable.
 
-- [ ] **WCON-01**: User can provide day-specific weekly constraints and preferences such as long-run day, hard-workout day, commute days, and double-threshold allowed or forbidden.
-- [ ] **WCON-02**: User receives an explanation of how constraints and planning guidance affected the generated week, including any conflicts or relaxed preferences.
-- [ ] **WCON-03**: User does not lose existing manual weekly edits without an explicit review or replacement action.
+- [x] **WCON-01**: User can provide day-specific weekly constraints and preferences such as long-run day, hard-workout day, commute days, and double-threshold allowed or forbidden.
+- [x] **WCON-02**: User receives an explanation of how constraints and planning guidance affected the generated week, including any conflicts or relaxed preferences.
+- [x] **WCON-03**: User does not lose existing manual weekly edits without an explicit review or replacement action.
 
 ## Future Requirements
 
@@ -45,6 +45,6 @@ The generated week must fit real life and remain editable.
 | WREC-02 | 10 | - | Pending |
 | WREC-03 | 10 | - | Pending |
 | WREC-04 | 10 | - | Pending |
-| WCON-01 | 11 | - | Pending |
-| WCON-02 | 11 | - | Pending |
-| WCON-03 | 11 | - | Pending |
+| WCON-01 | 11 | 11-01, 11-04 | Complete |
+| WCON-02 | 11 | 11-02, 11-04 | Complete |
+| WCON-03 | 11 | 11-03, 11-04 | Complete |

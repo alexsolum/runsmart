@@ -17,19 +17,20 @@ The coaching guidance must produce practical, tailored training decisions that f
 
 ## Next Milestone Goals
 
-- Close live-UAT debt for philosophy admin flows in production
-- Normalize requirement traceability updates as part of phase closeout
-- Address remaining synthesis prompt wording consistency debt
-- Define and scope v1.1 requirements with a fresh milestone setup
+- Move AI-powered weekly plan generation from `Treningsplan` into the `Ukeplan` workflow
+- Make weekly recommendations consume long-term block guidance and weekly mileage targets
+- Add admin-controlled weekly planning principles and focus guidance to the recommendation context
+- Support day-by-day weekly constraints such as long-run day, workout day, commute days, and double-threshold preferences
 
-## Current Milestone: v1.1 Strava Sync & Insight Trends
+## Current Milestone: v1.2 Weekly Planning Intelligence
 
-**Goal:** Enhance coaching insights with deeper trend analysis and robust, real-time Strava integration.
+**Goal:** Turn `Ukeplan` into the primary AI weekly planning surface so recommendations reflect block-level intent, admin coaching principles, and the athlete's real week.
 
 **Target features:**
-- Robust Strava Integration (Webhooks, unlimited sync, update handling)
-- Advanced Progress Analytics (Pace/HR efficiency trends by workout type)
-- Insight Synthesis Fixes (Reliable rich-text AI summaries)
+- Ukeplan-first weekly AI generation and editing flow
+- Recommendation engine grounded in `Treningsplan` weekly type and mileage inputs
+- Admin-configurable weekly focus and training-principle guidance
+- Per-day weekly constraints for schedule, workout placement, and preference handling
 
 ## Constraints
 
@@ -48,4 +49,4 @@ v1.0 roadmap and requirements are archived under:
 </details>
 
 ---
-*Last updated: 2026-03-08 after v1.0 milestone completion*
+*Last updated: 2026-03-13 for milestone v1.2 setup*

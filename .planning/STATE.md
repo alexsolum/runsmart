@@ -1,24 +1,25 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Strava Sync & Insight Trends
-current_phase: 8
-status: in-progress
-last_updated: "2026-03-11"
+milestone: v1.2
+milestone_name: Weekly Planning Intelligence
+current_phase: 10
+status: verifying
+last_updated: "2026-03-13"
+last_activity: 2026-03-13 - Plans 10-01 and 10-02 completed; phase 10 ready for verification
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # State
 
 **Initialized:** 2026-03-11
-**Current Phase:** 8 (Insight Reliability)
-**Status:** Decisions finalized, moving to research.
+**Current Phase:** 10 (Recommendation Context)
+**Status:** Verifying
 
-Last activity: 2026-03-13 - Completed quick task 9: Make improvement to chart in innsikt page. I have described the change in docs\\chart_improvement.md
+Last activity: 2026-03-13 - Plans 10-01 and 10-02 completed; phase 10 ready for verification
 
 ## Project Reference
 
@@ -38,17 +39,22 @@ See: .planning/PROJECT.md
 - Research: `.planning/milestones/v1.0-phases/06-RESEARCH.md`
 - Plan: `.planning/milestones/v1.0-phases/06-PLAN.md`
 
-## Phase Status
+## Current Position
 
-| Phase | Name | Status |
-|-------|------|--------|
-| 6 | Strava Robustness | In-Progress |
-| 7 | Advanced Analytics | Todo |
-| 8 | Insight Reliability | Todo |
+Phase: 10 (Recommendation Context)
+Plan: Verification
+Status: Both execution plans complete; verify phase goal before closing phase 10
+Resume file: `.planning/phases/10-recommendation-context/10-VERIFICATION.md`
 
 ## Notes
 
-- Milestone v1.1 started. Focus on Strava reliability and deeper analytics.
+- Milestone v1.2 started. Focus on weekly planning intelligence inside `Ukeplan`.
+- [Phase 09-ukeplan-ownership]: `WeeklyPlanPage` now owns AI week generation and remaps returned coach dates onto the currently focused week before calling `applyStructuredPlan`.
+- [Phase 09-ukeplan-ownership]: `LongTermPlanPage` no longer owns weekly generation; it stores read-only week intent and dispatches a handoff into `WeeklyPlanPage` through app-level navigation.
+- [Phase 10-recommendation-context]: Weekly recommendations should treat selected week type as directive, target mileage as a strong target, and notes as direct context shown in the `Ukeplan` setup summary.
+- [Phase 10-recommendation-context]: Active admin coaching philosophy should act as a guiding layer with explicit red-line guardrails; selected week intent wins unless a red line would be violated.
+- [Phase 10-recommendation-context]: Plan 10-01 established a normalized `recommendationContext` contract from `WeeklyPlanPage` through `buildCoachPayload`, including selected week dates, training type, mileage target, and notes.
+- [Phase 10-recommendation-context]: Plan 10-02 updated `gemini-coach` prompt precedence so selected-week intent outranks philosophy preferences while philosophy red lines remain explicit override-only guardrails.
 
 ### Quick Tasks Completed
 

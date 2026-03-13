@@ -19,11 +19,35 @@ import { makeAppData, SAMPLE_WORKOUT_ENTRIES, SAMPLE_PLAN } from "./mockAppData"
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
+vi.mock("../../src/lib/coachPayload", () => ({
+  buildCoachPayload: vi.fn(),
+}));
+vi.mock("../../src/lib/supabaseClient", () => ({
+  getSupabaseClient: vi.fn(),
+}));
 
 import { useAppData } from "../../src/context/AppDataContext";
+import { buildCoachPayload } from "../../src/lib/coachPayload";
+import { getSupabaseClient } from "../../src/lib/supabaseClient";
+import { WEEKLY_PLAN_HANDOFF_KEY } from "../../src/lib/appNavigation";
+
+function currentMondayIso() {
+  const d = new Date();
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - day + 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+function isoDateOffset(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0];
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   // Suppress window.confirm calls in delete tests
   vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
 });
@@ -33,6 +57,305 @@ describe("Weekly Plan — page structure", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
     expect(screen.getByRole("heading", { name: /Weekly Plan/i })).toBeInTheDocument();
+  });
+});
+
+describe("Weekly Plan — AI generation", () => {
+  it("shows the embedded AI week setup card", () => {
+    useAppData.mockReturnValue(makeAppData());
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText(/AI week setup/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Replace With AI Week/i })).toBeInTheDocument();
+  });
+
+  it("shows generate-first copy when the focused week is empty", () => {
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText(/Start this week with an AI-generated structure/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Generate AI Week/i })).toBeInTheDocument();
+  });
+
+  it("invokes gemini-coach and applies the returned week into the focused grid week", async () => {
+    const user = userEvent.setup();
+    const applyStructuredPlan = vi.fn().mockResolvedValue([]);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          {
+            date: "2026-04-07",
+            workout_type: "Easy",
+            distance_km: 12,
+            duration_min: 70,
+            description: "Aerobic support",
+          },
+          {
+            date: "2026-04-12",
+            workout_type: "Long Run",
+            distance_km: 24,
+            duration_min: 150,
+            description: "Long run progression",
+          },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Keep the long run steady.",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          mode: "plan",
+        }),
+      }),
+    );
+    expect(applyStructuredPlan).toHaveBeenCalledWith(
+      SAMPLE_PLAN.id,
+      [
+        expect.objectContaining({
+          workout_date: isoDateOffset(currentMondayIso(), 1),
+          workout_type: "Easy",
+          distance_km: 12,
+        }),
+        expect.objectContaining({
+          workout_date: isoDateOffset(currentMondayIso(), 6),
+          workout_type: "Long Run",
+          distance_km: 24,
+        }),
+      ],
+    );
+  });
+
+  it("requires confirmation before replacing a non-empty week", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: "2026-04-07", workout_type: "Easy", distance_km: 8, duration_min: 45, description: "Easy day" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Keep the long run steady.",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    globalThis.confirm.mockReturnValue(false);
+    const applyStructuredPlan = vi.fn();
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Replace With AI Week/i }));
+
+    expect(globalThis.confirm).toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+    expect(applyStructuredPlan).not.toHaveBeenCalled();
+  });
+
+  it("renders handoff intent from Training Plan when present in session storage", () => {
+    window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify({
+      planId: SAMPLE_PLAN.id,
+      weekStart: currentMondayIso(),
+      phase: "Build",
+      targetKm: 64,
+      notes: "Keep the long run steady and the midweek workout controlled.",
+    }));
+
+    useAppData.mockReturnValue(makeAppData());
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(screen.getByText("64 km")).toBeInTheDocument();
+    expect(screen.getByText(/Keep the long run steady/i)).toBeInTheDocument();
+  });
+
+  it("passes the same displayed current-week intent into buildCoachPayload and gemini-coach", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: currentMondayIso(), workout_type: "Easy", distance_km: 10, duration_min: 55, description: "Easy run" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(screen.getByText("65 km")).toBeInTheDocument();
+    expect(screen.getByText(/Introduce tempo and intervals/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Replace With AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalledWith(expect.objectContaining({
+      recommendationWeek: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+    }));
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          targetWeekStart: currentMondayIso(),
+          targetWeekEnd: isoDateOffset(currentMondayIso(), 6),
+          recommendationContext: expect.objectContaining({
+            trainingType: "Build",
+            targetMileageKm: 65,
+            notes: "Introduce tempo and intervals",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("keeps handoff-driven non-current intent aligned between the setup card and invoke payload", async () => {
+    const user = userEvent.setup();
+    const weekStart = isoDateOffset(currentMondayIso(), 7);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: weekStart, workout_type: "Easy", distance_km: 8, duration_min: 45, description: "Easy support" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart,
+        weekEnd: isoDateOffset(weekStart, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Travel Friday so move the quality work earlier.",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify({
+      planId: SAMPLE_PLAN.id,
+      weekStart,
+      phase: "Taper",
+      targetKm: 42,
+      notes: "Travel Friday so move the quality work earlier.",
+    }));
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Taper")).toBeInTheDocument();
+    expect(screen.getByText("42 km")).toBeInTheDocument();
+    expect(screen.getByText(/Travel Friday/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalledWith(expect.objectContaining({
+      recommendationWeek: {
+        weekStart,
+        weekEnd: isoDateOffset(weekStart, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Travel Friday so move the quality work earlier.",
+      },
+    }));
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          targetWeekStart: weekStart,
+          targetWeekEnd: isoDateOffset(weekStart, 6),
+          recommendationContext: expect.objectContaining({
+            weekStart,
+            trainingType: "Taper",
+            targetMileageKm: 42,
+          }),
+        }),
+      }),
+    );
   });
 });
 

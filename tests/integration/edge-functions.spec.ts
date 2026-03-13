@@ -42,8 +42,12 @@ function tryReadAccessTokenFromStorageState() {
 }
 
 function buildPlanModePayload() {
+  const targetWeekStart = '2026-03-16';
+  const targetWeekEnd = '2026-03-22';
   return {
     mode: 'plan',
+    targetWeekStart,
+    targetWeekEnd,
     weeklySummary: [
       { weekOf: '2026-02-09', distance: 48.2, runs: 5, longestRun: 16.0 },
       { weekOf: '2026-02-16', distance: 52.1, runs: 5, longestRun: 18.0 },
@@ -62,6 +66,13 @@ function buildPlanModePayload() {
       weekNumber: 6,
       targetMileage: 58,
       daysToRace: 101,
+    },
+    recommendationContext: {
+      weekStart: targetWeekStart,
+      weekEnd: targetWeekEnd,
+      trainingType: 'Taper',
+      targetMileageKm: 42,
+      notes: 'Travel Friday so keep the long run early and controlled.',
     },
     dailyLogs: [
       { date: '2026-03-01', sleep_hours: 7.5, sleep_quality: 4, fatigue: 2, mood: 4, stress: 2, training_quality: 4, resting_hr: 50, notes: null },
@@ -85,6 +96,13 @@ function assertStructuredPlanContract(body: any) {
     expect(typeof day.distance_km).toBe('number');
     expect(typeof day.duration_min).toBe('number');
     expect(typeof day.description).toBe('string');
+  }
+}
+
+function assertPlanDatesStayInRequestedWeek(body: any, expectedStart: string, expectedEnd: string) {
+  for (const day of body.structured_plan ?? []) {
+    expect(day.date >= expectedStart).toBeTruthy();
+    expect(day.date <= expectedEnd).toBeTruthy();
   }
 }
 
@@ -391,6 +409,7 @@ test.describe('Edge Function - gemini-coach plan contract with philosophy contex
     if (planRes.status() === 200) {
       const planBody = await planRes.json();
       assertStructuredPlanContract(planBody);
+      assertPlanDatesStayInRequestedWeek(planBody, '2026-03-16', '2026-03-22');
     }
   });
 
@@ -419,6 +438,7 @@ test.describe('Edge Function - gemini-coach plan contract with philosophy contex
     if (planRes.status() === 200) {
       const planBody = await planRes.json();
       assertStructuredPlanContract(planBody);
+      assertPlanDatesStayInRequestedWeek(planBody, '2026-03-16', '2026-03-22');
     }
   });
 

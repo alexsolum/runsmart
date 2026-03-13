@@ -1,37 +1,50 @@
-# Requirements: v1.1 Strava Sync & Insight Trends
+# Requirements: v1.2 Weekly Planning Intelligence
 
-**Goal:** Enhance coaching insights with deeper trend analysis and robust, real-time Strava integration.
+**Goal:** Turn `Ukeplan` into the primary AI weekly planning surface so recommendations reflect block-level intent, admin coaching principles, and the athlete's real week.
 
-## 1. Strava Integration (STRV)
-Real-time data ingestion and historical completeness.
+## 1. Ukeplan Ownership (UKE)
+`Ukeplan` becomes the single tactical weekly-planning workflow.
 
-- [ ] **STRV-01**: User's new activities appear automatically via Webhook (Create event).
-- [ ] **STRV-02**: User's activity updates (title, privacy) reflect automatically via Webhook (Update event).
-- [ ] **STRV-03**: User's deleted activities are removed automatically via Webhook (Delete event).
-- [ ] **STRV-04**: User can sync full activity history beyond the default 100-item limit (pagination support).
+- [x] **UKE-01**: User can generate an AI weekly plan directly from `Ukeplan`.
+- [x] **UKE-02**: User sees `Treningsplan` provide weekly intent and targets, while `Ukeplan` owns weekly day-by-day generation and editing.
 
-## 2. Progress Analytics (ANLY)
-Visual proof of fitness efficiency independent of race results.
+## 2. Recommendation Context (WREC)
+Weekly recommendations must be grounded in the long-term plan and coaching rules.
 
-- [ ] **ANLY-01**: User can view an Aerobic Efficiency trend chart (Speed/HR over time) with regression line.
-- [ ] **ANLY-02**: System filters analytics data to exclude non-runs, short durations (<10m), and invalid heart rate (0 or null).
+- [ ] **WREC-01**: Weekly AI recommendations use the selected week's training type from `Treningsplan`.
+- [ ] **WREC-02**: Weekly AI recommendations use the selected week's target mileage from `Treningsplan`.
+- [ ] **WREC-03**: Weekly AI recommendations incorporate the active admin coaching philosophy from the existing admin flow backed by the `coach_philosophy_documents` Supabase table.
+- [ ] **WREC-04**: Admin coaching philosophy can shape weekly planning recommendations with guidance such as focus, training principles, and red-line rules.
 
-## 3. Insight Synthesis (INSG)
-Reliable coaching summary presentation.
+## 3. Weekly Constraints & Safety (WCON)
+The generated week must fit real life and remain editable.
 
-- [ ] **INSG-03**: User sees a formatted Markdown coaching summary without JSON wrappers or raw code blocks.
+- [ ] **WCON-01**: User can provide day-specific weekly constraints and preferences such as long-run day, hard-workout day, commute days, and double-threshold allowed or forbidden.
+- [ ] **WCON-02**: User receives an explanation of how constraints and planning guidance affected the generated week, including any conflicts or relaxed preferences.
+- [ ] **WCON-03**: User does not lose existing manual weekly edits without an explicit review or replacement action.
+
+## Future Requirements
+
+- **WCON-04**: User can compare multiple generated weekly variants before choosing one.
+- **WREC-05**: Weekly AI recommendations adapt automatically from executed workouts mid-week.
+- **UKE-03**: User can reorder sessions with drag-and-drop weekly calendar interactions.
 
 ## Out of Scope
-- **ANLY-03**: AI interpretation of efficiency trends (deferred to v1.2).
-- **INSG-05**: Local fallback summary if AI fails (deferred; focus on fixing the AI contract first).
+
+- Full automatic daily replanning from live workout execution.
+- Multi-athlete weekly planning collaboration.
+- New external calendar sync features.
+- Replacing the long-term `Treningsplan` block builder with a day-by-day planner.
 
 ## Traceability
 | Req ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| STRV-01 | 6 | - | Pending |
-| STRV-02 | 6 | - | Pending |
-| STRV-03 | 6 | - | Pending |
-| STRV-04 | 6 | - | Pending |
-| ANLY-01 | 7 | - | Pending |
-| ANLY-02 | 7 | - | Pending |
-| INSG-03 | 8 | - | Pending |
+| UKE-01 | 9 | 09-01 | Complete |
+| UKE-02 | 9 | 09-02 | Complete |
+| WREC-01 | 10 | - | Pending |
+| WREC-02 | 10 | - | Pending |
+| WREC-03 | 10 | - | Pending |
+| WREC-04 | 10 | - | Pending |
+| WCON-01 | 11 | - | Pending |
+| WCON-02 | 11 | - | Pending |
+| WCON-03 | 11 | - | Pending |

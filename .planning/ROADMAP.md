@@ -1,50 +1,54 @@
-# Roadmap: v1.1 Strava Sync & Insight Trends
+# Roadmap: v1.2 Weekly Planning Intelligence
 
-**Created:** 2026-03-11
+**Created:** 2026-03-13
 **Project:** RunSmart
-**Total Requirements:** 7
-**Starting Phase:** 6
+**Total Requirements:** 8
+**Starting Phase:** 9
 
 ## Phase Overview
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 6 | Strava Robustness | Establish reliable, complete real-time data ingestion via Webhooks and pagination. | STRV-01, STRV-02, STRV-03, STRV-04 | 1. Webhook creates new activity in DB within 5s of upload.<br>2. Pagination loop successfully syncs history > 100 items.<br>3. Activity name change on Strava reflects in app via Update event. |
-| 7 | Advanced Analytics | Visualize aerobic efficiency trends to prove fitness gains independent of race results. | ANLY-01, ANLY-02 | 1. Chart displays individual "Easy Run" scatter points with regression trend line.<br>2. Filter logic correctly excludes short runs (<10m) and invalid HR (0).<br>3. Trend line updates reactively when data changes. |
-| 8 | Insight Reliability | Ensure coaching synthesis is always presented as clean, formatted Markdown. | INSG-03 | 1. Synthesis callout never renders raw JSON or code block syntax.<br>2. Sanitize pipeline strips artifacts before render.<br>3. AI response adheres to strict Markdown contract. |
+| 9 | Ukeplan Ownership | Make `Ukeplan` the single tactical weekly-planning surface while `Treningsplan` remains the source of weekly intent. | UKE-01, UKE-02 | 1. User can start AI weekly generation from `Ukeplan` without going through `Treningsplan`.<br>2. `Treningsplan` still exposes the selected week's type and mileage target as upstream context, not as a competing weekly generator.<br>3. The app presents one clear weekly-planning ownership model to the user. |
+| 10 | 2/2 | Complete   | 2026-03-13 | 1. Generated week uses the selected week's training type from `Treningsplan`.<br>2. Generated week uses the selected week's target mileage from `Treningsplan`.<br>3. Active admin coaching philosophy is included in the weekly recommendation context.<br>4. Weekly output reflects philosophy-driven principles or red lines in a visible way. |
+| 11 | Constraint-Aware Weekly Plans | Make generated weeks respect athlete day-by-day constraints, explain tradeoffs, and protect manual edits. | WCON-01, WCON-02, WCON-03 | 1. User can define day-specific constraints before generating a week.<br>2. Generated week explains how constraints and coaching context affected session placement, including conflicts.<br>3. Manual edits are not silently overwritten by regeneration. |
 
 ## Phase Details
 
-### Phase 6: Strava Robustness
-**Goal:** Establish reliable, complete real-time data ingestion via Webhooks and pagination.
+### Phase 9: Ukeplan Ownership
+**Goal:** Make `Ukeplan` the single tactical weekly-planning surface while `Treningsplan` remains the source of weekly intent.
+**Status:** Complete (2026-03-13)
 **Requirements:**
-- [x] **STRV-01**: User's new activities appear automatically via Webhook (Create event).
-- [x] **STRV-02**: User's activity updates (title, privacy) reflect automatically via Webhook (Update event).
-- [x] **STRV-03**: User's deleted activities are removed automatically via Webhook (Delete event).
-- [x] **STRV-04**: User can sync full activity history beyond the default 100-item limit (pagination support).
+- [x] **UKE-01**: User can generate an AI weekly plan directly from `Ukeplan`.
+- [x] **UKE-02**: User sees `Treningsplan` provide weekly intent and targets, while `Ukeplan` owns weekly day-by-day generation and editing.
 
 **Success Criteria:**
-1. Webhook creates new activity in DB within 5s of upload.
-2. Pagination loop successfully syncs history > 100 items.
-3. Activity name change on Strava reflects in app via Update event.
+1. User can start AI weekly generation from `Ukeplan` without going through `Treningsplan`.
+2. `Treningsplan` still exposes the selected week's type and mileage target as upstream context, not as a competing weekly generator.
+3. The app presents one clear weekly-planning ownership model to the user.
 
-### Phase 7: Advanced Analytics
-**Goal:** Visualize aerobic efficiency trends to prove fitness gains independent of race results.
+### Phase 10: Recommendation Context
+**Goal:** Feed weekly recommendations with block-level targets plus the existing admin coaching philosophy from `coach_philosophy_documents`.
 **Requirements:**
-- [x] **ANLY-01**: User can view an Aerobic Efficiency trend chart (Speed/HR over time) with regression line.
-- [x] **ANLY-02**: System filters analytics data to exclude non-runs, short durations (<10m), and invalid heart rate (0 or null).
+- [ ] **WREC-01**: Weekly AI recommendations use the selected week's training type from `Treningsplan`.
+- [ ] **WREC-02**: Weekly AI recommendations use the selected week's target mileage from `Treningsplan`.
+- [ ] **WREC-03**: Weekly AI recommendations incorporate the active admin coaching philosophy from the existing admin flow backed by the `coach_philosophy_documents` Supabase table.
+- [ ] **WREC-04**: Admin coaching philosophy can shape weekly planning recommendations with guidance such as focus, training principles, and red-line rules.
 
 **Success Criteria:**
-1. Chart displays individual "Easy Run" scatter points with regression trend line.
-2. Filter logic correctly excludes short runs (<10m) and invalid HR (0).
-3. Trend line updates reactively when data changes.
+1. Generated week uses the selected week's training type from `Treningsplan`.
+2. Generated week uses the selected week's target mileage from `Treningsplan`.
+3. Active admin coaching philosophy is included in the weekly recommendation context.
+4. Weekly output reflects philosophy-driven principles or red lines in a visible way.
 
-### Phase 8: Insight Reliability
-**Goal:** Ensure coaching synthesis is always presented as clean, formatted Markdown.
+### Phase 11: Constraint-Aware Weekly Plans
+**Goal:** Make generated weeks respect athlete day-by-day constraints, explain tradeoffs, and protect manual edits.
 **Requirements:**
-- [x] **INSG-03**: User sees a formatted Markdown coaching summary without JSON wrappers or raw code blocks.
+- [ ] **WCON-01**: User can provide day-specific weekly constraints and preferences such as long-run day, hard-workout day, commute days, and double-threshold allowed or forbidden.
+- [ ] **WCON-02**: User receives an explanation of how constraints and planning guidance affected the generated week, including any conflicts or relaxed preferences.
+- [ ] **WCON-03**: User does not lose existing manual weekly edits without an explicit review or replacement action.
 
 **Success Criteria:**
-1. Synthesis callout never renders raw JSON or code block syntax.
-2. Sanitize pipeline strips artifacts before render.
-3. AI response adheres to strict Markdown contract.
+1. User can define day-specific constraints before generating a week.
+2. Generated week explains how constraints and coaching context affected session placement, including conflicts.
+3. Manual edits are not silently overwritten by regeneration.

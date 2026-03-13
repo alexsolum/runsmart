@@ -43,18 +43,21 @@ const SYSTEM_INSTRUCTION =
 
 const PLAN_SYSTEM_INSTRUCTION =
   `You are Marius AI Bakken, an elite endurance running coach. ` +
-  `Analyze the athlete's 4-week training history and generate a complete 7-day training plan for the upcoming week. ` +
+  `Analyze the athlete's recent training history and generate a complete 7-day training plan for the specifically requested week. ` +
   `Your response MUST be a single valid JSON object with exactly three fields:\n` +
   `1. "coaching_feedback": a string (2-4 sentences) summarizing the last 4 weeks of training — key trends, progress, and any concerns.\n` +
-  `2. "adaptation_summary": a string (2-3 sentences) explaining what wellness/load signal drove the adaptation and how long-run structure or intensity distribution was adjusted. REQUIRED.\n` +
-  `3. "structured_plan": an array of exactly 7 objects, one per day starting from the next Monday, each with:\n` +
+  `2. "adaptation_summary": a string (2-3 sentences) explaining what wellness/load signal drove the adaptation, how long-run structure or intensity distribution was adjusted, and any guardrail-driven override. REQUIRED.\n` +
+  `3. "structured_plan": an array of exactly 7 objects, one per day starting from the requested target week start, each with:\n` +
   `   - "date": ISO date string (YYYY-MM-DD)\n` +
   `   - "workout_type": one of "Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"\n` +
   `   - "distance_km": number (0 for rest days)\n` +
   `   - "duration_min": integer (0 for rest days)\n` +
   `   - "description": string (1-2 sentences describing the workout purpose and execution)\n\n` +
   `Coaching requirements:\n` +
-  `- Respect the athlete's current phase and target weekly volume from their training plan.\n` +
+  `- Treat the selected-week recommendation context as the primary tactical directive for dates, training type, target mileage, and notes.\n` +
+  `- Use published philosophy as a background coaching layer. Philosophy red-line rules may force an override only when following the selected-week directive would violate a non-negotiable guardrail.\n` +
+  `- If a guardrail forces an override, explain it in normal coaching language inside coaching_feedback or adaptation_summary.\n` +
+  `- Respect the athlete's broader plan context and target weekly volume.\n` +
   `- Apply 80/20 polarization: most sessions easy, 1-2 quality sessions per week.\n` +
   `- Include exactly one long run (Sunday preferred, or Saturday if constraints apply).\n` +
   `- Ensure total weekly distance matches target volume within 10%.\n` +
@@ -333,6 +336,54 @@ function getCurrentPlanningMondayUtc(): Date {
   return getMondayOfWeekUtc(new Date());
 }
 
+function normalizeRecommendationContext(body: {
+  recommendationContext?: {
+    weekStart?: string | null;
+    weekEnd?: string | null;
+    trainingType?: string | null;
+    targetMileageKm?: number | null;
+    notes?: string | null;
+  } | null;
+  targetWeekStart?: string;
+  targetWeekEnd?: string;
+}): RecommendationContext | null {
+  const context = body.recommendationContext;
+  const weekStart = context?.weekStart ?? body.targetWeekStart ?? null;
+  const weekStartDate = parseIsoDate(weekStart ?? undefined);
+  const weekEnd = context?.weekEnd ??
+    body.targetWeekEnd ??
+    (weekStartDate ? toIsoDate(addDaysUtc(weekStartDate, 6)) : null);
+  const weekEndDate = parseIsoDate(weekEnd ?? undefined);
+  const targetMileageKm = context?.targetMileageKm;
+  const parsedTargetMileage = Number(targetMileageKm);
+
+  if (!weekStart && !weekEnd && !context?.trainingType && targetMileageKm == null && !context?.notes) {
+    return null;
+  }
+
+  return {
+    weekStart: weekStartDate ? toIsoDate(weekStartDate) : weekStart,
+    weekEnd: weekEndDate ? toIsoDate(weekEndDate) : weekEnd,
+    trainingType: context?.trainingType ?? null,
+    targetMileageKm: Number.isFinite(parsedTargetMileage) ? parsedTargetMileage : null,
+    notes: context?.notes ?? null,
+  };
+}
+
+function buildSelectedWeekDirective(body: RequestBody): string {
+  const recommendationContext = normalizeRecommendationContext(body);
+  if (!recommendationContext) {
+    return "No selected-week recommendation context provided; rely on broader plan context only.";
+  }
+
+  return [
+    `Target week: ${recommendationContext.weekStart ?? "unknown"} to ${recommendationContext.weekEnd ?? "unknown"}`,
+    `Selected week type: ${recommendationContext.trainingType ?? "not specified"}`,
+    `Selected target mileage: ${recommendationContext.targetMileageKm ?? "not specified"} km`,
+    `Selected notes: ${recommendationContext.notes ?? "none"}`,
+  ].join("\n");
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface WeeklySummary {
@@ -356,6 +407,14 @@ interface PlanContext {
   weekNumber: number;
   targetMileage: number;
   daysToRace: number;
+}
+
+interface RecommendationContext {
+  weekStart: string | null;
+  weekEnd: string | null;
+  trainingType: string | null;
+  targetMileageKm: number | null;
+  notes: string | null;
 }
 
 interface Checkin {
@@ -395,6 +454,9 @@ interface RequestBody {
   latestCheckin: Checkin | null;
   recentCheckins?: Checkin[];
   planContext: PlanContext | null;
+  recommendationContext?: RecommendationContext | null;
+  targetWeekStart?: string;
+  targetWeekEnd?: string;
   dailyLogs: DailyLog[];
   runnerProfile?: RunnerProfile | null;
   lang?: string;
@@ -621,6 +683,7 @@ function buildDefaultSystemInstruction(
 function buildReplanSystemInstruction(
   baseInstruction: string,
   lang: string | undefined,
+  selectedWeekDirective: string,
   philosophyAddendum: string,
   dynamicAddendum: string,
 ): string {
@@ -654,9 +717,10 @@ function buildReplanSystemInstruction(
     "Instruction precedence policy (highest to lowest):",
     "1) Output format and schema contract in this instruction.",
     "2) Safety and progression guardrails.",
-    "3) Active published coaching philosophy (runtime document).",
-    "4) Runtime playbook snippets.",
-    "5) Static playbook fallback context.",
+    "3) Selected-week recommendation context from the app request.",
+    "4) Active published coaching philosophy (runtime document).",
+    "5) Runtime playbook snippets.",
+    "6) Static playbook fallback context.",
     "",
     COACH_GUARDRAILS,
     "",
@@ -665,6 +729,12 @@ function buildReplanSystemInstruction(
     methodologyMandate,
     "",
     adaptationSummaryMandate,
+    "",
+    "Selected-week directive (primary tactical recommendation contract):",
+    selectedWeekDirective,
+    "",
+    "Philosophy conflict rule: selected-week direction wins unless a published philosophy red-line or explicit safety guardrail would be violated.",
+    "If a red-line override is necessary, keep the week recognizable and explain the override plainly.",
     "",
     "Active published philosophy (runtime):",
     philosophyAddendum,
@@ -848,14 +918,20 @@ function buildPrompt(data: RequestBody): string {
 }
 
 function buildPlanPrompt(data: RequestBody): string {
+  const recommendationContext = normalizeRecommendationContext(data);
   const contextLines = buildPrompt(data);
-  const nextMonday = getNextMonday();
+  const weekStart = recommendationContext?.weekStart ?? data.targetWeekStart ?? getNextMonday();
+  const weekEnd = recommendationContext?.weekEnd ?? data.targetWeekEnd ?? toIsoDate(addDaysUtc(parseIsoDate(weekStart) ?? parseIsoDate(getNextMonday())!, 6));
+  const targetMileage = recommendationContext?.targetMileageKm ?? data.planContext?.targetMileage ?? "appropriate volume";
   return [
     contextLines,
-    `Generate the 7-day plan starting from Monday ${nextMonday}.`,
+    `Generate the 7-day plan for the selected week from ${weekStart} to ${weekEnd}.`,
     `The plan MUST cover exactly 7 consecutive days (Monday through Sunday).`,
+    recommendationContext
+      ? `Selected-week directive: training type ${recommendationContext.trainingType ?? "not specified"}, target volume ${recommendationContext.targetMileageKm ?? "not specified"} km, notes: ${recommendationContext.notes ?? "none"}.`
+      : "Selected-week directive: not provided; fall back to the broader plan context.",
     `Output focus:`,
-    `- Total weekly km should target ${data.planContext?.targetMileage ?? "appropriate volume"} km.`,
+    `- Total weekly km should target ${targetMileage} km.`,
     `- Apply progressive overload appropriate for this athlete's recent training.`,
     `- Include at least one quality session (Tempo or Intervals) and one Long Run.`,
   ].join("\n");
@@ -1034,6 +1110,7 @@ Deno.serve(async (req) => {
       const systemInstruction = buildReplanSystemInstruction(
         LONG_TERM_REPLAN_SYSTEM_INSTRUCTION,
         body.lang,
+        buildSelectedWeekDirective(body),
         philosophyAddendum,
         dynamicPlaybookAddendum,
       );
@@ -1101,6 +1178,7 @@ Deno.serve(async (req) => {
       const systemInstruction = buildReplanSystemInstruction(
         baseInstruction,
         body.lang,
+        buildSelectedWeekDirective(body),
         philosophyAddendum,
         dynamicPlaybookAddendum,
       );

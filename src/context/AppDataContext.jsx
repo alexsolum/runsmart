@@ -9,13 +9,15 @@ import { useTrainingBlocks } from "../hooks/useTrainingBlocks";
 import { useWorkoutEntries } from "../hooks/useWorkoutEntries";
 import { useRunnerProfile } from "../hooks/useRunnerProfile";
 import { useCoachConversations } from "../hooks/useCoachConversations";
-import { useCoachPhilosophy } from "../hooks/useCoachPhilosophy";
+import { useHierarchicalPlan } from "../hooks/useHierarchicalPlan";
+import { useToast } from "./ToastContext";
 import { normalizeCheckin } from "../lib/coachPayload";
 
 const AppDataContext = createContext(null);
 
 export function AppDataProvider({ children }) {
   const auth = useAuth();
+  const { showToast, dismissToast } = useToast();
   const userId = auth.user?.id;
   const plans = usePlans(userId);
   const activities = useActivities(userId);
@@ -47,7 +49,7 @@ export function AppDataProvider({ children }) {
   const workoutEntries = useWorkoutEntries(userId);
   const runnerProfile = useRunnerProfile(userId);
   const coachConversations = useCoachConversations(userId);
-  const coachPhilosophy = useCoachPhilosophy(userId);
+  const hierarchicalPlan = useHierarchicalPlan(userId);
 
   const value = useMemo(
     () => ({
@@ -61,9 +63,11 @@ export function AppDataProvider({ children }) {
       workoutEntries,
       runnerProfile,
       coachConversations,
-      coachPhilosophy,
+      hierarchicalPlan,
+      showToast,
+      dismissToast,
     }),
-    [auth, plans, activities, normalizedCheckins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, coachPhilosophy],
+    [auth, plans, activities, normalizedCheckins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, hierarchicalPlan, showToast, dismissToast],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

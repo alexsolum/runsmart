@@ -3,6 +3,7 @@
 ## Current State
 
 **Shipped version:** v1.2 (2026-03-13)
+**v2.0 progress:** Phase 18 complete — Hierarchical plan hook layer with intake modal
 
 RunSmart now ships an end-to-end weekly planning workflow that fits the product’s athlete-first coaching model:
 - `Ukeplan` owns AI-powered weekly generation and editing
@@ -19,15 +20,20 @@ Current codebase snapshot:
 
 The coaching guidance must produce practical, tailored training decisions that fit real life while preserving long-term progression and injury prevention.
 
-## Next Milestone Goals
+## Current Milestone: v2.0 Claude Coach + Plan Overhaul
 
-- Define the next product milestone and convert its goals into a fresh `.planning/REQUIREMENTS.md`
-- Decide whether the next focus is weekly planner refinement, analytics depth, or data-sync reliability
-- Clean up carried planning debt from v1.2 where it affects workflow confidence
+**Goal:** Replace the Gemini AI backend with Claude API using the endurance coaching skill, adopt a hierarchical plan data model (plan → phases → weeks → days → workouts), and rebuild the weekly plan UI inspired by the claude-coach HTML viewer.
 
-## Current Milestone
-
-No milestone is currently open. The next milestone should start with `$gsd-new-milestone`.
+**Target features:**
+- Claude API Edge Function replacing gemini-coach with SKILL.md coaching methodology
+- Full training plan generation (all phases + weeks) in a single AI call
+- Conversational coaching chat powered by Claude
+- Hierarchical plan model: plan → phases → weeks → days → workouts (JSON-native)
+- Weekly plan UI overhaul: phase bar, weekly rows with 7-day columns, workout cards with zones
+- Workout detail modal with zone info, workout structure, and mark-complete
+- Drag-and-drop workouts between days
+- Weekly hours + km summary per week row
+- Remove admin philosophy editor (coaching context lives in SKILL.md reference files)
 
 ## Constraints
 
@@ -44,12 +50,23 @@ No milestone is currently open. The next milestone should start with `$gsd-new-m
 - ✓ Weekly planning grounded in selected-week training type and target mileage — v1.2
 - ✓ Admin coaching philosophy applied as secure weekly planning guidance — v1.2
 - ✓ Day-level weekly constraints and protected-day overwrite review — v1.2
+- ✓ Workout type registry and planner analytics domain helpers — Phase 13
+- ✓ 4-week planner grid with design system overhaul — Phase 14
+- ✓ Workout type color coding and constraint day visualization — Phase 14
+- ✓ Click-to-edit workout workflow — Phase 15
+- ✓ Claude API Edge Function with embedded coaching methodology — Phase 17
+- ✓ Hierarchical plans JSONB table with RLS — Phase 17
+- ✓ Philosophy editor removal and cleanup — Phase 17
+- ✓ Full training plan generation via Claude with SKILL.md methodology — Phase 18
+- ✓ Weekly plan hook layer (useHierarchicalPlan) with atomic operations — Phase 18
+- ✓ Plan intake modal with smart pre-fill and form validation — Phase 18
 
 ### Active
 
-- [ ] Define the next milestone scope and user value
-- [ ] Improve milestone traceability hygiene so requirements and summaries stay synchronized
-- [ ] Decide how automated auth coverage should work for live Playwright weekly-planning flows
+- [ ] Conversational coaching chat powered by Claude (Phase 21)
+- [ ] Weekly plan UI overhaul inspired by claude-coach HTML viewer (Phase 19)
+- [ ] Drag-and-drop workouts between days (Phase 20)
+- [ ] Weekly hours + km summary per week row (Phase 19)
 
 ### Out of Scope
 
@@ -72,4 +89,4 @@ Archived planning artifacts:
 </details>
 
 ---
-*Last updated: 2026-03-13 after v1.2 milestone completion*
+*Last updated: 2026-03-30 after Phase 18 completion*

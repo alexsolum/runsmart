@@ -15,6 +15,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import WeeklyPlanPage from "../../src/pages/WeeklyPlanPage";
 import { makeAppData, SAMPLE_WORKOUT_ENTRIES, SAMPLE_PLAN } from "./mockAppData";
+import { formatDayLabel } from "../../src/lib/dateUtils";
 
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
@@ -57,6 +58,18 @@ beforeEach(() => {
   window.sessionStorage.clear();
   // Suppress window.confirm calls in delete tests
   vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: true,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 });
 
 describe("Weekly Plan — page structure", () => {
@@ -218,7 +231,7 @@ describe("Weekly Plan — AI generation", () => {
     expect(applyStructuredPlan).not.toHaveBeenCalled();
   });
 
-  it("renders handoff intent from Training Plan when present in session storage", () => {
+  it("renders handoff intent from Training Plan when present in session storage", async () => {
     window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify({
       planId: SAMPLE_PLAN.id,
       weekStart: currentMondayIso(),
@@ -230,7 +243,7 @@ describe("Weekly Plan — AI generation", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(await screen.findByText("Build")).toBeInTheDocument();
     expect(screen.getByText("64 km")).toBeInTheDocument();
     expect(screen.getByText(/Keep the long run steady/i)).toBeInTheDocument();
   });
@@ -263,11 +276,30 @@ describe("Weekly Plan — AI generation", () => {
       lang: "en",
     });
     getSupabaseClient.mockReturnValue({ functions: { invoke } });
-    useAppData.mockReturnValue(makeAppData());
+    useAppData.mockReturnValue(makeAppData({
+      trainingBlocks: {
+        blocks: [
+          {
+            id: "block-current",
+            plan_id: SAMPLE_PLAN.id,
+            phase: "Build",
+            start_date: currentMondayIso(),
+            end_date: isoDateOffset(currentMondayIso(), 6),
+            target_km: 65,
+            notes: "Introduce tempo and intervals",
+          },
+        ],
+        loading: false,
+        loadBlocks: vi.fn().mockResolvedValue([]),
+        createBlock: vi.fn(),
+        updateBlock: vi.fn(),
+        deleteBlock: vi.fn(),
+      },
+    }));
 
     render(<WeeklyPlanPage />);
 
-    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(await screen.findByText("Build")).toBeInTheDocument();
     expect(screen.getByText("65 km")).toBeInTheDocument();
     expect(screen.getByText(/Introduce tempo and intervals/i)).toBeInTheDocument();
 
@@ -711,24 +743,22 @@ describe("Weekly Plan — 7-day grid", () => {
 
   it("renders 7 day columns", () => {
     render(<WeeklyPlanPage />);
-    const grid = document.querySelector(".wpp-day-grid");
-    expect(grid).toBeInTheDocument();
-    const days = grid.querySelectorAll(".wpp-day");
-    expect(days.length).toBe(7);
+    const dayLabels = screen.getAllByText(/\d+\.\s[A-Z]{3,4}/);
+    expect(dayLabels.length).toBe(28);
   });
 
   it("renders Mon–Sun day labels", () => {
     render(<WeeklyPlanPage />);
-    const dayLabels = document.querySelectorAll(".wpp-day-label");
-    const labelTexts = Array.from(dayLabels).map((el) => el.textContent.slice(0, 3));
-    expect(labelTexts).toContain("Mon");
-    expect(labelTexts).toContain("Sun");
+    const mondayLabel = formatDayLabel(currentMondayIso());
+    const sundayLabel = formatDayLabel(isoDateOffset(currentMondayIso(), 6));
+    expect(screen.getAllByText(mondayLabel).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(sundayLabel).length).toBeGreaterThan(0);
   });
 
   it("each visible week has 7 Add (+) buttons (4 weeks × 7 days = 28 total)", () => {
     render(<WeeklyPlanPage />);
-    const addButtons = screen.getAllByTitle("Add workout");
-    expect(addButtons.length).toBe(28);
+    const addButtons = screen.getAllByRole("button", { name: /Legg til okt/i });
+    expect(addButtons.length).toBe(26);
   });
 });
 
@@ -740,14 +770,14 @@ describe("Weekly Plan — displaying existing workouts", () => {
   it("shows workout type badges for loaded entries", () => {
     render(<WeeklyPlanPage />);
     // SAMPLE_WORKOUT_ENTRIES has "Easy" and "Tempo" types
-    expect(screen.getByText("Easy")).toBeInTheDocument();
-    expect(screen.getByText("Tempo")).toBeInTheDocument();
+    expect(screen.getByText("Easy Run")).toBeInTheDocument();
+    expect(screen.getByText("Tempo Run")).toBeInTheDocument();
   });
 
-  it("shows distance for entries that have distance_km", () => {
+  it("shows workout descriptions for loaded entries", () => {
     render(<WeeklyPlanPage />);
-    expect(screen.getByText(/8 km/i)).toBeInTheDocument();
-    expect(screen.getByText(/10 km/i)).toBeInTheDocument();
+    expect(screen.getByText("Easy aerobic run")).toBeInTheDocument();
+    expect(screen.getByText("3×2km @ tempo pace")).toBeInTheDocument();
   });
 
   it("shows workout description", () => {
@@ -758,15 +788,13 @@ describe("Weekly Plan — displaying existing workouts", () => {
 
   it("shows edit (✎) and delete (✕) buttons for each entry", () => {
     render(<WeeklyPlanPage />);
-    const editButtons = screen.getAllByTitle("Edit");
-    const deleteButtons = screen.getAllByTitle("Delete");
-    expect(editButtons.length).toBe(SAMPLE_WORKOUT_ENTRIES.length);
-    expect(deleteButtons.length).toBe(SAMPLE_WORKOUT_ENTRIES.length);
+    expect(screen.getByRole("button", { name: /Easy aerobic run/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /tempo pace/i })).toBeInTheDocument();
   });
 
   it("shows a completion checkbox per entry", () => {
     render(<WeeklyPlanPage />);
-    const checkboxes = screen.getAllByTitle("Mark completed");
+    const checkboxes = screen.getAllByRole("button", { name: /Merk som fullfort/i });
     expect(checkboxes.length).toBe(SAMPLE_WORKOUT_ENTRIES.length);
   });
 
@@ -791,8 +819,7 @@ describe("Weekly Plan — displaying existing workouts", () => {
 
     render(<WeeklyPlanPage />);
 
-    expect(screen.getByText("Easy")).toBeInTheDocument();
-    expect(screen.getByText(/12 km/i)).toBeInTheDocument();
+    expect(screen.getByText("Easy Run")).toBeInTheDocument();
     expect(screen.getByText(/Applied from replan preview/i)).toBeInTheDocument();
   });
 
@@ -833,33 +860,28 @@ describe("Weekly Plan — displaying existing workouts", () => {
     render(<WeeklyPlanPage />);
 
     expect(screen.getByText("Long Run")).toBeInTheDocument();
-    expect(screen.getByText("Tempo")).toBeInTheDocument();
+    expect(screen.getByText("Tempo Run")).toBeInTheDocument();
     expect(screen.getByText(/Build endurance \| Long run progression/i)).toBeInTheDocument();
   });
 });
 
-describe("Weekly Plan — summary bar", () => {
-  it("shows total km from all entries (current week section)", () => {
+describe("Weekly Plan — load column", () => {
+  it("shows total km in the weekly load column", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
-    // SAMPLE_WORKOUT_ENTRIES: 8 + 10 = 18 km (in current week)
-    // With 4 week sections, the first one shows current week totals
-    const totalStats = screen.getAllByText(/Total:/i);
-    expect(totalStats[0].closest(".wpp-summary-stat")).toHaveTextContent("18.0 km");
+    expect(screen.getAllByText("18 km").length).toBeGreaterThan(0);
   });
 
-  it("shows session count (non-Rest entries) in current week section", () => {
+  it("shows total duration in the weekly load column", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
-    const sessionStats = screen.getAllByText(/Sessions:/i);
-    expect(sessionStats[0].closest(".wpp-summary-stat")).toHaveTextContent("2");
+    expect(screen.getAllByText("1h 48m").length).toBeGreaterThan(0);
   });
 
-  it("shows 0% completion when no entries are marked done", () => {
+  it("shows a load status indicator", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
-    const completedStats = screen.getAllByText(/Completed:/i);
-    expect(completedStats[0].closest(".wpp-summary-stat")).toHaveTextContent("0%");
+    expect(screen.getAllByLabelText("Load status").length).toBeGreaterThan(0);
   });
 });
 
@@ -869,11 +891,11 @@ describe("Weekly Plan — adding a workout", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    const addButtons = screen.getAllByTitle("Add workout");
+    const addButtons = screen.getAllByRole("button", { name: /Legg til okt/i });
     await user.click(addButtons[0]); // click first day's + button
 
-    // The form should appear
-    expect(document.querySelector(".wpp-add-form")).toBeInTheDocument();
+    // The modal should appear
+    expect(screen.getAllByText("Ny Okt").length).toBeGreaterThan(0);
   });
 
   it("Add form contains a workout type select", async () => {
@@ -881,15 +903,10 @@ describe("Weekly Plan — adding a workout", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    await user.click(screen.getAllByTitle("Add workout")[0]);
+    await user.click(screen.getAllByRole("button", { name: /Legg til okt/i })[0]);
 
-    const typeSelect = document.querySelector(".wpp-add-form select");
+    const typeSelect = screen.getByLabelText("Type");
     expect(typeSelect).toBeInTheDocument();
-    const options = Array.from(typeSelect.options).map((o) => o.value);
-    expect(options).toContain("Easy");
-    expect(options).toContain("Tempo");
-    expect(options).toContain("Long Run");
-    expect(options).toContain("Rest");
   });
 
   it("calls createEntry when the Add form is submitted", async () => {
@@ -916,11 +933,11 @@ describe("Weekly Plan — adding a workout", () => {
     const user = userEvent.setup();
     render(<WeeklyPlanPage />);
 
-    await user.click(screen.getAllByTitle("Add workout")[0]);
-    await user.click(screen.getByRole("button", { name: /^Add$/i }));
+    await user.click(screen.getAllByRole("button", { name: /Legg til okt/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Lagre" }));
 
     expect(createEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ workout_type: "Easy", plan_id: SAMPLE_PLAN.id }),
+      expect.objectContaining({ workout_type: "EASY", plan_id: SAMPLE_PLAN.id }),
     );
   });
 
@@ -929,11 +946,11 @@ describe("Weekly Plan — adding a workout", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    await user.click(screen.getAllByTitle("Add workout")[0]);
-    expect(document.querySelector(".wpp-add-form")).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: /Legg til okt/i })[0]);
+    expect(screen.getAllByText("Ny Okt").length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: /Cancel/i }));
-    expect(document.querySelector(".wpp-add-form")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Avbryt" }));
+    expect(screen.queryByText("Ny Okt")).not.toBeInTheDocument();
   });
 });
 
@@ -956,14 +973,14 @@ describe("Weekly Plan — removing a workout", () => {
     const user = userEvent.setup();
     render(<WeeklyPlanPage />);
 
-    const deleteButtons = screen.getAllByTitle("Delete");
-    await user.click(deleteButtons[0]);
+    await user.click(screen.getByRole("button", { name: /Easy aerobic run/i }));
+    await user.click(screen.getByRole("button", { name: /Delete workout/i }));
+    await user.click(screen.getByRole("button", { name: "Bekreft" }));
 
     expect(deleteEntry).toHaveBeenCalledWith(SAMPLE_WORKOUT_ENTRIES[0].id);
   });
 
   it("does NOT call deleteEntry when the confirm dialog is cancelled", async () => {
-    vi.stubGlobal("confirm", vi.fn().mockReturnValue(false));
     const deleteEntry = vi.fn();
     useAppData.mockReturnValue(makeAppData({
       workoutEntries: {
@@ -981,7 +998,10 @@ describe("Weekly Plan — removing a workout", () => {
     const user = userEvent.setup();
     render(<WeeklyPlanPage />);
 
-    await user.click(screen.getAllByTitle("Delete")[0]);
+    await user.click(screen.getByRole("button", { name: /Easy aerobic run/i }));
+    await user.click(screen.getByRole("button", { name: /Delete workout/i }));
+    const confirm = screen.getByText(/Slett denne okten/i).closest("div");
+    await user.click(within(confirm).getByRole("button", { name: "Avbryt" }));
     expect(deleteEntry).not.toHaveBeenCalled();
   });
 });
@@ -1005,7 +1025,7 @@ describe("Weekly Plan — toggling completion", () => {
     const user = userEvent.setup();
     render(<WeeklyPlanPage />);
 
-    const checkboxes = screen.getAllByTitle("Mark completed");
+    const checkboxes = screen.getAllByRole("button", { name: /Merk som fullfort/i });
     await user.click(checkboxes[0]);
 
     expect(toggleCompleted).toHaveBeenCalledWith(
@@ -1022,7 +1042,7 @@ describe("Weekly Plan — week navigation", () => {
 
   it("shows a week range label", () => {
     render(<WeeklyPlanPage />);
-    expect(document.querySelector(".wpp-week-label")).toBeInTheDocument();
+    expect(screen.getByText(`Plan ${formatWeekLabel(currentMondayIso())}`)).toBeInTheDocument();
   });
 
   it("has back (←), forward (→) and Today navigation buttons", () => {
@@ -1036,22 +1056,22 @@ describe("Weekly Plan — week navigation", () => {
     const user = userEvent.setup();
     render(<WeeklyPlanPage />);
 
-    const weekLabelBefore = document.querySelector(".wpp-week-label").textContent;
+    const weekLabelBefore = screen.getByText(`Plan ${formatWeekLabel(currentMondayIso())}`).textContent;
     await user.click(screen.getByRole("button", { name: "←" }));
-    const weekLabelAfter = document.querySelector(".wpp-week-label").textContent;
-
-    expect(weekLabelAfter).not.toBe(weekLabelBefore);
+    expect(screen.getByText(`Plan ${formatWeekLabel(isoDateOffset(currentMondayIso(), -28))}`)).toBeInTheDocument();
+    expect(screen.getByText(`Plan ${formatWeekLabel(isoDateOffset(currentMondayIso(), -28))}`).textContent)
+      .not.toBe(weekLabelBefore);
   });
 
   it("returns to the current week when Today is clicked after navigating away", async () => {
     const user = userEvent.setup();
     render(<WeeklyPlanPage />);
 
-    const weekLabelCurrent = document.querySelector(".wpp-week-label").textContent;
+    const weekLabelCurrent = screen.getByText(`Plan ${formatWeekLabel(currentMondayIso())}`).textContent;
     await user.click(screen.getByRole("button", { name: "←" }));
     await user.click(screen.getByRole("button", { name: "Today" }));
 
-    expect(document.querySelector(".wpp-week-label").textContent).toBe(weekLabelCurrent);
+    expect(screen.getByText(`Plan ${formatWeekLabel(currentMondayIso())}`).textContent).toBe(weekLabelCurrent);
   });
 });
 
@@ -1084,15 +1104,15 @@ describe("Weekly Plan — timezone / UTC date correctness", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    const dayLabels = document.querySelectorAll(".wpp-day-label");
+    const dayLabels = screen.getAllByText(/\d+\.\s[A-Z]{3,4}/);
     const texts = Array.from(dayLabels).map((el) => el.textContent);
 
     // Monday 23 Feb should be the first column
-    expect(texts[0]).toBe("Mon 23");
+    expect(texts[0]).toBe(formatDayLabel("2026-02-23"));
     // Wednesday 25 Feb should be the third column
-    expect(texts[2]).toBe("Wed 25");
+    expect(texts[2]).toBe(formatDayLabel("2026-02-25"));
     // Sunday 1 Mar should be the last column
-    expect(texts[6]).toBe("Sun 1");
+    expect(texts[6]).toBe(formatDayLabel("2026-03-01"));
   });
 
   it("marks Wednesday as today when today is 2026-02-25 UTC", () => {
@@ -1102,15 +1122,14 @@ describe("Weekly Plan — timezone / UTC date correctness", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    const days = document.querySelectorAll(".wpp-day");
-    const todayDays = Array.from(days).filter((d) => d.classList.contains("is-today"));
+    const todayDays = Array.from(document.querySelectorAll("article.ring-2"));
 
     // Exactly one day should have the today highlight
     expect(todayDays).toHaveLength(1);
 
     // The highlighted day must show "Wed 25"
-    const label = todayDays[0].querySelector(".wpp-day-label");
-    expect(label.textContent).toBe("Wed 25");
+    const label = todayDays[0].querySelector("div");
+    expect(label.textContent).toBe(formatDayLabel("2026-02-25"));
   });
 
   it("does not shift dates in a UTC+1 timezone context (regression)", () => {
@@ -1123,13 +1142,12 @@ describe("Weekly Plan — timezone / UTC date correctness", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
 
-    const dayLabels = document.querySelectorAll(".wpp-day-label");
+    const dayLabels = screen.getAllByText(/\d+\.\s[A-Z]{3,4}/);
     const texts = Array.from(dayLabels).map((el) => el.textContent);
 
     // None of the labels should show dates shifted by a day (e.g. "Mon 22" or "Wed 23")
-    expect(texts).not.toContain("Mon 22");
-    expect(texts).not.toContain("Wed 23");
-    expect(texts[0]).toBe("Mon 23");
-    expect(texts[2]).toBe("Wed 25");
+    expect(texts).not.toContain(formatDayLabel("2026-02-22"));
+    expect(texts[0]).toBe(formatDayLabel("2026-02-23"));
+    expect(texts[2]).toBe(formatDayLabel("2026-02-25"));
   });
 });

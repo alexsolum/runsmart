@@ -5,6 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { t, setLanguage, getCurrentLanguage, useI18n } from "../../src/i18n/translations";
 import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
+beforeEach(() => {
+  localStorage.clear();
+  act(() => {
+    setLanguage("no");
+  });
+});
+
 // Reset language to Norwegian (the app default) after every test to avoid cross-test pollution
 afterEach(() => {
   act(() => {

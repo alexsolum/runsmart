@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import './tokens.css';
+@import './pa-tokens.css';
 @import '../../styles.css';
 
 @custom-variant dark (&:is(.dark *));
@@ -9,6 +10,8 @@
   --font-serif: "Instrument Serif", Georgia, serif;
   --font-mono: "JetBrains Mono", monospace;
   --font-display: "Outfit", "DM Sans", system-ui, sans-serif;
+  --font-manrope: "Manrope", system-ui, sans-serif;
+  --font-inter: "Inter", system-ui, sans-serif;
 }
 
 /* ── shadcn/ui CSS variable definitions ── */

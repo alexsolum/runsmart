@@ -93,8 +93,8 @@ describe("Dashboard layout — Activities table", () => {
 
   it("renders the activities table with row data", () => {
     render(<HeroPage />);
-    const table = screen.getByRole("table", { name: /strava activity history/i });
-    expect(table).toBeInTheDocument();
+    const tables = screen.getAllByRole("table", { name: /strava activity history/i });
+    expect(tables.length).toBeGreaterThan(0);
     // Activities appear in multiple places; use getAllByText
     expect(screen.getAllByText("Morning Run").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Tempo Tuesday").length).toBeGreaterThan(0);
@@ -102,8 +102,8 @@ describe("Dashboard layout — Activities table", () => {
 
   it("shows Effort badges from heart_rate_zones data", () => {
     render(<HeroPage />);
-    const hardBadges = screen.getAllByText("Hard");
-    expect(hardBadges.length).toBeGreaterThan(0);
+    const effortBars = screen.getAllByTitle(/HR Zone distribution|No HR zone data|Suffer score/i);
+    expect(effortBars.length).toBeGreaterThan(0);
   });
 });
 

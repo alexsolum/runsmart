@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppDataProvider, useAppData } from "./context/AppDataContext";
+import { ToastProvider } from "./context/ToastContext";
 import { useI18n } from "./i18n/translations";
 import AuthPage from "./pages/AuthPage";
 import HeroPage from "./pages/HeroPage";
@@ -11,7 +12,6 @@ import DataPage from "./pages/DataPage";
 import InsightsPage from "./pages/InsightsPage";
 import DailyLogPage from "./pages/DailyLogPage";
 import MobilePage from "./pages/MobilePage";
-import AdminPhilosophyPage from "./pages/AdminPhilosophyPage";
 import MobileNavBar from "./components/MobileNavBar";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import { APP_NAVIGATE_EVENT } from "./lib/appNavigation";
@@ -28,7 +28,6 @@ import {
   Search,
   Bell,
   Smartphone,
-  Shield,
 } from "lucide-react";
 
 // Static nav structure — labels are i18n keys, translated at render time
@@ -55,25 +54,14 @@ const NAV_GROUPS = [
 ];
 
 function Shell() {
-  const { auth, plans, activities, checkins, coachPhilosophy } = useAppData();
+  const { auth, plans, activities, checkins } = useAppData();
   const { t } = useI18n();
   const [activePage, setActivePage] = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState("analytics");
 
-  const navGroups = useMemo(() => {
-    const groups = NAV_GROUPS.map((group) => ({ ...group, items: [...group.items] }));
-    if (coachPhilosophy.isAdmin) {
-      groups[1].items.push({
-        key: "admin",
-        labelKey: "nav.admin",
-        icon: Shield,
-        component: AdminPhilosophyPage,
-      });
-    }
-    return groups;
-  }, [coachPhilosophy.isAdmin]);
-  const allNavItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
+  const navGroups = NAV_GROUPS;
+  const allNavItems = useMemo(() => NAV_GROUPS.flatMap((g) => g.items), []);
 
   useEffect(() => {
     if (!auth.user?.id) return;
@@ -252,8 +240,10 @@ function AuthGate() {
 
 export default function App() {
   return (
-    <AppDataProvider>
-      <AuthGate />
-    </AppDataProvider>
+    <ToastProvider>
+      <AppDataProvider>
+        <AuthGate />
+      </AppDataProvider>
+    </ToastProvider>
   );
 }

@@ -1,94 +1,109 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-current_phase: null
-status: ready_for_next_milestone
-last_updated: "2026-03-13T22:35:00.000Z"
-last_activity: 2026-03-13 - Milestone v1.2 archived after audit with accepted tech debt
+milestone: v2.0
+milestone_name: Claude Coach + Plan Overhaul
+current_phase: 19
+current_plan: 2
+status: completed
+last_updated: "2026-03-30T20:42:20.808Z"
+last_activity: 2026-03-30
 progress:
-  total_phases: 3
+  total_phases: 6
   completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 6
+  completed_plans: 6
 ---
-
 
 # State
 
-**Initialized:** 2026-03-11
-**Current Phase:** None
-**Status:** Milestone v1.2 archived
+**Initialized:** 2026-03-29
+**Current Phase:** 19
+**Current Plan:** 2
+**Status:** Phase 19 complete
 
-Last activity: 2026-03-13 - Milestone v1.2 archived after audit with accepted tech debt
+Last activity: 2026-03-30
 
 ## Project Reference
 
-See: .planning/PROJECT.md
+See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The coaching guidance must produce practical, tailored training decisions that fit real life while preserving long-term progression and injury prevention.
+**Current focus:** Phase 20 — drag-and-drop-rescheduling
 
 ## Artifacts
 
 - Project: `.planning/PROJECT.md`
 - Config: `.planning/config.json`
-- Research: `.planning/research/`
+- Research: `.planning/research/SUMMARY.md`
 - Roadmap: `.planning/ROADMAP.md`
-- Milestones: `.planning/milestones/`
-- Codebase map: `.planning/codebase/`
-- Context: `.planning/milestones/v1.0-phases/06-CONTEXT.md`
-- Research: `.planning/milestones/v1.0-phases/06-RESEARCH.md`
-- Plan: `.planning/milestones/v1.0-phases/06-PLAN.md`
+- Requirements: `.planning/REQUIREMENTS.md`
+- Coach skill: `docs/running_coach/SKILL.md`
+- Coach references: `docs/running_coach/reference/`
+- Coach output examples: `docs/running_coach/output/`
 
 ## Current Position
 
-Phase: None
-Plan: Milestone complete
-Status: Ready to define the next milestone
-Resume file: .planning/PROJECT.md
+Phase: 19 (plan-viewer-ui) — COMPLETE
+Plan: 2 of 2
 
-## Notes
+## Performance Metrics
 
-- Milestone v1.2 archived. Start the next milestone with `$gsd-new-milestone`.
-- Current shipped weekly-planning model:
-  - `Ukeplan` owns AI week generation and editing.
-  - `Treningsplan` supplies read-only weekly intent and handoff context.
-  - Selected-week context and admin philosophy flow through the secure weekly planning path.
-  - Weekly constraints and protected-day overwrite review are part of the shipped planner behavior.
+**Velocity:**
 
-### Quick Tasks Completed
+- Total plans completed (v2.0): 2
+- Average duration: 30 minutes
+- Total execution time: 60 minutes
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 1 | debug why strava sync fails; reproduce with chromium MCP and inspect Supabase + Vercel | 2026-03-12 | 577d04c | [1-debug-why-strava-sync-fails-reproduce-wi](./quick/1-debug-why-strava-sync-fails-reproduce-wi/) |
-| 2 | Resume the Insights / Innsikt AI card fix and finish deployment | 2026-03-12 | pending | [2-resume-the-insights-innsikt-ai-card-fix-](./quick/2-resume-the-insights-innsikt-ai-card-fix-/) |
-| 3 | I need you to change the Innsikt page to norwegian as well (as i have selected norwegian in the sidebar navigation). All text on the page should be norwegian, as well as the response from the AI Coach (gemini) | 2026-03-12 | 36eeea2 | [3-i-need-you-to-change-the-innsikt-page-to](./quick/3-i-need-you-to-change-the-innsikt-page-to/) |
-| 4 | Cache the AI coaching feedback on the InsightsPage (insights_synthesis mode) with 1-hour TTL keyed by language | 2026-03-12 | 68345f5 | [4-cache-the-ai-coaching-feedback-on-the-in](./quick/4-cache-the-ai-coaching-feedback-on-the-in/) |
-| 5 | Improve the aerobic efficiency trend chart (180-day window, regression quality badge R²/strength/count, pace in tooltip) | 2026-03-12 | 2e00225 | [5-improve-the-aerobic-efficiency-trend-cha](./quick/5-improve-the-aerobic-efficiency-trend-cha/) |
-| 6 | Improve aerobic efficiency chart: pace (min/km) Y-axis, HR-based classification, inverted axis, larger dots | 2026-03-12 | 32c19cd | [6-improve-aerobic-efficiency-trend-chart-m](./quick/6-improve-aerobic-efficiency-trend-chart-m/) |
-| 7 | Rework aerobic efficiency chart to reference-workout HR tracking (computeReferenceWorkouts, bpm Y-axis, empty state) | 2026-03-12 | 1827f65 | [7-rework-aerobic-efficiency-chart-to-use-r](./quick/7-rework-aerobic-efficiency-chart-to-use-r/) |
-| 8 | Fix avg pace KPI on dashboard and add Alle løp paginated activity tab with HR zone bar | 2026-03-12 | a42ba8b | [8-fix-avg-pace-kpi-on-dashboard-and-add-pa](./quick/8-fix-avg-pace-kpi-on-dashboard-and-add-pa/) |
-| 9 | Make improvement to chart in innsikt page. I have described the change in docs\\chart_improvement.md | 2026-03-13 | c8d4d32 | [9-make-improvement-to-chart-in-innsikt-pag](./quick/9-make-improvement-to-chart-in-innsikt-pag/) |
+**By Phase:**
 
-## Decisions
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| Phase 18 | P01 | 30 min | 2 | 4 |
+| Phase 18 | P02 | 30 min | 3 | 2 |
 
-- isAdmin bootstrap: tableEmpty (count=0) || existing row — OR logic resolves deadlock without changing App.jsx or edge function
-- Server-side ensureAdminAccess() still handles actual row insertion on first saveDraft mutation
-- [Phase 03-feedback-loop-integration]: gemini-instructions stubs use .jsx extension for jsdom pickup; module-not-found is intentional RED state for 03-01
-- [Phase 03-feedback-loop-integration]: makeAppData default checkins updated to SAMPLE_CHECKINS with loadCheckins mock to prevent undefined.catch() crashes
-- [Phase 03-feedback-loop-integration]: recentCheckins uses slice(0,3).map(normalizeCheckin).filter(Boolean); latestCheckin unchanged for backward compat
-- [Phase 03-feedback-loop-integration]: instructionSnippets.js is frontend-only for test assertions; citation/methodology mandate strings are copied by value into Deno edge function instruction builders
-- [Phase 03-feedback-loop-integration]: philosophyAddendum passed as optional 4th param to buildDefaultSystemInstruction — now injected into initial and followup Gemini calls alongside replan modes
-- [Phase 03-feedback-loop-integration]: adaptation_summary stored as separate useState in CoachPage; embedded in replanData object in LongTermPlanPage — consistent with each page's existing state shape
-- [Phase 04-insights-coach-layer]: computeTrainingLoadState: locked TSB thresholds (>10=good_form, >=-5=neutral, >=-15=accumulating_fatigue, else overreaching_risk); 15-day trend window ±2 dead-band; reuses coach-adaptation-note CSS class
-- [Phase 04-insights-coach-layer]: INSG-02: INSIGHTS_SYNTHESIS_INSTRUCTION_SNIPPET inlined in Deno edge function; instructionSnippets.js export for test assertions only
-- [Phase 04-insights-coach-layer]: INSG-02: Synthesis callout silently omitted on error - no error UI displayed to user
-- [Phase 05-insights-synthesis-hardening]: 05-01 migrated insights_synthesis to strict plain-text four-section contract (Mileage Trend, Intensity Distribution, Long-Run Progression, Race Readiness) with 10-12 week interpretation horizon wording
-- [Phase 05-insights-synthesis-hardening]: 05-01 enforces sanitize -> section-validation -> deterministic fallback pipeline in edge function before returning synthesis
-- [Phase 05-insights-synthesis-hardening]: 05-02 sets mode-aware payload windows (default 4w/7d, insights_synthesis 12w/84d) with deterministic chronology and explicit insights-mode wiring from InsightsPage
-- [quick-4]: SYNTHESIS_CACHE uses module-level object (not localStorage) — survives SPA navigation, resets on browser reload; keyed by lang so en/no caches are independent
-- [quick-5]: rStrength thresholds: >=0.5=strong, >=0.25=moderate, else weak; pace in tooltip = 60/speed(km/h) formatted M:SS min/km with "—" fallback for zero speed
-- [quick-6]: maxHR = 95th-percentile of all activity average_heartrate values (fallback 190); easy filter HR<75%, workout HR>=85% or intensityScore>75, long duration>4500s AND HR<85%; trend-gain badge inverted for pace (negative=faster=green)
-- [quick-7]: Modal bin = Math.floor(distance_m/1000); modalCenter = (bin+0.5)*1000; candidates ±15%; pace outliers ±20% excluded; minimum 5 runs for chart display; trend badge shows bpm delta (negative=green) + % change
-- [quick-8]: avgPaceSpm filters to Run/Walk only; average_pace (s/km) preferred, fallback computed from moving_time/distance; fmtPaceDisplay now takes s/km directly; Alle løp tab shows all activities (unfiltered by date range) sorted newest-first
-- [quick-9]: endurance efficiency uses flat aerobic runs/rides only (30+ min, <=50 m per 5 km, avg HR <= 80% inferred max HR); Pa:HR chart only renders for activities with split-level data; synthesis cache no longer hydrates when the current page has no activity data
+| Phase 19 | P01 | 38 min | 2 | 8 |
+
+*Updated after each plan completion*
+| Phase 19 P02 | 11 min | 2 tasks | 6 files |
+
+## Accumulated Context
+
+### Decisions
+
+- v2.0 scope: Replace Gemini with Claude API, adopt hierarchical plan model, rebuild weekly plan UI
+- v1.3 Phase 16 deferred — weekly summary replaced by new plan viewer design in v2.0
+- CLEAN-02 bundled with Phase 17 (Edge Function) — philosophy editor removal is atomic with function update, not a separate phase
+- Use raw fetch to call Anthropic REST API (avoids Deno lock file v5 incompatibility with Supabase)
+- Phase 20 (drag-and-drop) explicitly depends on DATA-03 atomic RPC from Phase 18
+- Cleanup phases (CLEAN-01, CLEAN-03) placed in Phase 22 — after new system is proven in production
+- [Phase 17]: CLEAN-02 complete: philosophy editor system fully removed; coaching context lives in SKILL.md reference files in claude-coach Edge Function
+- [Phase 17]: Raw fetch to Anthropic REST API (no SDK) confirmed as pattern for all Edge Functions
+- [Phase 17]: planSchema.js created as pure domain module reusable by both Edge Function and frontend
+- [Phase 18 Plan 01]: generatePlan sets generating:true synchronously before async invoke
+- [Phase 18 Plan 01]: moveWorkout is a no-op when fromDate === toDate (prevents unnecessary RPC calls)
+- [Phase 18 Plan 01]: All RPCs use row-level locking (FOR UPDATE) to prevent concurrent modifications
+- [Phase 18 Plan 02]: Form validation fires on submit (not blur) for better UX with clear error messages
+- [Phase 18 Plan 02]: PlanIntakeModal handles pre-fill from Strava activities (4-week average), runner profile background, and workout entries (hard/rest days)
+- [Phase 18 Plan 02]: Generating state spinner cycles 3 coaching messages with 4-second intervals for UX feedback during Edge Function call
+- [Phase 18 Plan 02]: Replace confirmation dialog prevents accidental overwrites when existing plan is present
+- [Phase 19]: Past phases collapse by default, but current and future phases always render expanded.
+- [Phase 19]: Mobile week browsing uses a single-day pager instead of compressing seven columns.
+- [Phase 19]: Workout cards stay scan-focused and delegate completion/editing to the detail modal only.
+- [Phase 19]: Successful workout edits close the modal so the updated card is immediately visible in the grid.
+
+### Blockers/Concerns
+
+- Phase 17 research flag: structured outputs schema must be tested against Claude API in isolation before hook or UI work begins — if schema exceeds grammar compilation limits, sentinel value mitigation must be applied first
+- Phase 20 research flag: dnd-kit DragOverlay scroll boundary behavior in a scrollable container has documented edge cases — research before implementation
+
+### Pending Todos
+
+- Day/date-range AI plan generation (v2.1 COACH-04)
+- Multi-turn SKILL.md assessment UX pattern needs design decision during Phase 17 or 19 planning
+
+## Session Continuity
+
+Last session: 2026-03-30T20:42:20.796Z
+Completed: Phase 19 Plan 02 (Workout detail modal with completion toggle and hierarchical edit flow)
+Summary: .planning/phases/19-plan-viewer-ui/19-02-SUMMARY.md
+Next: Phase 20 (Drag-and-Drop Rescheduling)

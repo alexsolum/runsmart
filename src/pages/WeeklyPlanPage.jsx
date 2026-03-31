@@ -9,6 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FourWeekGrid } from "../components/planner/FourWeekGrid";
+import { MobilePlannerPager } from "../components/planner/MobilePlannerPager";
+import {
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from "../components/ui/ResponsiveModal";
+import { WorkoutForm } from "../components/planner/WorkoutForm";
+import { FAB } from "../components/planner/FAB";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import { todayIso } from "../lib/dateUtils";
 
 const WORKOUT_TYPES = ["Easy", "Tempo", "Intervals", "Long Run", "Recovery", "Strength", "Cross-Train", "Rest"];
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -399,7 +411,7 @@ function TypeBadge({ type }) {
 
 const selectClass = "w-full border border-input rounded-md px-2 py-1.5 font-inherit text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring";
 
-function WorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
+function LegacyWorkoutForm({ date, initial, onSave, onCancel, loading, className }) {
   const blank = { workout_type: "Easy", distance_km: "", duration_min: "", description: "" };
   const [form, setForm] = useState({ ...blank, ...initial });
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
@@ -520,7 +532,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
       <div className="grid gap-1.5 flex-1">
         {dayEntries.map((entry) =>
           editingHere && editingEntry.id === entry.id ? (
-            <WorkoutForm
+            <LegacyWorkoutForm
               key={entry.id}
               date={date}
               initial={entry}
@@ -542,7 +554,7 @@ function DayColumn({ date, dayName, entries, addingTo, editingEntry, onAdd, onCa
       </div>
 
       {isAddingHere && (
-        <WorkoutForm
+        <LegacyWorkoutForm
           date={date}
           initial={null}
           onSave={(data) => onSave(null, data)}
@@ -633,6 +645,14 @@ export default function WeeklyPlanPage() {
   const [weeklyConstraints, setWeeklyConstraints] = useState(createEmptyWeeklyConstraints);
   const [latestGenerationFeedback, setLatestGenerationFeedback] = useState(null);
   const [pendingPlanReview, setPendingPlanReview] = useState(null);
+  const [isDesktopPlannerView, setIsDesktopPlannerView] = useState(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia("(min-width: 900px)").matches;
+  });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState("create");
+  const [createDate, setCreateDate] = useState(null);
+  const isMobile = !useMediaQuery("(min-width: 768px)");
 
   // Auto-select first plan
   useEffect(() => {
@@ -657,6 +677,22 @@ export default function WeeklyPlanPage() {
     } catch {
       window.sessionStorage.removeItem(WEEKLY_PLAN_HANDOFF_KEY);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+
+    const mediaQuery = window.matchMedia("(min-width: 900px)");
+    const handleChange = (event) => setIsDesktopPlannerView(event.matches);
+    setIsDesktopPlannerView(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
   }, []);
 
   // 4-week visible window
@@ -775,6 +811,72 @@ export default function WeeklyPlanPage() {
     },
     [workoutEntries],
   );
+
+  const handleOpenEdit = useCallback((entry) => {
+    setEditingEntry(entry);
+    setCreateDate(null);
+    setModalMode("edit");
+    setModalOpen(true);
+  }, []);
+
+  const handleOpenCreate = useCallback((date) => {
+    setCreateDate(date || todayIso());
+    setEditingEntry(null);
+    setModalMode("create");
+    setModalOpen(true);
+  }, []);
+
+  const handleFormSubmit = useCallback(async (formData) => {
+    if (!selectedPlanId) return;
+    setPageError(null);
+    try {
+      if (modalMode === "edit" && editingEntry?.id) {
+        await workoutEntries.updateEntry(editingEntry.id, {
+          workout_type: formData.workout_type,
+          workout_date: formData.workout_date,
+          distance_km: formData.distance_km || null,
+          duration_min: formData.duration_min || null,
+          description: formData.description || null,
+          completed: !!formData.completed,
+        });
+      } else {
+        await workoutEntries.createEntry({
+          plan_id: selectedPlanId,
+          workout_type: formData.workout_type,
+          workout_date: formData.workout_date,
+          distance_km: formData.distance_km || null,
+          duration_min: formData.duration_min || null,
+          description: formData.description || null,
+        });
+      }
+      setModalOpen(false);
+      setEditingEntry(null);
+      setCreateDate(null);
+    } catch (err) {
+      setPageError(err?.message || "Failed to save workout.");
+    }
+  }, [editingEntry, modalMode, selectedPlanId, workoutEntries]);
+
+  const handleFormDelete = useCallback(async (entryId) => {
+    setPageError(null);
+    try {
+      await workoutEntries.deleteEntry(entryId);
+      setModalOpen(false);
+      setEditingEntry(null);
+      setCreateDate(null);
+    } catch (err) {
+      setPageError(err?.message || "Failed to delete workout.");
+    }
+  }, [workoutEntries]);
+
+  const handleToggleCompleted = useCallback(async (id, current) => {
+    setPageError(null);
+    try {
+      await workoutEntries.toggleCompleted(id, current);
+    } catch (err) {
+      setPageError(err?.message || "Failed to toggle completion.");
+    }
+  }, [workoutEntries]);
 
   const handleConstraintChange = useCallback((field, value) => {
     setWeeklyConstraints((current) => ({
@@ -918,7 +1020,10 @@ export default function WeeklyPlanPage() {
 
   return (
     <PageContainer>
-      <div className="w-full max-w-screen-xl mx-auto overflow-x-hidden">
+      <div
+        className="w-full max-w-screen-xl mx-auto overflow-x-hidden"
+        style={{ background: "var(--pa-surface)" }}
+      >
         <div className="mb-5">
           <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">Weekly Plan</h2>
           <p className="m-0 text-sm text-slate-500">Plan your workouts day by day across the next four weeks.</p>
@@ -985,26 +1090,55 @@ export default function WeeklyPlanPage() {
         {!selectedPlanId ? (
           <p className="text-sm text-slate-400 text-center py-8">Select or create a training plan to start planning your week.</p>
         ) : (
-          <div className="space-y-6">
-            {visibleWeeks.map((weekStart) => (
-              <WeekSection
-                key={weekStart}
-                weekStart={weekStart}
-                allEntries={normalizedEntries}
-                addingTo={addingTo}
-                editingEntry={editingEntry}
-                onAdd={handleAdd}
-                onCancelAdd={() => setAddingTo(null)}
-                onSave={handleSave}
-                onEdit={setEditingEntry}
-                onDelete={handleDelete}
-                onToggle={handleToggle}
-                loading={workoutEntries.loading}
-                pageError={pageError}
-              />
-            ))}
+          <div>
+            {isDesktopPlannerView ? (
+              <div className="hidden md:block" style={{ padding: "0 var(--pa-space-8)" }}>
+                <FourWeekGrid
+                  entries={normalizedEntries}
+                  loading={workoutEntries.loading}
+                  loadEntriesForRange={workoutEntries.loadEntriesForRange}
+                  planId={selectedPlanId}
+                  blocks={trainingBlocks.blocks ?? []}
+                  onEdit={handleOpenEdit}
+                  onToggleCompleted={handleToggleCompleted}
+                  onCreateForDate={handleOpenCreate}
+                />
+              </div>
+            ) : (
+              <div className="md:hidden">
+                <MobilePlannerPager
+                  entries={normalizedEntries}
+                  loading={workoutEntries.loading}
+                  loadEntriesForRange={workoutEntries.loadEntriesForRange}
+                  planId={selectedPlanId}
+                  blocks={trainingBlocks.blocks ?? []}
+                  onEdit={handleOpenEdit}
+                  onToggleCompleted={handleToggleCompleted}
+                  onCreateForDate={handleOpenCreate}
+                />
+              </div>
+            )}
           </div>
         )}
+
+        {isMobile && selectedPlanId ? (
+          <FAB onClick={() => handleOpenCreate(todayIso())} />
+        ) : null}
+
+        <ResponsiveModal open={modalOpen} onOpenChange={setModalOpen}>
+          <ResponsiveModalContent>
+            <ResponsiveModalHeader>
+              <ResponsiveModalTitle>{modalMode === "edit" ? "Rediger Okt" : "Ny Okt"}</ResponsiveModalTitle>
+            </ResponsiveModalHeader>
+            <WorkoutForm
+              entry={modalMode === "edit" ? editingEntry : { workout_date: createDate || todayIso() }}
+              mode={modalMode}
+              onSubmit={handleFormSubmit}
+              onDelete={modalMode === "edit" ? handleFormDelete : undefined}
+              onCancel={() => setModalOpen(false)}
+            />
+          </ResponsiveModalContent>
+        </ResponsiveModal>
       </div>
     </PageContainer>
   );

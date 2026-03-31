@@ -1,0 +1,110 @@
+/* ══════════════════════════════════════════════════════
+   Precision Athlete Design Tokens (pa-tokens.css)
+   Namespace: --pa-*
+   ══════════════════════════════════════════════════════ */
+
+/* ── 1. Color: Core Palette ── */
+:root {
+  --pa-primary:            #003371;
+  --pa-primary-container:  #00499c;
+  --pa-on-primary:         #ffffff;
+  --pa-on-surface:         #191c1d;
+  --pa-on-surface-variant:  #434652;
+}
+
+/* ── 2. Color: Surface Hierarchy ── */
+:root {
+  --pa-surface:                  #f8f9fa;
+  --pa-surface-container-low:    #f3f4f5;
+  --pa-surface-container-lowest: #ffffff;
+}
+
+/* ── 1.5 Color: Workout Type Semantic Tokens ── */
+:root {
+  --pa-type-hard:                #003371;
+  --pa-type-hard-container:      #e0e9f5;
+  --pa-type-easy:                #3b82f6;
+  --pa-type-easy-container:      #eff6ff;
+  --pa-type-endurance:           #f59e0b;
+  --pa-type-endurance-container: #fef3c7;
+  --pa-type-race:                #d4af37;
+  --pa-type-race-container:      #fff9e6;
+  --pa-type-rest:                #94a3b8;
+  --pa-type-rest-container:      #f1f5f9;
+  --pa-type-other:               #0d9488;
+  --pa-type-other-container:     #f0fdfa;
+}
+
+/* ── 3. Typography ── */
+:root {
+  --pa-font-display: "Manrope", system-ui, sans-serif;
+  --pa-font-body:    "Inter", system-ui, sans-serif;
+
+  /* Display scale (Manrope) */
+  --pa-text-display-lg: 2.25rem;   /* 36px */
+  --pa-text-display-md: 1.875rem;  /* 30px */
+  --pa-text-display-sm: 1.5rem;    /* 24px */
+
+  /* Headline scale (Manrope) */
+  --pa-text-headline-lg: 1.25rem;  /* 20px */
+  --pa-text-headline-md: 1.125rem; /* 18px */
+  --pa-text-headline-sm: 1rem;     /* 16px */
+
+  /* Body scale (Inter) */
+  --pa-text-body-lg: 1rem;         /* 16px */
+  --pa-text-body-md: 0.875rem;     /* 14px */
+  --pa-text-body-sm: 0.75rem;      /* 12px */
+
+  /* Label scale (Inter) */
+  --pa-text-label-lg: 0.875rem;    /* 14px */
+  --pa-text-label-md: 0.75rem;     /* 12px */
+  --pa-text-label-sm: 0.6875rem;   /* 11px */
+}
+
+/* ── 4. Spacing (4px baseline grid) ── */
+:root {
+  --pa-space-1:  4px;
+  --pa-space-2:  8px;
+  --pa-space-3:  12px;
+  --pa-space-4:  16px;
+  --pa-space-6:  24px;
+  --pa-space-8:  32px;
+  --pa-space-10: 40px;
+  --pa-space-12: 48px;
+  --pa-space-16: 64px;
+}
+
+/* ── 5. Elevation & Shadows ── */
+:root {
+  --pa-shadow-ambient: 0 12px 32px rgba(0, 51, 113, 0.08);
+  --pa-shadow-card:    0 4px 16px rgba(0, 51, 113, 0.06);
+  --pa-outline:        rgba(0, 51, 113, 0.20);
+  --pa-radius-card:    0.75rem;
+  --pa-radius-full:    999px;
+}
+
+/* ── 6. Glassmorphism ── */
+:root {
+  --pa-glass-bg:     rgba(0, 51, 113, 0.85);
+  --pa-glass-blur:   20px;
+  --pa-glass-shadow: 0 8px 32px rgba(0, 51, 113, 0.24);
+}
+
+.pa-glass {
+  background: var(--pa-glass-bg);
+  box-shadow: var(--pa-glass-shadow);
+  color: var(--pa-on-primary);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .pa-glass {
+    background: rgba(0, 51, 113, 0.15);
+    -webkit-backdrop-filter: blur(var(--pa-glass-blur));
+    backdrop-filter: blur(var(--pa-glass-blur));
+  }
+}
+
+/* ── 7. Gradient ── */
+:root {
+  --pa-gradient-cta: linear-gradient(135deg, #003371 0%, #00499c 100%);
+}

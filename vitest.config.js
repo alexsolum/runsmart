@@ -15,7 +15,7 @@ export default defineConfig({
         // Pure compute / domain logic — fast, no DOM needed
         test: {
           name: "unit",
-          include: ["tests/unit/compute.test.js", "tests/unit/coachPayload.test.js"],
+          include: ["tests/unit/**/*.test.js"],
           environment: "node",
         },
       },
@@ -29,7 +29,7 @@ export default defineConfig({
         },
         test: {
           name: "components",
-          include: ["tests/unit/**/*.test.jsx", "tests/ui/**/*.test.jsx"],
+          include: ["tests/*.test.jsx", "tests/unit/**/*.test.jsx", "tests/ui/**/*.test.jsx"],
           environment: "jsdom",
           setupFiles: ["./tests/unit/setup.js"],
           globals: true,

@@ -2,6 +2,8 @@
 
 "use strict";
 
+import { WORKOUT_TYPES, normalizeWorkoutType } from "./workoutTypes.js";
+
   // ---- Date helpers ----
 
   function getWeekStart(date) {
@@ -28,6 +30,113 @@
     });
     return weeks;
   }
+
+  function computeWeeklyLoadStats(entries, targetKm) {
+    var stats = {
+      zoneDistribution: { hard: 0, easy: 0, endurance: 0, other: 0 },
+      totalHours: 0,
+      totalKm: 0,
+      status: "on-target",
+    };
+
+    if (!entries || !entries.length) return stats;
+
+    entries.forEach(function(entry) {
+      var typeKey = normalizeWorkoutType(entry.workout_type);
+      var typeInfo = WORKOUT_TYPES[typeKey] || WORKOUT_TYPES.EASY;
+      var km = Number(entry.distance_km) || 0;
+      var duration = Number(entry.duration_min) || 0;
+      var group = typeInfo.group;
+
+      if (duration === 0 && km > 0) {
+        var inferredPace = group === "hard" ? 5 : 6;
+        duration = km * inferredPace;
+      }
+
+      stats.totalKm += km;
+      stats.totalHours += duration / 60;
+
+      if (group === "rest" || group === "race") {
+        group = "other";
+      }
+
+      if (group && stats.zoneDistribution[group] !== undefined) {
+        stats.zoneDistribution[group] += duration;
+      }
+    });
+
+    var totalDuration = Object.values(stats.zoneDistribution).reduce(function(sum, value) {
+      return sum + value;
+    }, 0);
+
+    if (totalDuration > 0) {
+      Object.keys(stats.zoneDistribution).forEach(function(key) {
+        stats.zoneDistribution[key] = Math.round((stats.zoneDistribution[key] / totalDuration) * 100);
+      });
+    }
+
+    stats.totalHours = +stats.totalHours.toFixed(1);
+    stats.totalKm = +stats.totalKm.toFixed(1);
+
+    if (targetKm > 0 && stats.totalKm > targetKm * 1.1) {
+      stats.status = "over-target";
+    }
+
+    return stats;
+  }
+
+  function computeHistoricalAverage(activities) {
+    if (!activities || !activities.length) return 0;
+
+    var weeklySums = computeWeeklySummary(activities);
+    var distances = Object.values(weeklySums).map(function(week) {
+      return (Number(week.distance) || 0) / 1000;
+    });
+
+    if (!distances.length) return 0;
+
+    var sum = distances.reduce(function(total, value) {
+      return total + value;
+    }, 0);
+
+    return sum / distances.length;
+  }
+
+  function computeVolumeTrend(activities, weeklyEntries, numWeeks) {
+    var trend = [];
+    var today = new Date();
+    var currentWeekStart = getWeekStart(today);
+    var weeksToBuild = numWeeks || 4;
+    var historicalKm = computeHistoricalAverage(activities);
+
+    for (var i = 0; i < weeksToBuild; i++) {
+      var weekStart = new Date(currentWeekStart);
+      weekStart.setUTCDate(weekStart.getUTCDate() + (i * 7));
+
+      var weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+
+      var dateKey = weekStart.toISOString().split("T")[0];
+      var plannedKm = (weeklyEntries || [])
+        .filter(function(entry) {
+          if (!entry.workout_date) return false;
+          var workoutDate = new Date(entry.workout_date);
+          return workoutDate >= weekStart && workoutDate < weekEnd;
+        })
+        .reduce(function(sum, entry) {
+          return sum + (Number(entry.distance_km) || 0);
+        }, 0);
+
+      trend.push({
+        weekStart: dateKey,
+        plannedKm: +plannedKm.toFixed(1),
+        historicalKm: +historicalKm.toFixed(1),
+      });
+    }
+
+    return trend;
+  }
+
 
   // ---- Training blocks ----
 
@@ -1143,6 +1252,9 @@
 export {
   getWeekStart,
   computeWeeklySummary,
+  computeWeeklyLoadStats,
+  computeHistoricalAverage,
+  computeVolumeTrend,
   computeTrainingBlocks,
   computeCurrentBlock,
   computeTrainingLoad,

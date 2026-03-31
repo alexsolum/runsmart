@@ -47,6 +47,101 @@ describe("computeWeeklySummary", () => {
   });
 });
 
+describe("computeWeeklyLoadStats", () => {
+  it("returns zone distribution, total hours, and on-target status", () => {
+    const entries = [
+      { workout_type: "tempo", distance_km: 10, duration_min: 50 },
+      { workout_type: "easy", distance_km: 8, duration_min: 48 },
+      { workout_type: "long run", distance_km: 20, duration_min: 120 },
+      { workout_type: "gym", distance_km: 0, duration_min: 45 },
+    ];
+
+    const result = Compute.computeWeeklyLoadStats(entries, 45);
+
+    expect(result.zoneDistribution).toEqual({
+      hard: 19,
+      easy: 18,
+      endurance: 46,
+      other: 17,
+    });
+    expect(result.totalHours).toBe(4.4);
+    expect(result.totalKm).toBe(38);
+    expect(result.status).toBe("on-target");
+  });
+
+  it("estimates duration for entries without duration and flags over-target weeks", () => {
+    const entries = [
+      { workout_type: "intensity", distance_km: 12, duration_min: 0 },
+      { workout_type: "easy", distance_km: 20, duration_min: 0 },
+      { workout_type: "rest", distance_km: 0, duration_min: 30 },
+    ];
+
+    const result = Compute.computeWeeklyLoadStats(entries, 25);
+
+    expect(result.zoneDistribution).toEqual({
+      hard: 29,
+      easy: 57,
+      endurance: 0,
+      other: 14,
+    });
+    expect(result.totalHours).toBe(3.5);
+    expect(result.totalKm).toBe(32);
+    expect(result.status).toBe("over-target");
+  });
+
+  it("returns empty stats for missing entries", () => {
+    expect(Compute.computeWeeklyLoadStats([], 20)).toEqual({
+      zoneDistribution: { hard: 0, easy: 0, endurance: 0, other: 0 },
+      totalHours: 0,
+      totalKm: 0,
+      status: "on-target",
+    });
+  });
+});
+
+describe("computeVolumeTrend", () => {
+  it("computes weekly planned vs historical km for the requested week count", () => {
+    const currentWeekStart = Compute.getWeekStart(new Date());
+    const weekOne = new Date(currentWeekStart);
+    const weekTwo = new Date(currentWeekStart);
+    weekTwo.setUTCDate(weekTwo.getUTCDate() + 7);
+
+    const activities = [
+      { started_at: "2025-01-06T08:00:00Z", distance: 10000, elevation_gain: 100, moving_time: 3600 },
+      { started_at: "2025-01-08T08:00:00Z", distance: 20000, elevation_gain: 200, moving_time: 7200 },
+      { started_at: "2025-01-13T08:00:00Z", distance: 15000, elevation_gain: 150, moving_time: 5400 },
+    ];
+    const weeklyEntries = [
+      { workout_date: weekOne.toISOString().split("T")[0], distance_km: 12 },
+      { workout_date: new Date(weekOne.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], distance_km: 8 },
+      { workout_date: weekTwo.toISOString().split("T")[0], distance_km: 15.5 },
+    ];
+
+    const trend = Compute.computeVolumeTrend(activities, weeklyEntries, 2);
+
+    expect(trend).toEqual([
+      {
+        weekStart: weekOne.toISOString().split("T")[0],
+        plannedKm: 20,
+        historicalKm: 22.5,
+      },
+      {
+        weekStart: weekTwo.toISOString().split("T")[0],
+        plannedKm: 15.5,
+        historicalKm: 22.5,
+      },
+    ]);
+  });
+
+  it("returns zero values when no activities or entries exist", () => {
+    const trend = Compute.computeVolumeTrend([], [], 1);
+
+    expect(trend).toHaveLength(1);
+    expect(trend[0].plannedKm).toBe(0);
+    expect(trend[0].historicalKm).toBe(0);
+  });
+});
+
 describe("computeTrainingBlocks", () => {
   it("returns 4 blocks", () => {
     const plan = {

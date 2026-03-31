@@ -5,12 +5,15 @@
  * across weeks, with create/edit/delete functionality backed by Supabase.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
 import KoopTimeline from "../../src/components/KoopTimeline";
-import { makeAppData, SAMPLE_BLOCKS, SAMPLE_PLAN } from "./mockAppData";
+import { makeAppData, SAMPLE_BLOCKS, SAMPLE_HIERARCHICAL_PLAN, SAMPLE_PLAN } from "./mockAppData";
 import { APP_NAVIGATE_EVENT, WEEKLY_PLAN_HANDOFF_KEY } from "../../src/lib/appNavigation";
+import { PlanViewer } from "../../src/components/planner/PlanViewer";
+import { WorkoutDetailModal } from "../../src/components/planner/WorkoutDetailModal";
 
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
@@ -21,6 +24,148 @@ import { useAppData } from "../../src/context/AppDataContext";
 beforeEach(() => {
   vi.clearAllMocks();
   window.sessionStorage.clear();
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches: query.includes("min-width: 768px"),
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+});
+
+function PlanViewerHarness({ todayIso = "2026-03-30" }) {
+  const [selection, setSelection] = useState(null);
+
+  return (
+    <>
+      <PlanViewer
+        planData={SAMPLE_HIERARCHICAL_PLAN.plan_data}
+        todayIso={todayIso}
+        onWorkoutSelect={setSelection}
+      />
+      <WorkoutDetailModal
+        open={Boolean(selection)}
+        onOpenChange={(open) => {
+          if (!open) setSelection(null);
+        }}
+        selection={selection}
+        onToggleCompleted={vi.fn()}
+        onSave={vi.fn()}
+      />
+    </>
+  );
+}
+
+function createInteractiveHierarchicalPlanAppData() {
+  const planState = structuredClone(SAMPLE_HIERARCHICAL_PLAN);
+
+  const applyPatch = vi.fn().mockImplementation(async (patches) => {
+    const patch = patches[0];
+    const week = planState.plan_data.weeks.find((item) => item.weekNumber === patch.week);
+    const day = week?.days.find((item) => item.date === patch.dayDate);
+    const workout = day?.workouts.find((item) => item.id === patch.workoutId);
+
+    if (workout) {
+      Object.assign(workout, patch.fields);
+    }
+
+    return planState.plan_data;
+  });
+
+  const toggleWorkoutCompleted = vi.fn().mockImplementation(async (workoutId, weekNumber, dayDate) => {
+    const week = planState.plan_data.weeks.find((item) => item.weekNumber === weekNumber);
+    const day = week?.days.find((item) => item.date === dayDate);
+    const workout = day?.workouts.find((item) => item.id === workoutId);
+
+    if (workout) {
+      workout.completed = !workout.completed;
+    }
+
+    return planState.plan_data;
+  });
+
+  return makeAppData({
+    hierarchicalPlan: {
+      plan: planState,
+      loading: false,
+      generating: false,
+      error: null,
+      loadPlan: vi.fn().mockResolvedValue(planState),
+      generatePlan: vi.fn().mockResolvedValue(planState),
+      applyPatch,
+      toggleWorkoutCompleted,
+      moveWorkout: vi.fn().mockResolvedValue(planState),
+      getWeek: vi.fn().mockImplementation((weekNumber) =>
+        planState.plan_data.weeks.find((week) => week.weekNumber === weekNumber) ?? null
+      ),
+      getPhases: vi.fn().mockReturnValue(planState.plan_data.phases),
+    },
+  });
+}
+
+describe("PlanViewer", () => {
+  it("renders phase timeline labels and clickable targets", () => {
+    render(<PlanViewer planData={SAMPLE_HIERARCHICAL_PLAN.plan_data} todayIso="2026-03-02" />);
+
+    expect(screen.getByRole("button", { name: /^Base$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Build$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Peak$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Taper$/i })).toBeInTheDocument();
+    expect(document.getElementById("phase-base-1-2")).toBeInTheDocument();
+    expect(document.getElementById("phase-build-3-4")).toBeInTheDocument();
+  });
+
+  it("renders the week summary band with km before hours", () => {
+    render(<PlanViewer planData={SAMPLE_HIERARCHICAL_PLAN.plan_data} todayIso="2026-03-02" />);
+
+    const weekCard = screen.getByTestId("week-card-3");
+    expect(within(weekCard).getByText("Week 3")).toBeInTheDocument();
+    expect(within(weekCard).getByText("Build")).toBeInTheDocument();
+    expect(within(weekCard).getByText(/Extend marathon-specific strength and long-run purpose/i)).toBeInTheDocument();
+
+    const metrics = within(weekCard).getByTestId("week-metrics-3");
+    expect(metrics.textContent.indexOf("58 km")).toBeLessThan(metrics.textContent.indexOf("7.5 hr"));
+  });
+
+  it("renders exactly seven day cells and derives empty copy from recovery state only", () => {
+    render(<PlanViewer planData={SAMPLE_HIERARCHICAL_PLAN.plan_data} todayIso="2026-03-02" />);
+
+    const weekOne = screen.getByTestId("week-grid-1");
+    const weekTwo = screen.getByTestId("week-grid-2");
+    expect(within(weekOne).getAllByTestId(/day-cell-/)).toHaveLength(7);
+    expect(within(weekOne).getAllByText("No session planned").length).toBeGreaterThan(0);
+    expect(within(weekTwo).getAllByText("Rest day").length).toBeGreaterThan(0);
+  });
+
+  it("collapses past phases by default while current and future phases stay expanded", async () => {
+    const user = userEvent.setup();
+    render(<PlanViewer planData={SAMPLE_HIERARCHICAL_PLAN.plan_data} todayIso="2026-03-30" />);
+
+    const baseSection = screen.getByTestId("phase-section-base-1-2");
+    expect(within(baseSection).queryByTestId("week-card-1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Expand Base/i }));
+    expect(within(baseSection).getByTestId("week-card-1")).toBeInTheDocument();
+    expect(screen.getByTestId("phase-section-peak-5-6")).toBeInTheDocument();
+    expect(screen.getByTestId("week-card-5")).toBeInTheDocument();
+  });
+
+  it("renders a sticky horizontal timeline rail and mobile single-day pager", async () => {
+    const user = userEvent.setup();
+    render(<PlanViewer planData={SAMPLE_HIERARCHICAL_PLAN.plan_data} todayIso="2026-03-16" initialMobile />);
+
+    expect(screen.getByTestId("phase-timeline")).toHaveAttribute("data-mobile", "true");
+    expect(screen.getByTestId("phase-timeline")).toHaveAttribute("data-overflow-x", "true");
+    const weekCard = screen.getByTestId("week-card-3");
+    expect(within(weekCard).getByTestId("mobile-day-indicator-3")).toHaveTextContent("Day 1 of 7");
+
+    await user.click(within(weekCard).getByRole("button", { name: /Next day/i }));
+    expect(within(weekCard).getByTestId("mobile-day-indicator-3")).toHaveTextContent("Day 2 of 7");
+  });
 });
 
 describe("Training Plan - weekly handoff", () => {
@@ -68,6 +213,124 @@ describe("Training Plan — page structure", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<LongTermPlanPage />);
     expect(screen.getByRole("heading", { name: /Training Plan/i })).toBeInTheDocument();
+  });
+
+  it("renders the hierarchical plan viewer when a plan exists", () => {
+    useAppData.mockReturnValue(makeAppData());
+    render(<LongTermPlanPage />);
+
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("week-card-5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Regenerate Plan/i })).toBeInTheDocument();
+  });
+
+  it("keeps loading and empty plan states intact", () => {
+    useAppData.mockReturnValue(makeAppData({
+      hierarchicalPlan: {
+        ...makeAppData().hierarchicalPlan,
+        loading: true,
+      },
+    }));
+    render(<LongTermPlanPage />);
+    expect(screen.getByText("Loading plan...")).toBeInTheDocument();
+  });
+
+  it("opens a workout detail modal in summary mode with completion actions kept off the grid", async () => {
+    const user = userEvent.setup();
+    render(<PlanViewerHarness />);
+
+    expect(screen.queryByRole("button", { name: /Mark complete/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Mark incomplete/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Peak marathon session/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: /Peak marathon session/i })).toBeInTheDocument();
+    expect(within(dialog).getByText("Run")).toBeInTheDocument();
+    expect(within(dialog).getByText("Workout")).toBeInTheDocument();
+    expect(within(dialog).getByText("Z3")).toBeInTheDocument();
+    expect(within(dialog).getByText("75 min")).toBeInTheDocument();
+    expect(within(dialog).getByText("14 km")).toBeInTheDocument();
+    expect(within(dialog).getByText("2 x 5 km at marathon effort with easy float.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Edit workout/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Mark complete/i })).toBeInTheDocument();
+  });
+
+  it("switches the selected workout from summary mode into an edit form with hierarchical field names", async () => {
+    const user = userEvent.setup();
+    render(<PlanViewerHarness />);
+
+    await user.click(screen.getByRole("button", { name: /Peak marathon session/i }));
+    await user.click(screen.getByRole("button", { name: /Edit workout/i }));
+
+    expect(screen.getByLabelText("Sport")).toHaveAttribute("name", "sport");
+    expect(screen.getByLabelText("Type")).toHaveAttribute("name", "type");
+    expect(screen.getByLabelText("Workout name")).toHaveAttribute("name", "name");
+    expect(screen.getByLabelText("Description")).toHaveAttribute("name", "description");
+    expect(screen.getByLabelText("Duration")).toHaveAttribute("name", "durationMinutes");
+    expect(screen.getByLabelText("Distance")).toHaveAttribute("name", "distanceKm");
+    expect(screen.getByDisplayValue("Peak marathon session")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Specific marathon prep.")).toBeInTheDocument();
+  });
+
+  it("toggles workout completion from the modal and updates the visible action after save", async () => {
+    const user = userEvent.setup();
+    const appData = createInteractiveHierarchicalPlanAppData();
+    useAppData.mockReturnValue(appData);
+    render(<LongTermPlanPage />);
+
+    await user.click(screen.getByRole("button", { name: /Peak marathon session/i }));
+    await user.click(screen.getByRole("button", { name: /Mark complete/i }));
+
+    await waitFor(() =>
+      expect(appData.hierarchicalPlan.toggleWorkoutCompleted).toHaveBeenCalledWith(
+        "w-14",
+        5,
+        "2026-04-02",
+      )
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Mark incomplete/i })).toBeInTheDocument()
+    );
+  });
+
+  it("saves modal edits through applyPatch with the viewer payload shape and redraws the grid", async () => {
+    const user = userEvent.setup();
+    const appData = createInteractiveHierarchicalPlanAppData();
+    useAppData.mockReturnValue(appData);
+    render(<LongTermPlanPage />);
+
+    await user.click(screen.getByRole("button", { name: /Peak marathon session/i }));
+    await user.click(screen.getByRole("button", { name: /Edit workout/i }));
+
+    await user.clear(screen.getByLabelText("Workout name"));
+    await user.type(screen.getByLabelText("Workout name"), "Peak marathon session updated");
+    await user.clear(screen.getByLabelText("Duration"));
+    await user.type(screen.getByLabelText("Duration"), "82");
+    await user.clear(screen.getByLabelText("Distance"));
+    await user.type(screen.getByLabelText("Distance"), "16");
+    await user.click(screen.getByRole("button", { name: /Save workout/i }));
+
+    await waitFor(() =>
+      expect(appData.hierarchicalPlan.applyPatch).toHaveBeenCalledWith([
+        {
+          week: 5,
+          dayDate: "2026-04-02",
+          workoutId: "w-14",
+          fields: {
+            sport: "Run",
+            type: "Workout",
+            name: "Peak marathon session updated",
+            description: "Specific marathon prep.",
+            durationMinutes: 82,
+            distanceKm: 16,
+          },
+        },
+      ])
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Peak marathon session updated/i })).toBeInTheDocument()
+    );
   });
 });
 

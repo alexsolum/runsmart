@@ -48,9 +48,27 @@ Audit:
 - [x] **Phase 17: Claude Edge Function + Plan Foundation** - Working claude-coach Edge Function, hierarchical_plans DB table, and philosophy editor removed atomically (completed 2026-03-30)
 - [x] **Phase 18: Hierarchical Plan Hook Layer** - useHierarchicalPlan and supporting data utilities wired into AppDataContext, PlanIntakeModal with form intake and generation UI (completed 2026-03-30)
 - [x] **Phase 19: Plan Viewer UI** - Phase bar, scrollable week grid, workout cards, detail modal, and weekly summary (completed 2026-03-30)
-- [ ] **Phase 20: Drag-and-Drop Rescheduling** - Within-week workout drag-and-drop backed by an atomic Postgres RPC
+- [x] **Phase 20: Drag-and-Drop Rescheduling** - Within-week workout drag-and-drop backed by an atomic Postgres RPC (completed 2026-03-31)
 - [ ] **Phase 21: Coach Chat + Plan Patch** - Conversational coaching chat with plan context injection and AI-suggested plan modifications
 - [ ] **Phase 22: Cleanup + Deprecation** - gemini-coach and old AI generation flow retired after new system is proven
+
+## Phase Progress
+
+**Execution Order:** 17 → 18 → 19 → 20 → 21 → 22
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 12. Design Token Foundation | v1.3 | 1/1 | Complete | 2026-03-24 |
+| 13. Domain Logic + Workout Type Registry | v1.3 | 2/2 | Complete | 2026-03-24 |
+| 14. Planner Primitives + 4-Week Grid | v1.3 | 5/5 | Complete | 2026-03-25 |
+| 15. Click-to-Edit Workflow + FAB | v1.3 | 3/3 | Complete | 2026-03-25 |
+| 16. Volume Trend Header + App Shell | v1.3 | 0/? | Deferred | - |
+| 17. Claude Edge Function + Plan Foundation | v2.0 | 2/2 | Complete | 2026-03-30 |
+| 18. Hierarchical Plan Hook Layer | v2.0 | 2/2 | Complete | 2026-03-30 |
+| 19. Plan Viewer UI | v2.0 | 2/2 | Complete | 2026-03-30 |
+| 20. Drag-and-Drop Rescheduling | v2.0 | 1/1 | Complete | 2026-03-31 |
+| 21. Coach Chat + Plan Patch | v2.0 | 0/? | Not started | - |
+| 22. Cleanup + Deprecation | v2.0 | 0/? | Not started | - |
 
 ## Phase Details
 
@@ -106,7 +124,9 @@ Plans:
   2. Dropping a workout on a target day updates the plan in the database — a page reload shows the workout on the new day
   3. If the database write fails, the workout snaps back to its original day — no half-persisted state is visible to the user
   4. An undo toast appears for 5 seconds after a successful move — the user can revert the swap before it commits
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [x] 20-01-PLAN.md — Dnd-kit integration in PlanWeekCard, PlanDayCell, and PlanWorkoutCard; undo toast logic (completed 2026-03-31)
 
 ### Phase 21: Coach Chat + Plan Patch
 **Goal**: Users can have a conversation with Claude that has full plan and recent Strava context — the coach can suggest specific plan changes the user can review and apply
@@ -128,20 +148,3 @@ Plans:
   3. A full audit confirms zero remaining imports of useCoachPhilosophy, gemini-coach, or the old weekly AI generation components
 **Plans**: TBD
 
-## Progress
-
-**Execution Order:** 17 → 18 → 19 → 20 → 21 → 22
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 12. Design Token Foundation | v1.3 | 1/1 | Complete | 2026-03-24 |
-| 13. Domain Logic + Workout Type Registry | v1.3 | 2/2 | Complete | 2026-03-24 |
-| 14. Planner Primitives + 4-Week Grid | v1.3 | 5/5 | Complete | 2026-03-25 |
-| 15. Click-to-Edit Workflow + FAB | v1.3 | 3/3 | Complete | 2026-03-25 |
-| 16. Volume Trend Header + App Shell | v1.3 | 0/? | Deferred | - |
-| 17. Claude Edge Function + Plan Foundation | v2.0 | 2/2 | Complete | 2026-03-30 |
-| 18. Hierarchical Plan Hook Layer | v2.0 | 2/2 | Complete | 2026-03-30 |
-| 19. Plan Viewer UI | v2.0 | 2/2 | Complete | 2026-03-30 |
-| 20. Drag-and-Drop Rescheduling | v2.0 | 0/? | Not started | - |
-| 21. Coach Chat + Plan Patch | v2.0 | 0/? | Not started | - |
-| 22. Cleanup + Deprecation | v2.0 | 0/? | Not started | - |

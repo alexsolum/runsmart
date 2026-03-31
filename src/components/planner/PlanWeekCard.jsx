@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { 
-  DndContext, 
-  DragOverlay, 
-  PointerSensor, 
-  useSensor, 
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
   useSensors,
   KeyboardSensor,
-  DefaultAnnouncements,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { PlanDayCell } from "./PlanDayCell";

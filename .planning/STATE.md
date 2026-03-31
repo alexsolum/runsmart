@@ -2,33 +2,33 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Claude Coach + Plan Overhaul
-current_phase: 19
-current_plan: 2
-status: completed
-last_updated: "2026-03-31T12:39:00.833Z"
-last_activity: 2026-03-30
+current_phase: 21
+current_plan: 1
+status: executing
+last_updated: "2026-03-31T18:45:43.079Z"
+last_activity: 2026-03-31
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 6
+  total_plans: 10
+  completed_plans: 7
 ---
 
 # State
 
 **Initialized:** 2026-03-29
-**Current Phase:** 19
-**Current Plan:** 2
-**Status:** Phase 19 complete
+**Current Phase:** 21
+**Current Plan:** 1
+**Status:** Ready to execute
 
-Last activity: 2026-03-30
+Last activity: 2026-03-31
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The coaching guidance must produce practical, tailored training decisions that fit real life while preserving long-term progression and injury prevention.
-**Current focus:** Phase 20 — drag-and-drop-rescheduling
+**Current focus:** Phase 21 — Coach Chat + Plan Patch
 
 ## Artifacts
 
@@ -43,8 +43,8 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 19 (plan-viewer-ui) — COMPLETE
-Plan: 2 of 2
+Phase: 21 (Coach Chat + Plan Patch) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Plan: 2 of 2
 
 *Updated after each plan completion*
 | Phase 19 P02 | 11 min | 2 tasks | 6 files |
+| Phase 21 P01 | 15 | 2 tasks | 2 files |
 
 ## Accumulated Context
 

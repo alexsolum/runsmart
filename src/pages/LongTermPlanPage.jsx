@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
+import { useI18n } from "../i18n/translations";
 import PageContainer from "../components/layout/PageContainer";
 import KoopTimeline from "../components/KoopTimeline";
 import { PlanViewer } from "../components/planner/PlanViewer";
 import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
 import { APP_NAVIGATE_EVENT, WEEKLY_PLAN_HANDOFF_KEY } from "../lib/appNavigation";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
+import { CoachFAB } from "../components/CoachFAB";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -273,7 +275,8 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
 }
 
 export default function LongTermPlanPage() {
-  const { plans, trainingBlocks, hierarchicalPlan } = useAppData();
+  const { plans, trainingBlocks, hierarchicalPlan, coachConversations, activities, dailyLogs, checkins, runnerProfile } = useAppData();
+  const { lang } = useI18n();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [editingBlock, setEditingBlock] = useState(null);
@@ -718,6 +721,21 @@ export default function LongTermPlanPage() {
           )}
         </div>
       </div>
+
+      {/* Coach FAB — contextual chat overlay */}
+      {hierarchicalPlan.plan && (
+        <CoachFAB
+          coachConversations={coachConversations}
+          hierarchicalPlan={hierarchicalPlan}
+          activities={activities}
+          dailyLogs={dailyLogs}
+          checkins={checkins}
+          runnerProfile={runnerProfile}
+          trainingBlocks={trainingBlocks}
+          activePlan={plans.plans[0] ?? null}
+          lang={lang}
+        />
+      )}
     </PageContainer>
   );
 }

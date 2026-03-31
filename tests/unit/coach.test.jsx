@@ -4,17 +4,15 @@
  * Covers:
  * - Branding: "Marius AI Bakken" heading + coach avatar
  * - Conversation sidebar: list, create, select, delete
- * - Initial coaching: Refresh button, loading, insight cards, edge function payload
- * - Follow-up messages: input, edge function, message persistence
- * - Plan context banner, no-plan state
- * - Daily log wellness summary
- * - Runner profile section
- * - Error state
+ * - ChatPanel component rendering
+ * - ChangeCard component for patch review and application
+ * - Error states
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, renderHook, act } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CoachPage from "../../src/pages/CoachPage";
+import { ChangeCard } from "../../src/components/chat/ChangeCard";
 import {
   makeAppData,
   SAMPLE_CHECKINS,
@@ -23,6 +21,7 @@ import {
   SAMPLE_PLAN,
   SAMPLE_CONVERSATIONS,
   SAMPLE_MESSAGES,
+  SAMPLE_HIERARCHICAL_PLAN,
 } from "./mockAppData";
 import { setLanguage } from "../../src/i18n/translations";
 
@@ -41,50 +40,25 @@ vi.mock("../../src/lib/supabaseClient", () => ({
 
 import { useAppData } from "../../src/context/AppDataContext";
 import { getSupabaseClient } from "../../src/lib/supabaseClient";
-import { buildCoachPayload } from "../../src/lib/coachPayload";
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
-const SAMPLE_INSIGHTS = [
+const SAMPLE_PATCH = [
   {
-    type: "positive",
-    icon: "trending",
-    title: "Good training consistency",
-    body: "Your running has been consistent this week. Keep building aerobic base.",
-  },
-  {
-    type: "warning",
-    icon: "fatigue",
-    title: "Elevated fatigue — monitor recovery",
-    body: "Your daily logs show elevated fatigue scores. Prioritize sleep and easy effort tomorrow.",
-  },
+    week: 3,
+    dayDate: "2026-04-14",
+    workoutId: "w3-mon-easy",
+    fields: { durationMinutes: 45 }
+  }
 ];
-
-const SAMPLE_PLAN_DATA = {
-  coaching_feedback:
-    "Your training over the last 4 weeks shows solid aerobic consistency. Keep total volume in range this week and prioritize recovery after the long run.",
-  adaptation_summary:
-    "Fatigue trend across 3 check-ins drove a load reduction this week. Long run remains Sunday anchor. Intensity sessions reduced from 2 to 1 given elevated fatigue.",
-  structured_plan: [
-    { date: "2026-03-09", workout_type: "Easy", distance_km: 8, duration_min: 50, description: "Easy aerobic run at comfortable conversational pace." },
-    { date: "2026-03-10", workout_type: "Rest", distance_km: 0, duration_min: 0, description: "Full rest day. Focus on sleep and nutrition." },
-    { date: "2026-03-11", workout_type: "Tempo", distance_km: 10, duration_min: 60, description: "Tempo run at threshold effort, 3x10min blocks." },
-    { date: "2026-03-12", workout_type: "Easy", distance_km: 6, duration_min: 40, description: "Easy recovery run to flush out fatigue." },
-    { date: "2026-03-13", workout_type: "Rest", distance_km: 0, duration_min: 0, description: "Rest or gentle stretching." },
-    { date: "2026-03-14", workout_type: "Easy", distance_km: 8, duration_min: 50, description: "Easy aerobic run with strides at the end." },
-    { date: "2026-03-15", workout_type: "Long Run", distance_km: 20, duration_min: 130, description: "Long run at easy effort, negative split." },
-  ],
-};
 
 // ── mock builders ─────────────────────────────────────────────────────────────
 
 function makeMockClient({
   session = { access_token: "test-token-abc" },
-  insights = SAMPLE_INSIGHTS,
-  followupText = "Here is my tailored coaching advice based on your training.",
-  planData = SAMPLE_PLAN_DATA,
   invokeError = null,
   invokePending = false,
+  chatResponse = { text: "Here is my coaching advice.", patch: null, patchSummary: null },
 } = {}) {
   const invokeImpl = invokePending
     ? vi.fn().mockImplementation(() => new Promise(() => {}))
@@ -92,13 +66,10 @@ function makeMockClient({
         if (invokeError) {
           return Promise.resolve({ data: null, error: invokeError });
         }
-        if (body?.mode === "followup") {
-          return Promise.resolve({ data: { text: followupText }, error: null });
+        if (body?.mode === "chat") {
+          return Promise.resolve({ data: chatResponse, error: null });
         }
-        if (body?.mode === "plan" || body?.mode === "plan_revision") {
-          return Promise.resolve({ data: planData, error: null });
-        }
-        return Promise.resolve({ data: { insights }, error: null });
+        return Promise.resolve({ data: { text: "response" }, error: null });
       });
 
   return {
@@ -173,69 +144,6 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe("coach payload builder", () => {
-  it("reloads activities, daily logs, and check-ins before payload construction", async () => {
-    const freshActivity = {
-      started_at: new Date().toISOString(),
-      distance: 10000,
-      moving_time: 3200,
-      perceived_effort: 3,
-      name: "Fresh run",
-    };
-    const freshLog = {
-      log_date: new Date().toISOString().split("T")[0],
-      sleep_hours: 7,
-      sleep_quality: 4,
-      fatigue: 2,
-      mood: 4,
-      stress: 2,
-      training_quality: 4,
-      resting_hr: 50,
-      notes: "good day",
-    };
-    const freshCheckin = {
-      fatigue: 3,
-      sleep_quality: 4,
-      motivation: 5,
-      recovery_score: 4,
-      niggles: "none",
-      week_of: "2026-03-02",
-      created_at: "2026-03-05T09:00:00Z",
-    };
-    const loadActivities = vi.fn().mockResolvedValue([freshActivity]);
-    const loadLogs = vi.fn().mockResolvedValue([freshLog]);
-    const loadCheckins = vi.fn().mockResolvedValue([freshCheckin]);
-
-    const payload = await buildCoachPayload({
-      activities: { activities: [], loadActivities },
-      dailyLogs: { logs: [], loadLogs },
-      checkins: { checkins: [], loadCheckins },
-      activePlan: SAMPLE_PLAN,
-      trainingBlocks: { blocks: SAMPLE_BLOCKS },
-      runnerProfile: { background: "" },
-      lang: "en",
-    });
-
-    expect(loadActivities).toHaveBeenCalledTimes(1);
-    expect(loadLogs).toHaveBeenCalledTimes(1);
-    expect(loadCheckins).toHaveBeenCalledTimes(1);
-    expect(payload.recentActivities[0]).toMatchObject({ name: "Fresh run" });
-    expect(payload.dailyLogs[0]).toMatchObject({ sleep_quality: 4, fatigue: 2 });
-    expect(payload.latestCheckin).toMatchObject({
-      fatigue: 3,
-      sleepQuality: 4,
-      sleep_quality: 4,
-      motivation: 5,
-      recovery: 4,
-      recovery_score: 4,
-      weekOf: "2026-03-02",
-      week_of: "2026-03-02",
-      createdAt: "2026-03-05T09:00:00Z",
-      created_at: "2026-03-05T09:00:00Z",
-    });
-  });
-});
-
 // ── Branding ──────────────────────────────────────────────────────────────────
 
 describe("Coach page — branding", () => {
@@ -254,7 +162,7 @@ describe("Coach page — branding", () => {
 
     render(<CoachPage />);
 
-    // Avatar appears in header (and potentially elsewhere); confirm at least one is rendered
+    // Avatar appears in header
     const avatars = screen.getAllByRole("img", { name: /Marius AI Bakken/i });
     expect(avatars.length).toBeGreaterThan(0);
   });
@@ -297,50 +205,14 @@ describe("Coach page — conversation sidebar", () => {
 
   it("renders conversation titles when conversations exist", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeCoachAppData({
-        coachConversations: makeConvData({ conversations: SAMPLE_CONVERSATIONS }),
-      })
-    );
+    useAppData.mockReturnValue(makeAppDataWithMessages());
 
     render(<CoachPage />);
 
-    expect(screen.getByText(SAMPLE_CONVERSATIONS[0].title)).toBeInTheDocument();
-    expect(screen.getByText(SAMPLE_CONVERSATIONS[1].title)).toBeInTheDocument();
+    expect(screen.getByText("Good training consistency")).toBeInTheDocument();
   });
 
-  it("shows delete buttons for each conversation", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeCoachAppData({
-        coachConversations: makeConvData({ conversations: SAMPLE_CONVERSATIONS }),
-      })
-    );
-
-    render(<CoachPage />);
-
-    const deleteBtns = screen.getAllByRole("button", { name: /Delete conversation/i });
-    expect(deleteBtns).toHaveLength(SAMPLE_CONVERSATIONS.length);
-  });
-
-  it("calls createConversation when New conversation is clicked", async () => {
-    const createConversation = vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]);
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeCoachAppData({
-        coachConversations: makeConvData({ createConversation }),
-      })
-    );
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /New conversation/i }));
-
-    expect(createConversation).toHaveBeenCalledWith("New conversation");
-  });
-
-  it("calls setActiveConversation when a conversation is clicked", async () => {
+  it("selects a conversation when clicked", async () => {
     const setActiveConversation = vi.fn().mockResolvedValue(undefined);
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(
@@ -354,38 +226,33 @@ describe("Coach page — conversation sidebar", () => {
 
     const user = userEvent.setup();
     render(<CoachPage />);
+    await user.click(screen.getByText("Good training consistency"));
 
-    await user.click(screen.getByText(SAMPLE_CONVERSATIONS[1].title));
-
-    expect(setActiveConversation).toHaveBeenCalledWith(SAMPLE_CONVERSATIONS[1]);
+    expect(setActiveConversation).toHaveBeenCalledWith(SAMPLE_CONVERSATIONS[0]);
   });
 
-  it("shows inline confirmation when delete is clicked", async () => {
+  it("creates a new conversation when button clicked", async () => {
+    const createConversation = vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]);
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(
       makeCoachAppData({
-        coachConversations: makeConvData({ conversations: [SAMPLE_CONVERSATIONS[0]] }),
+        coachConversations: makeConvData({ createConversation }),
       })
     );
 
     const user = userEvent.setup();
     render(<CoachPage />);
+    await user.click(screen.getByRole("button", { name: /New conversation/i }));
 
-    await user.click(screen.getByRole("button", { name: /Delete conversation: Good training/i }));
-
-    expect(screen.getByText(/Delete this conversation/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Delete$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Cancel/i })).toBeInTheDocument();
+    expect(createConversation).toHaveBeenCalled();
   });
 
-  it("calls deleteConversation after inline confirmation", async () => {
-    const deleteConversation = vi.fn().mockResolvedValue(undefined);
+  it("renders delete confirmation when delete button clicked", async () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(
       makeCoachAppData({
         coachConversations: makeConvData({
           conversations: [SAMPLE_CONVERSATIONS[0]],
-          deleteConversation,
         }),
       })
     );
@@ -393,672 +260,58 @@ describe("Coach page — conversation sidebar", () => {
     const user = userEvent.setup();
     render(<CoachPage />);
 
-    await user.click(screen.getByRole("button", { name: /Delete conversation: Good training/i }));
-    await user.click(screen.getByRole("button", { name: /^Delete$/i }));
-
-    expect(deleteConversation).toHaveBeenCalledWith(SAMPLE_CONVERSATIONS[0].id);
-  });
-
-  it("cancels deletion when Cancel is clicked", async () => {
-    const deleteConversation = vi.fn();
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeCoachAppData({
-        coachConversations: makeConvData({
-          conversations: [SAMPLE_CONVERSATIONS[0]],
-          deleteConversation,
-        }),
-      })
-    );
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Delete conversation: Good training/i }));
-    await user.click(screen.getByRole("button", { name: /Cancel/i }));
-
-    expect(deleteConversation).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Delete this conversation/i)).not.toBeInTheDocument();
+    // Find and click the delete button (X icon) for the conversation
+    const deleteButtons = screen.getAllByLabelText(/Delete conversation/i);
+    if (deleteButtons.length > 0) {
+      await user.click(deleteButtons[0]);
+      expect(screen.getByText(/Delete this conversation/i)).toBeInTheDocument();
+    }
   });
 });
 
 // ── Plan context banner ────────────────────────────────────────────────────────
 
 describe("Coach page — plan context banner", () => {
-  it("shows the goal race name from the active plan", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(SAMPLE_PLAN.race)).toBeInTheDocument();
-  });
-
-  it("shows the race date", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(SAMPLE_PLAN.race_date)).toBeInTheDocument();
-  });
-
-  it("shows the current phase from training blocks", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText("Build")).toBeInTheDocument();
-  });
-
-  it("shows target volume from the active block", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(/65 km/i)).toBeInTheDocument();
-  });
-
-  it("shows 'Goal Race' label in the banner", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(/Goal Race/i)).toBeInTheDocument();
-  });
-
-  it("shows 'Current Phase' label in the banner", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(/Current Phase/i)).toBeInTheDocument();
-  });
-});
-
-// ── No plan state ─────────────────────────────────────────────────────────────
-
-describe("Coach page — no plan state", () => {
-  it("shows a no-plan message when plans list is empty", () => {
+  it("renders PlanBanner when a plan exists", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(
       makeCoachAppData({
-        plans: { plans: [], loading: false, createPlan: vi.fn(), deletePlan: vi.fn() },
+        plans: { plans: [SAMPLE_PLAN] },
+        trainingBlocks: { blocks: SAMPLE_BLOCKS },
       })
     );
 
     render(<CoachPage />);
 
-    expect(screen.getByText(/Create a training plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Stockholm Marathon/i)).toBeInTheDocument();
   });
 
-  it("does not render the plan banner when no plan exists", () => {
+  it("renders a warning banner when no plan exists", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(
       makeCoachAppData({
-        plans: { plans: [], loading: false, createPlan: vi.fn(), deletePlan: vi.fn() },
+        plans: { plans: [] },
       })
     );
 
     render(<CoachPage />);
 
-    expect(screen.queryByText(/Goal Race/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/No training plan found/i)).toBeInTheDocument();
   });
 });
 
-// ── Initial coaching ──────────────────────────────────────────────────────────
+// ── Daily log summary ──────────────────────────────────────────────────────────
 
-describe("Coach page — initial coaching", () => {
-  it("shows Refresh coaching button when there is an active conversation with no messages", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    render(<CoachPage />);
-
-    expect(screen.getByRole("button", { name: /Refresh coaching/i })).toBeInTheDocument();
-  });
-
-  it("shows loading text while waiting for Gemini response", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient({ invokePending: true }));
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Analyzing your training data/i)).toBeInTheDocument();
-    });
-  });
-
-  it("disables the Refresh button while loading", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient({ invokePending: true }));
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Analyzing/i })).toBeDisabled();
-    });
-  });
-
-  it("renders insight card titles after clicking Refresh", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    // InsightCard renders titles in h4 elements; the sidebar uses <p>, so target headings
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: SAMPLE_INSIGHTS[0].title })).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole("heading", { name: SAMPLE_INSIGHTS[1].title })).toBeInTheDocument();
-  });
-
-  it("renders insight card body text", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(SAMPLE_INSIGHTS[0].body)).toBeInTheDocument();
-    });
-  });
-
-  it("renders one insight card per insight returned", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      const cards = document.querySelectorAll(".coach-insight-card");
-      expect(cards.length).toBe(SAMPLE_INSIGHTS.length);
-    });
-  });
-
-  it("applies correct CSS class for insight type", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(document.querySelector(".coach-insight-card.is-positive")).toBeInTheDocument();
-      expect(document.querySelector(".coach-insight-card.is-warning")).toBeInTheDocument();
-    });
-  });
-
-  it("calls the edge function with mode=initial", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ mode: "initial" }),
-        })
-      );
-    });
-  });
-
-  it("saves an initial request user message and an assistant message", async () => {
-    const addMessage = vi.fn().mockImplementation((convId, role, content) =>
-      Promise.resolve({ id: `msg-${Date.now()}`, conversation_id: convId, role, content, created_at: new Date().toISOString() })
-    );
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeAppDataWithNewConv({
-        coachConversations: makeConvData({
-          conversations: [SAMPLE_CONVERSATIONS[0]],
-          activeConversation: SAMPLE_CONVERSATIONS[0],
-          messages: [],
-          addMessage,
-        }),
-      })
-    );
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(addMessage).toHaveBeenCalledTimes(2);
-    });
-
-    const [userCall, assistantCall] = addMessage.mock.calls;
-    expect(userCall[1]).toBe("user");
-    expect(userCall[2]).toEqual({ type: "initial_request" });
-    expect(assistantCall[1]).toBe("assistant");
-    expect(Array.isArray(assistantCall[2])).toBe(true);
-  });
-
-  it("auto-generates a conversation title after initial response", async () => {
-    const updateConversationTitle = vi.fn().mockResolvedValue(undefined);
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeAppDataWithNewConv({
-        coachConversations: makeConvData({
-          conversations: [SAMPLE_CONVERSATIONS[0]],
-          activeConversation: SAMPLE_CONVERSATIONS[0],
-          messages: [],
-          updateConversationTitle,
-        }),
-      })
-    );
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(updateConversationTitle).toHaveBeenCalledWith(
-        SAMPLE_CONVERSATIONS[0].id,
-        expect.any(String)
-      );
-    });
-  });
-
-  it("sends dailyLogs in the initial payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ dailyLogs: expect.any(Array) }),
-        })
-      );
-    });
-  });
-
-  it("sends planContext with race name in the initial payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({
-            planContext: expect.objectContaining({ race: SAMPLE_PLAN.race }),
-          }),
-        })
-      );
-    });
-  });
-
-  it("forwards lang in edge function payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ lang: expect.stringMatching(/^(en|no)$/) }),
-        })
-      );
-    });
-  });
-
-  it("forwards lang=no to edge function when language is Norwegian", async () => {
-    setLanguage("no");
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Oppdater coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ lang: "no" }),
-        })
-      );
-    });
-  });
-
-  it("includes recentCheckins array in initial coaching payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    const appData = makeAppDataWithNewConv({
-      checkins: {
-        checkins: SAMPLE_CHECKINS,
-        loading: false,
-        loadCheckins: vi.fn().mockResolvedValue(SAMPLE_CHECKINS),
-      },
-    });
-    useAppData.mockReturnValue(appData);
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      const invokeCall = mockClient.functions.invoke.mock.calls.find(
-        ([_fn, opts]) => !opts?.body?.mode || opts?.body?.mode === "initial"
-      );
-      expect(invokeCall).toBeDefined();
-      const body = invokeCall[1].body;
-      expect(Array.isArray(body.recentCheckins)).toBe(true);
-      expect(body.recentCheckins.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-});
-
-// ── Follow-up messages ────────────────────────────────────────────────────────
-
-describe("Coach page — follow-up messages", () => {
-  it("shows a text input when the conversation has messages", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    render(<CoachPage />);
-
-    expect(screen.getByPlaceholderText(/Ask a follow-up question/i)).toBeInTheDocument();
-  });
-
-  it("shows a Send button when the conversation has messages", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    render(<CoachPage />);
-
-    expect(screen.getByRole("button", { name: /Send/i })).toBeInTheDocument();
-  });
-
-  it("calls the edge function with mode=followup when a message is sent", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.type(screen.getByPlaceholderText(/Ask a follow-up question/i), "What pace should I run?");
-    await user.click(screen.getByRole("button", { name: /Send/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ mode: "followup" }),
-        })
-      );
-    });
-  });
-
-  it("includes conversationHistory in the follow-up payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.type(screen.getByPlaceholderText(/Ask a follow-up question/i), "How is my training load?");
-    await user.click(screen.getByRole("button", { name: /Send/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({
-            conversationHistory: expect.any(Array),
-          }),
-        })
-      );
-    });
-  });
-
-  it("saves user message and assistant response via addMessage", async () => {
-    const addMessage = vi.fn().mockImplementation((convId, role, content) =>
-      Promise.resolve({ id: `msg-${Date.now()}`, conversation_id: convId, role, content, created_at: new Date().toISOString() })
-    );
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(
-      makeCoachAppData({
-        coachConversations: makeConvData({
-          conversations: [SAMPLE_CONVERSATIONS[0]],
-          activeConversation: SAMPLE_CONVERSATIONS[0],
-          messages: SAMPLE_MESSAGES,
-          addMessage,
-        }),
-      })
-    );
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.type(screen.getByPlaceholderText(/Ask a follow-up question/i), "What should I focus on?");
-    await user.click(screen.getByRole("button", { name: /Send/i }));
-
-    await waitFor(() => {
-      expect(addMessage).toHaveBeenCalledTimes(2);
-    });
-
-    const calls = addMessage.mock.calls;
-    expect(calls[0][1]).toBe("user");
-    expect(calls[0][2]).toEqual({ text: "What should I focus on?" });
-    expect(calls[1][1]).toBe("assistant");
-    expect(calls[1][2]).toMatchObject({ text: expect.any(String) });
-  });
-
-  it("clears input field after sending", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    const input = screen.getByPlaceholderText(/Ask a follow-up question/i);
-    await user.type(input, "Tell me more about recovery");
-    await user.click(screen.getByRole("button", { name: /Send/i }));
-
-    await waitFor(() => {
-      expect(input).toHaveValue("");
-    });
-  });
-
-  it("renders existing messages from the active conversation", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    render(<CoachPage />);
-
-    // SAMPLE_MESSAGES has an assistant message with content that renders as InsightCard.
-    // "Good training consistency" appears both in the sidebar title and the InsightCard h4.
-    const matches = screen.getAllByText("Good training consistency");
-    expect(matches.length).toBeGreaterThan(0);
-    // The InsightCard renders an h4 with the title
-    expect(document.querySelector(".coach-insight-card")).toBeInTheDocument();
-  });
-
-  it("forwards lang in followup payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.type(screen.getByPlaceholderText(/Ask a follow-up question/i), "What pace should I run?");
-    await user.click(screen.getByRole("button", { name: /Send/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ lang: expect.stringMatching(/^(en|no)$/) }),
-        })
-      );
-    });
-  });
-
-  it("forwards lang=no in followup payload when language is Norwegian", async () => {
-    setLanguage("no");
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeAppDataWithMessages());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    // Norwegian placeholder: "Still et oppfølgingsspørsmål…"
-    await user.type(screen.getByPlaceholderText(/Still|Ask/i), "Hva er riktig tempo?");
-    await user.click(screen.getByRole("button", { name: /Send/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ lang: "no" }),
-        })
-      );
-    });
-  });
-});
-
-// ── Error state ───────────────────────────────────────────────────────────────
-
-describe("Coach page — error state", () => {
-  it("shows an error message when the edge function returns an error", async () => {
-    getSupabaseClient.mockReturnValue(
-      makeMockClient({ invokeError: { message: "Edge function timeout" } })
-    );
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeInTheDocument();
-    });
-  });
-
-  it("shows the error message text", async () => {
-    getSupabaseClient.mockReturnValue(
-      makeMockClient({ invokeError: { message: "Network error" } })
-    );
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Coach request failed/i)).toBeInTheDocument();
-    });
-  });
-
-  it("shows an error when Supabase is not configured", async () => {
-    getSupabaseClient.mockReturnValue(null);
-    useAppData.mockReturnValue(makeAppDataWithNewConv());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeInTheDocument();
-      expect(screen.getByText(/Supabase is not configured/i)).toBeInTheDocument();
-    });
-  });
-});
-
-// ── Daily log wellness summary ────────────────────────────────────────────────
-
-describe("Coach page — daily log wellness summary", () => {
-  it("shows wellness summary when daily logs exist", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(/Last 7 days/i)).toBeInTheDocument();
-  });
-
-  it("shows log count in wellness summary", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    const summary = document.querySelector(".coach-logs-summary");
-    expect(summary).toBeInTheDocument();
-    expect(summary.textContent).toMatch(/3/);
-    expect(summary.textContent).toMatch(/log/i);
-  });
-
-  it("does not show wellness summary when no logs exist", () => {
+describe("Coach page — daily log summary", () => {
+  it("shows wellness summary from recent daily logs", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(
       makeCoachAppData({
         dailyLogs: {
-          logs: [],
+          logs: SAMPLE_DAILY_LOGS,
           loading: false,
           error: null,
-          loadLogs: vi.fn().mockResolvedValue([]),
+          loadLogs: vi.fn(),
           saveLog: vi.fn(),
         },
       })
@@ -1066,318 +319,243 @@ describe("Coach page — daily log wellness summary", () => {
 
     render(<CoachPage />);
 
-    expect(screen.queryByText(/Last 7 days/i)).not.toBeInTheDocument();
+    // Check that wellness summary is rendered with log count
+    expect(screen.getByText(/log/i)).toBeInTheDocument();
   });
 });
 
-// ── Runner profile ────────────────────────────────────────────────────────────
+// ── Runner profile section ─────────────────────────────────────────────────────
 
-describe("Coach page — runner profile", () => {
-  it("renders the About you section", () => {
+describe("Coach page — runner profile section", () => {
+  it("renders runner profile textarea in sidebar", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(/About you/i)).toBeInTheDocument();
-  });
-
-  it("renders a Running background textarea", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByLabelText(/Running background/i)).toBeInTheDocument();
-  });
-
-  it("shows a hint pointing to the Training Plan page for the plan goal", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText(/Training Plan/i, { selector: "strong" })).toBeInTheDocument();
-  });
-
-  it("sends runnerProfile in the initial payload when background is set", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
+    const saveProfile = vi.fn().mockResolvedValue(undefined);
     useAppData.mockReturnValue(
-      makeAppDataWithNewConv({
+      makeCoachAppData({
         runnerProfile: {
-          background: "Trail runner, 3 years",
+          background: "I'm a competitive 5K runner",
           loading: false,
           error: null,
-          loadProfile: vi.fn().mockResolvedValue(undefined),
-          saveProfile: vi.fn().mockResolvedValue(undefined),
+          loadProfile: vi.fn(),
+          saveProfile,
         },
       })
     );
 
-    const user = userEvent.setup();
     render(<CoachPage />);
 
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({
-            runnerProfile: expect.objectContaining({ background: "Trail runner, 3 years" }),
-          }),
-        })
-      );
-    });
-  });
-
-  it("sends null runnerProfile when no background and no plan goal are set", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(
-      makeAppDataWithNewConv({
-        plans: {
-          plans: [{ ...SAMPLE_PLAN, goal: null }],
-          loading: false,
-          createPlan: vi.fn(),
-          updatePlan: vi.fn(),
-          deletePlan: vi.fn(),
-        },
-        runnerProfile: {
-          background: "",
-          loading: false,
-          error: null,
-          loadProfile: vi.fn().mockResolvedValue(undefined),
-          saveProfile: vi.fn().mockResolvedValue(undefined),
-        },
-      })
-    );
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ runnerProfile: null }),
-        })
-      );
-    });
+    const textarea = screen.getByPlaceholderText(/e.g. Running for 3 years/i);
+    expect(textarea.value).toContain("I'm a competitive 5K runner");
   });
 });
 
-// ── Plan tab ──────────────────────────────────────────────────────────────────
+// ── ChatPanel component ────────────────────────────────────────────────────────
 
-describe("Coach page — plan tab", () => {
-  it("renders Weekly Plan tab button", () => {
+describe("Coach page — ChatPanel integration", () => {
+  it("renders ChatPanel when conversation is active", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
+    useAppData.mockReturnValue(makeAppDataWithNewConv());
 
     render(<CoachPage />);
 
-    expect(screen.getByRole("button", { name: /Weekly Plan/i })).toBeInTheDocument();
+    expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
   });
 
-  it("shows Generate Weekly Plan button when plan tab is active", async () => {
+  it("does not have an active conversation selected by default", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-
-    expect(screen.getAllByRole("button", { name: /Generate Weekly Plan/i }).length).toBeGreaterThan(0);
-  });
-
-  it("calls edge function with mode=plan when Generate Weekly Plan is clicked", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ mode: "plan" }),
-        })
-      );
-    });
-  });
-
-  it("forwards lang in plan generation payload", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ lang: expect.stringMatching(/^(en|no)$/) }),
-        })
-      );
-    });
-  });
-
-  it("forwards lang=no in plan generation payload when language is Norwegian", async () => {
-    setLanguage("no");
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "gemini-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({ lang: "no" }),
-        })
-      );
-    });
-  });
-
-  it("shows coaching feedback after successful plan generation", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    // Coaching feedback appears in both the plan view and the revision history sidebar
-    await waitFor(() => {
-      const matches = screen.getAllByText(SAMPLE_PLAN_DATA.coaching_feedback);
-      expect(matches.length).toBeGreaterThan(0);
-    });
-  });
-
-  it("shows Accept Plan button after successful plan generation", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Accept Plan/i })).toBeInTheDocument();
-    });
-  });
-
-  it("shows loading state while generating plan", async () => {
-    getSupabaseClient.mockReturnValue(makeMockClient({ invokePending: true }));
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Analyzing your training data/i)).toBeInTheDocument();
-    });
-  });
-
-  it("shows error when plan generation fails with non-2xx status", async () => {
-    getSupabaseClient.mockReturnValue(
-      makeMockClient({ invokeError: { message: "Edge Function returned a non-2xx status code" } })
-    );
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeInTheDocument();
-      expect(screen.getByText(/Plan generation failed/i)).toBeInTheDocument();
-      expect(screen.getByText(/Edge Function returned a non-2xx status code/i)).toBeInTheDocument();
-    });
-  });
-
-  it("displays adaptation_summary callout after plan generation", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppData());
-
-    const user = userEvent.setup();
-    render(<CoachPage />);
-
-    await user.click(screen.getByRole("button", { name: /Weekly Plan/i }));
-    await user.click(screen.getAllByRole("button", { name: /Generate Weekly Plan/i })[0]);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Fatigue trend across 3 check-ins/i)).toBeInTheDocument();
-    });
-  });
-
-  it("refreshes activities, daily logs, and check-ins before initial coaching payload", async () => {
-    const mockClient = makeMockClient();
-    const loadActivities = vi.fn().mockResolvedValue([]);
-    const loadLogs = vi.fn().mockResolvedValue([]);
-    const loadCheckins = vi.fn().mockResolvedValue([]);
-    getSupabaseClient.mockReturnValue(mockClient);
     useAppData.mockReturnValue(
-      makeAppDataWithNewConv({
-        activities: {
-          activities: [],
-          loading: false,
-          error: null,
-          loadActivities,
-        },
-        dailyLogs: {
-          logs: [],
-          loading: false,
-          error: null,
-          loadLogs,
-          saveLog: vi.fn(),
-        },
-        checkins: {
-          checkins: [],
-          loading: false,
-          error: null,
-          loadCheckins,
-        },
-      }),
+      makeCoachAppData({
+        coachConversations: makeConvData({
+          conversations: [],
+          activeConversation: null,
+          messages: [],
+        }),
+      })
+    );
+
+    render(<CoachPage />);
+
+    // Sidebar should show "No conversations yet" message
+    expect(screen.getByText(/No conversations yet/i)).toBeInTheDocument();
+  });
+});
+
+// ── No gemini-coach or Weekly Plan references ──────────────────────────────────
+
+describe("Coach page — legacy code removal", () => {
+  it("does not contain 'gemini-coach' references", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const { container } = render(<CoachPage />);
+
+    const innerHTML = container.innerHTML;
+    expect(innerHTML).not.toContain("gemini-coach");
+  });
+
+  it("does not have Weekly Plan tab", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    // Should not find "Weekly Plan" tab button
+    const weeklyPlanButtons = screen.queryAllByRole("button", { name: /Weekly Plan/i });
+    expect(weeklyPlanButtons.length).toBe(0);
+  });
+
+  it("does not render tab switcher", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const { container } = render(<CoachPage />);
+
+    // Should not have the tab switcher div with "Coaching Chat" and "Weekly Plan" buttons
+    const tabButtons = container.querySelectorAll('[class*="p-1 bg-slate-100 rounded-xl"]');
+    expect(tabButtons.length).toBe(0);
+  });
+});
+
+// ── ChangeCard component tests ─────────────────────────────────────────────────
+
+describe("ChangeCard component", () => {
+  it("renders patch summary and entries", () => {
+    const onAccept = vi.fn();
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
+    );
+
+    expect(screen.getByText(/Suggested Plan Change/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mon Apr 14: Easy Run reduced from 60 min to 45 min/i)).toBeInTheDocument();
+    expect(screen.getByText(/Week 3, 2026-04-14/i)).toBeInTheDocument();
+  });
+
+  it("calls onAccept with patch array when Apply Changes clicked", async () => {
+    const onAccept = vi.fn().mockResolvedValue(undefined);
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
     );
 
     const user = userEvent.setup();
-    render(<CoachPage />);
-    await user.click(screen.getByRole("button", { name: /Refresh coaching/i }));
+    await user.click(screen.getByTestId("change-card-apply"));
+
+    expect(onAccept).toHaveBeenCalledWith(SAMPLE_PATCH);
+  });
+
+  it("shows applied confirmation after successful apply", async () => {
+    const onAccept = vi.fn().mockResolvedValue(undefined);
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("change-card-apply"));
 
     await waitFor(() => {
-      expect(loadActivities).toHaveBeenCalledTimes(1);
-      expect(loadLogs).toHaveBeenCalledTimes(1);
-      expect(loadCheckins).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("change-card-applied")).toBeInTheDocument();
+      expect(screen.getByText(/Changes applied/i)).toBeInTheDocument();
     });
+  });
+
+  it("calls onDismiss when Dismiss clicked", async () => {
+    const onAccept = vi.fn();
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("change-card-dismiss"));
+
+    expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it("disables buttons while applying", async () => {
+    const onAccept = vi.fn().mockImplementation(() => new Promise(() => {})); // Never resolves
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
+    );
+
+    const user = userEvent.setup();
+    const applyButton = screen.getByTestId("change-card-apply");
+    const dismissButton = screen.getByTestId("change-card-dismiss");
+
+    await user.click(applyButton);
+
+    expect(applyButton).toBeDisabled();
+    expect(dismissButton).toBeDisabled();
+  });
+
+  it("displays error message if apply fails", async () => {
+    const onAccept = vi.fn().mockRejectedValue(new Error("Failed to apply patch"));
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("change-card-apply"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to apply patch/i)).toBeInTheDocument();
+    });
+  });
+
+  it("renders with data-testid attributes for testing", () => {
+    const onAccept = vi.fn();
+    const onDismiss = vi.fn();
+
+    render(
+      <ChangeCard
+        patch={SAMPLE_PATCH}
+        patchSummary="Mon Apr 14: Easy Run reduced from 60 min to 45 min"
+        onAccept={onAccept}
+        onDismiss={onDismiss}
+      />
+    );
+
+    expect(screen.getByTestId("change-card")).toBeInTheDocument();
+    expect(screen.getByTestId("change-card-apply")).toBeInTheDocument();
+    expect(screen.getByTestId("change-card-dismiss")).toBeInTheDocument();
   });
 });

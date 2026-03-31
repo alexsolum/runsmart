@@ -823,135 +823,309 @@
     return c / 3.6;
   }
 
-  function computeAerobicEfficiency(activities) {
-    if (!activities || !activities.length) return [];
-
-    return activities
-      .filter(function (a) {
-        var duration = Number(a.moving_time) || 0;
-        var hr = Number(a.average_heartrate) || 0;
-        var type = (a.type || "").toLowerCase();
-        return duration >= 1200 && type === "run" && hr > 0;
-      })
-      .map(function (a) {
-        var dist = Number(a.distance) || 0;
-        var time = Number(a.moving_time) || 0;
-        var elev = Number(a.elevation_gain) || 0;
-        var hr = Number(a.average_heartrate) || 0;
-
-        var speed = time > 0 ? dist / time : 0; // m/s
-        var grade = dist > 0 ? elev / dist : 0;
-        var gap = speed * getMinettiFactor(grade);
-        var efficiency = hr > 0 ? gap / hr : 0;
-
-        return {
-          id: a.id,
-          date: a.started_at,
-          x: new Date(a.started_at).getTime(),
-          y: efficiency,
-          name: a.name,
-          speed: speed * 3.6, // Return km/h for UI display convenience
-          gap: gap * 3.6, // Return km/h for UI display convenience
-          hr: hr,
-          distance: dist,
-          intensityScore: a.suffer_score || 0,
-          heart_rate_zones: a.heart_rate_zones
-        };
-      })
-      .sort(function (a, b) {
-        return a.x - b.x;
-      });
+  function percentile(values, ratio) {
+    if (!values || !values.length) return 0;
+    var sorted = values.slice().sort(function(a, b) { return a - b; });
+    var index = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * ratio)));
+    return sorted[index];
   }
 
-  function computeReferenceWorkouts(activities) {
-    if (!activities || !activities.length) return { referenceKm: null, points: [] };
+  function estimateMaxHeartRate(activities) {
+    var explicitMax = (activities || [])
+      .map(function(a) { return Number(a.max_heartrate) || 0; })
+      .filter(Boolean);
+    if (explicitMax.length) return Math.max.apply(null, explicitMax);
 
-    // Step 1: filter to valid runs
-    var runs = activities.filter(function(a) {
-      var type = (a.type || "").toLowerCase();
-      return type === "run" &&
-        Number(a.moving_time) >= 1200 &&
-        Number(a.average_heartrate) > 0 &&
-        Number(a.distance) > 0;
-    });
+    var avgHrs = (activities || [])
+      .map(function(a) { return Number(a.average_heartrate) || 0; })
+      .filter(Boolean);
+    if (!avgHrs.length) return 190;
 
-    if (!runs.length) return { referenceKm: null, points: [] };
+    // Fall back to observed aerobic history when no athlete max HR is stored.
+    return Math.max(190, Math.round(percentile(avgHrs, 0.95) / 0.8));
+  }
 
-    // Step 2: bucket by floor(distance_m / 1000)
-    var binCounts = {};
-    runs.forEach(function(a) {
-      var bin = Math.floor(Number(a.distance) / 1000);
-      binCounts[bin] = (binCounts[bin] || 0) + 1;
-    });
+  function isSupportedEfficiencyType(activity) {
+    var type = String(activity && activity.type || "").toLowerCase();
+    return type === "run" || type === "ride" || type === "cycling" || type === "cycle";
+  }
 
-    // Step 3: find modal bin (highest count; ties: pick highest bin)
-    var modalBin = null;
-    var modalCount = 0;
-    Object.keys(binCounts).forEach(function(binStr) {
-      var bin = Number(binStr);
-      var count = binCounts[binStr];
-      if (count > modalCount || (count === modalCount && (modalBin === null || bin > modalBin))) {
-        modalBin = bin;
-        modalCount = count;
-      }
-    });
+  function getSpeedMetersPerMinute(activity) {
+    var avgSpeed = Number(activity.average_speed) || 0;
+    if (avgSpeed > 0) return avgSpeed * 60;
+    var distance = Number(activity.distance) || 0;
+    var duration = Number(activity.moving_time) || 0;
+    return duration > 0 ? (distance / duration) * 60 : 0;
+  }
 
-    if (modalBin === null) return { referenceKm: null, points: [] };
-
-    // Step 4: modalCenter_m
-    var modalCenter_m = (modalBin + 0.5) * 1000;
-
-    // Step 5: candidates — within ±15% of modalCenter_m
-    var candidates = runs.filter(function(a) {
-      return Math.abs(Number(a.distance) - modalCenter_m) / modalCenter_m <= 0.15;
-    });
-
-    // Step 6: compute paces and median
-    var paces = candidates.map(function(a) {
-      return Number(a.moving_time) / Number(a.distance);
-    }).sort(function(a, b) { return a - b; });
-
-    var medianPace;
-    var mid = Math.floor(paces.length / 2);
-    if (paces.length % 2 === 0) {
-      medianPace = (paces[mid - 1] + paces[mid]) / 2;
-    } else {
-      medianPace = paces[mid];
+  function getOutputMetric(activity) {
+    var watts = Number(activity.average_watts || activity.weighted_average_watts) || 0;
+    if (watts > 0) {
+      return { value: watts, unit: "watts", label: "Power" };
     }
+    return { value: getSpeedMetersPerMinute(activity), unit: "m_per_min", label: "Speed" };
+  }
 
-    // Step 7: filter by pace (±20% of median)
-    var filtered = candidates.filter(function(a) {
-      var pace = Number(a.moving_time) / Number(a.distance);
-      return Math.abs(pace - medianPace) / medianPace <= 0.20;
-    });
+  function getTerrainPer5k(activity) {
+    var distance = Number(activity.distance) || 0;
+    var elevation = Number(activity.elevation_gain) || 0;
+    return distance > 0 ? (elevation * 5000) / distance : 0;
+  }
 
-    // Step 8: referenceKm
-    var referenceKm = Math.round(modalCenter_m / 100) / 10;
+  function isEfficiencyActivity(activity, maxHeartRate) {
+    if (!activity || !isSupportedEfficiencyType(activity)) return false;
 
-    // Return early with empty points if fewer than 5 qualifying runs
-    if (filtered.length < 5) {
-      return { referenceKm: referenceKm, points: [] };
-    }
+    var duration = Number(activity.moving_time) || 0;
+    var avgHr = Number(activity.average_heartrate) || 0;
+    var distance = Number(activity.distance) || 0;
+    var output = getOutputMetric(activity);
 
-    // Step 9: map to output shape
-    var points = filtered.map(function(a) {
+    if (duration < 1800 || avgHr <= 0 || distance <= 0 || output.value <= 0) return false;
+    if (getTerrainPer5k(activity) > 50) return false;
+    return avgHr <= maxHeartRate * 0.8;
+  }
+
+  function toEfficiencyPoint(activity) {
+    var date = activity.started_at;
+    var avgHr = Number(activity.average_heartrate) || 0;
+    var output = getOutputMetric(activity);
+    var duration = Number(activity.moving_time) || 0;
+    var distance = Number(activity.distance) || 0;
+    var speedMpm = getSpeedMetersPerMinute(activity);
+    var speedKph = speedMpm * 0.06;
+    return {
+      id: activity.id,
+      activityId: activity.id,
+      name: activity.name,
+      type: activity.type,
+      date: date,
+      x: new Date(date).getTime(),
+      y: avgHr > 0 ? output.value / avgHr : 0,
+      efficiencyFactor: avgHr > 0 ? output.value / avgHr : 0,
+      averageHeartRate: avgHr,
+      outputValue: output.value,
+      outputUnit: output.unit,
+      outputLabel: output.label,
+      distance: distance,
+      durationSeconds: duration,
+      durationMinutes: duration / 60,
+      terrainPer5k: getTerrainPer5k(activity),
+      speedMpm: speedMpm,
+      speedKph: speedKph,
+      averagePaceSecondsPerKm: speedMpm > 0 ? 1000 / speedMpm * 60 : 0,
+      averageWatts: Number(activity.average_watts || activity.weighted_average_watts) || null,
+    };
+  }
+
+  function computeRollingAverage(points, windowDays) {
+    var windowMs = windowDays * 24 * 60 * 60 * 1000;
+    return points.map(function(point, index) {
+      var cutoff = point.x - windowMs;
+      var inWindow = points.filter(function(candidate, candidateIndex) {
+        return candidateIndex <= index && candidate.x >= cutoff && candidate.x <= point.x;
+      });
+      var sum = inWindow.reduce(function(total, candidate) {
+        return total + candidate.efficiencyFactor;
+      }, 0);
       return {
-        id: a.id,
-        date: a.started_at,
-        x: new Date(a.started_at).getTime(),
-        y: Number(a.average_heartrate),
-        name: a.name,
-        distance: Number(a.distance),
-        hr: Number(a.average_heartrate),
-        speed: (Number(a.distance) / Number(a.moving_time)) * 3.6,
-        intensityScore: a.suffer_score || 0,
+        x: point.x,
+        date: point.date,
+        rollingAverage: inWindow.length ? sum / inWindow.length : point.efficiencyFactor,
+      };
+    });
+  }
+
+  function normalizeSplits(activity) {
+    var rawSplits = [];
+    if (Array.isArray(activity.splits_metric)) rawSplits = activity.splits_metric;
+    else if (Array.isArray(activity.splits_standard)) rawSplits = activity.splits_standard;
+    else if (Array.isArray(activity.laps)) rawSplits = activity.laps;
+
+    var normalized = rawSplits
+      .map(function(split) {
+        return {
+          time: Number(split.moving_time || split.elapsed_time || split.time) || 0,
+          distance: Number(split.distance) || 0,
+          hr: Number(split.average_heartrate || split.avg_hr || split.heartrate) || 0,
+          watts: Number(split.average_watts || split.weighted_average_watts || split.avg_watts) || 0,
+        };
+      })
+      .filter(function(split) {
+        return split.time > 0 && split.distance > 0 && split.hr > 0;
+      });
+
+    if (normalized.length >= 2) return normalized;
+
+    var firstHalfTime = Number(activity.first_half_moving_time || activity.first_half_elapsed_time) || 0;
+    var secondHalfTime = Number(activity.second_half_moving_time || activity.second_half_elapsed_time) || 0;
+    var firstHalfDistance = Number(activity.first_half_distance) || 0;
+    var secondHalfDistance = Number(activity.second_half_distance) || 0;
+    var firstHalfHr = Number(activity.first_half_average_heartrate) || 0;
+    var secondHalfHr = Number(activity.second_half_average_heartrate) || 0;
+    var firstHalfWatts = Number(activity.first_half_average_watts) || 0;
+    var secondHalfWatts = Number(activity.second_half_average_watts) || 0;
+
+    if (
+      firstHalfTime > 0 &&
+      secondHalfTime > 0 &&
+      firstHalfDistance > 0 &&
+      secondHalfDistance > 0 &&
+      firstHalfHr > 0 &&
+      secondHalfHr > 0
+    ) {
+      return [
+        { time: firstHalfTime, distance: firstHalfDistance, hr: firstHalfHr, watts: firstHalfWatts },
+        { time: secondHalfTime, distance: secondHalfDistance, hr: secondHalfHr, watts: secondHalfWatts },
+      ];
+    }
+
+    return [];
+  }
+
+  function aggregateSplitWindow(splits, windowStart, windowEnd) {
+    var elapsed = 0;
+    var totalTime = 0;
+    var totalDistance = 0;
+    var hrSeconds = 0;
+    var wattsSeconds = 0;
+
+    for (var i = 0; i < splits.length; i++) {
+      var split = splits[i];
+      var splitStart = elapsed;
+      var splitEnd = elapsed + split.time;
+      elapsed = splitEnd;
+
+      var overlapStart = Math.max(windowStart, splitStart);
+      var overlapEnd = Math.min(windowEnd, splitEnd);
+      var overlap = overlapEnd - overlapStart;
+      if (overlap <= 0) continue;
+
+      var ratio = overlap / split.time;
+      totalTime += overlap;
+      totalDistance += split.distance * ratio;
+      hrSeconds += split.hr * overlap;
+      wattsSeconds += split.watts * overlap;
+    }
+
+    if (totalTime <= 0 || hrSeconds <= 0) return null;
+
+    var avgHr = hrSeconds / totalTime;
+    var avgWatts = wattsSeconds > 0 ? wattsSeconds / totalTime : 0;
+    var speedMpm = (totalDistance / totalTime) * 60;
+    var outputValue = avgWatts > 0 ? avgWatts : speedMpm;
+
+    return {
+      time: totalTime,
+      distance: totalDistance,
+      averageHeartRate: avgHr,
+      outputValue: outputValue,
+      efficiencyFactor: avgHr > 0 ? outputValue / avgHr : 0,
+    };
+  }
+
+  function computeActivityDecoupling(activity) {
+    var splits = normalizeSplits(activity);
+    if (splits.length < 2) return null;
+
+    var totalTime = splits.reduce(function(sum, split) { return sum + split.time; }, 0);
+    if (totalTime <= 0) return null;
+
+    var midpoint = totalTime / 2;
+    var firstHalf = aggregateSplitWindow(splits, 0, midpoint);
+    var secondHalf = aggregateSplitWindow(splits, midpoint, totalTime);
+    if (!firstHalf || !secondHalf || firstHalf.efficiencyFactor <= 0) return null;
+
+    return {
+      firstHalfEfficiency: firstHalf.efficiencyFactor,
+      secondHalfEfficiency: secondHalf.efficiencyFactor,
+      decouplingPercent:
+        ((firstHalf.efficiencyFactor - secondHalf.efficiencyFactor) / firstHalf.efficiencyFactor) * 100,
+    };
+  }
+
+  function computeEnduranceEfficiency(activities, options) {
+    var windowDays = options && options.windowDays ? options.windowDays : 365;
+    if (!activities || !activities.length) {
+      return {
+        maxHeartRate: 190,
+        points: [],
+        rollingAverage: [],
+        decouplingPoints: [],
+        rollingWindowDays: 30,
+      };
+    }
+
+    var cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - windowDays);
+
+    var recent = activities.filter(function(activity) {
+      return new Date(activity.started_at) >= cutoff;
+    });
+    var maxHeartRate = estimateMaxHeartRate(recent);
+    var qualifying = recent.filter(function(activity) {
+      return isEfficiencyActivity(activity, maxHeartRate);
+    });
+
+    var points = qualifying
+      .map(function(activity) {
+        return toEfficiencyPoint(activity);
+      })
+      .sort(function(a, b) {
+        return a.x - b.x;
+      });
+
+    var rollingAverage = computeRollingAverage(points, 30);
+    var rollingMap = {};
+    rollingAverage.forEach(function(entry) {
+      rollingMap[entry.x] = entry.rollingAverage;
+    });
+
+    points = points.map(function(point) {
+      var decoupling = computeActivityDecoupling(qualifying.find(function(activity) {
+        return activity.id === point.activityId;
+      }));
+      return {
+        ...point,
+        rollingAverage: rollingMap[point.x],
+        decouplingPercent: decoupling ? decoupling.decouplingPercent : null,
       };
     });
 
-    // Step 10: sort by x ascending
-    points.sort(function(a, b) { return a.x - b.x; });
+    var decouplingPoints = points
+      .filter(function(point) {
+        return point.decouplingPercent != null && isFinite(point.decouplingPercent);
+      })
+      .map(function(point) {
+        return {
+          id: point.id,
+          name: point.name,
+          date: point.date,
+          x: point.durationMinutes,
+          y: point.decouplingPercent,
+          durationMinutes: point.durationMinutes,
+          efficiencyFactor: point.efficiencyFactor,
+        };
+      });
 
-    return { referenceKm: referenceKm, points: points };
+    return {
+      maxHeartRate: maxHeartRate,
+      points: points,
+      rollingAverage: rollingAverage,
+      decouplingPoints: decouplingPoints,
+      rollingWindowDays: 30,
+    };
+  }
+
+  function computeAerobicEfficiency(activities) {
+    return computeEnduranceEfficiency(activities, { windowDays: 365 }).points;
+  }
+
+  function computeReferenceWorkouts(activities) {
+    var efficiency = computeEnduranceEfficiency(activities, { windowDays: 365 });
+    return {
+      referenceKm: null,
+      points: efficiency.points,
+    };
   }
 
   function calculateTrendGain(points) {
@@ -982,6 +1156,8 @@ export {
   computeWeeklyProgress,
   linearRegression,
   getMinettiFactor,
+  estimateMaxHeartRate,
+  computeEnduranceEfficiency,
   computeAerobicEfficiency,
   computeReferenceWorkouts,
   calculateTrendGain,

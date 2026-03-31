@@ -123,6 +123,92 @@ function buildPlanContext(plan, blocks) {
   };
 }
 
+function buildRecommendationContext(recommendationWeek) {
+  if (!recommendationWeek) return null;
+
+  const weekStart = firstDefined(recommendationWeek.weekStart, recommendationWeek.startDate, recommendationWeek.targetWeekStart);
+  const weekEnd = firstDefined(recommendationWeek.weekEnd, recommendationWeek.endDate, recommendationWeek.targetWeekEnd);
+  const trainingType = firstDefined(recommendationWeek.trainingType, recommendationWeek.phase);
+  const targetMileageKm = numberOrNull(
+    firstDefined(
+      recommendationWeek.targetMileageKm,
+      recommendationWeek.targetKm,
+      recommendationWeek.target_km,
+    ),
+  );
+  const notes = firstDefined(recommendationWeek.notes, recommendationWeek.coachNotes);
+
+  if (!weekStart && !weekEnd && trainingType == null && targetMileageKm == null && notes == null) {
+    return null;
+  }
+
+  return {
+    weekStart: weekStart ?? null,
+    weekEnd: weekEnd ?? (weekStart ? new Date(new Date(`${weekStart}T00:00:00Z`).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : null),
+    trainingType: trainingType ?? null,
+    targetMileageKm,
+    notes: notes ?? null,
+  };
+}
+
+function buildWeekDirective(recommendationWeek) {
+  const recommendationContext = buildRecommendationContext(recommendationWeek);
+  if (!recommendationContext) return null;
+
+  return {
+    ...recommendationContext,
+    constraints: {
+      enforceTrainingType: recommendationContext.trainingType != null,
+      enforceTargetMileage: recommendationContext.targetMileageKm != null,
+      mileageTolerancePct: recommendationContext.trainingType?.toLowerCase() === "taper" ? 0.08 : 0.1,
+      overrideRequiresExplanation: true,
+    },
+  };
+}
+
+function normalizeWeekDay(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const match = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].find(
+    (day) => day.toLowerCase() === raw.toLowerCase(),
+  );
+  return match ?? null;
+}
+
+function buildWeeklyConstraints(weeklyConstraints) {
+  if (!weeklyConstraints) return null;
+
+  const preferredLongRunDay = normalizeWeekDay(weeklyConstraints.preferredLongRunDay);
+  const preferredHardWorkoutDay = normalizeWeekDay(weeklyConstraints.preferredHardWorkoutDay);
+  const commuteDays = Array.from(
+    new Set(
+      (Array.isArray(weeklyConstraints.commuteDays) ? weeklyConstraints.commuteDays : [])
+        .map(normalizeWeekDay)
+        .filter(Boolean),
+    ),
+  );
+  const doubleThresholdAllowed = typeof weeklyConstraints.doubleThresholdAllowed === "boolean"
+    ? weeklyConstraints.doubleThresholdAllowed
+    : null;
+
+  if (
+    !preferredLongRunDay &&
+    !preferredHardWorkoutDay &&
+    commuteDays.length === 0 &&
+    doubleThresholdAllowed == null
+  ) {
+    return null;
+  }
+
+  return {
+    preferredLongRunDay,
+    preferredHardWorkoutDay,
+    commuteDays,
+    doubleThresholdAllowed,
+  };
+}
+
 function getRecentDailyLogs(logs, days = 7) {
   const cutoff = new Date(Date.now() - Math.max(days - 1, 0) * 24 * 60 * 60 * 1000);
   return logs
@@ -173,6 +259,8 @@ export async function buildCoachPayload({
   activePlan,
   trainingBlocks,
   runnerProfile,
+  recommendationWeek,
+  weeklyConstraints,
   lang,
   mode = "default",
 }) {
@@ -191,6 +279,9 @@ export async function buildCoachPayload({
     latestCheckin: normalizeCheckin(freshCheckins[0] ?? null),
     recentCheckins: freshCheckins.slice(0, 3).map(normalizeCheckin).filter(Boolean),
     planContext: buildPlanContext(activePlan, trainingBlocks.blocks ?? []),
+    recommendationContext: buildRecommendationContext(recommendationWeek),
+    weekDirective: buildWeekDirective(recommendationWeek),
+    weeklyConstraints: buildWeeklyConstraints(weeklyConstraints),
     dailyLogs: getRecentDailyLogs(freshLogs, windows.logDays),
     runnerProfile: runnerProfilePayload,
     lang,

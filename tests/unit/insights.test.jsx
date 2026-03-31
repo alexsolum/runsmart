@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import InsightsPage from "../../src/pages/InsightsPage";
+import InsightsPage, { __resetInsightsSynthesisCacheForTests } from "../../src/pages/InsightsPage";
 import { makeAppData, SAMPLE_ACTIVITIES } from "./mockAppData";
 
 vi.mock("../../src/context/AppDataContext", () => ({
@@ -26,6 +26,13 @@ import { getSupabaseClient } from "../../src/lib/supabaseClient.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetInsightsSynthesisCacheForTests();
+  vi.stubGlobal("localStorage", {
+    getItem: vi.fn(() => "en"),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  });
 });
 
 describe("Insights — page structure", () => {
@@ -151,6 +158,62 @@ describe("Insights — with enough data for charts", () => {
     expect(fill).toBeInTheDocument();
     // width style should be set (non-zero CTL → non-zero fitness score)
     expect(fill.style.width).not.toBe("0%");
+  });
+
+  it("renders endurance-efficiency chart titles when qualifying activities exist", () => {
+    const richActivities = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i * 7);
+      return {
+        id: `ef-${i}`,
+        user_id: "user-1",
+        name: `Aerobic ${i}`,
+        type: "Run",
+        started_at: d.toISOString(),
+        distance: 10000,
+        moving_time: 3600,
+        average_speed: 2.78 + i * 0.02,
+        average_heartrate: 128 + i,
+        elevation_gain: 35,
+        splits_metric: [
+          { moving_time: 1800, distance: 5000, average_heartrate: 128 + i },
+          { moving_time: 1800, distance: 4900, average_heartrate: 132 + i },
+        ],
+      };
+    });
+
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: richActivities, loading: false, error: null, loadActivities: vi.fn() },
+    }));
+
+    render(<InsightsPage />);
+    expect(screen.getByText(/Endurance Efficiency/i)).toBeInTheDocument();
+    expect(screen.getByText(/Decoupling vs. Duration/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No qualifying aerobic reference sessions yet/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the new efficiency empty state when no activities qualify", () => {
+    const noisyActivities = [
+      {
+        id: "bad-1",
+        user_id: "user-1",
+        name: "Hill Repeats",
+        type: "Run",
+        started_at: new Date().toISOString(),
+        distance: 7000,
+        moving_time: 2100,
+        average_speed: 3.33,
+        average_heartrate: 175,
+        elevation_gain: 200,
+      },
+    ];
+
+    useAppData.mockReturnValue(makeAppData({
+      activities: { activities: noisyActivities, loading: false, error: null, loadActivities: vi.fn() },
+    }));
+
+    render(<InsightsPage />);
+    expect(screen.getByText(/No qualifying aerobic reference sessions yet/i)).toBeInTheDocument();
   });
 });
 

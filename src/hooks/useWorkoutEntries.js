@@ -26,14 +26,14 @@ function reducer(state, action) {
     case "updated":
       return {
         ...state,
-        entries: state.entries.map((e) => (e.id === action.payload.id ? action.payload : e)),
+        entries: state.entries.map((entry) => (entry.id === action.payload.id ? action.payload : entry)),
         loading: false,
         success: true,
       };
     case "deleted":
       return {
         ...state,
-        entries: state.entries.filter((e) => e.id !== action.payload),
+        entries: state.entries.filter((entry) => entry.id !== action.payload),
         loading: false,
         success: true,
       };
@@ -134,6 +134,68 @@ function buildStructuredDaysFromLongTermWeek(week) {
   }).filter((day) => day.workout_type !== "Rest");
 }
 
+function uniqueIsoDates(values) {
+  return Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map(toIsoDate)
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+async function markDayProtected(client, userId, planId, workoutDate, isProtected = true) {
+  if (!client || !userId || !planId || !workoutDate) return null;
+  const payload = {
+    user_id: userId,
+    plan_id: planId,
+    workout_date: workoutDate,
+    is_protected: isProtected,
+    protection_source: isProtected ? "manual_edit" : "ai_override",
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client
+    .from("weekly_plan_day_states")
+    .upsert([payload], { onConflict: "plan_id,workout_date" });
+  if (error) throw error;
+  return payload;
+}
+
+async function loadProtectedDays(client, userId, planId, startDate, endDate) {
+  if (!client || !planId || !startDate || !endDate) return [];
+  let query = client
+    .from("weekly_plan_day_states")
+    .select("*")
+    .eq("plan_id", planId)
+    .gte("workout_date", startDate)
+    .lte("workout_date", endDate);
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).filter((row) => row?.is_protected !== false);
+}
+
+function buildApplyPreview(normalized, protectedRows, forceOverwriteDates = []) {
+  const targetDates = uniqueIsoDates(normalized.map((day) => day.workout_date));
+  const forcedDates = new Set(uniqueIsoDates(forceOverwriteDates));
+  const protectedDateSet = new Set(
+    protectedRows
+      .map((row) => toIsoDate(row?.workout_date))
+      .filter((date) => date && !forcedDates.has(date)),
+  );
+  const protectedDates = targetDates.filter((date) => protectedDateSet.has(date));
+  const replaceableDates = targetDates.filter((date) => !protectedDateSet.has(date));
+
+  return {
+    protectedDates,
+    replaceableDates,
+    reviewRequired: protectedDates.length > 0,
+    structuredPlan: normalized,
+  };
+}
+
 export function useWorkoutEntries(userId) {
   const client = useMemo(() => getSupabaseClient(), []);
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -196,6 +258,7 @@ export function useWorkoutEntries(userId) {
         dispatch({ type: "error", payload: error });
         throw error;
       }
+      await markDayProtected(client, userId, data.plan_id, data.workout_date, true);
       dispatch({ type: "created", payload: data });
       return data;
     },
@@ -205,10 +268,55 @@ export function useWorkoutEntries(userId) {
   const updateEntry = useCallback(
     async (id, patch) => {
       if (!client) throw new Error("Supabase is not configured");
+      const existingEntry = state.entries.find((entry) => entry.id === id);
       dispatch({ type: "pending" });
       const { data, error } = await client
         .from("workout_entries")
         .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) {
+        dispatch({ type: "error", payload: error });
+        throw error;
+      }
+      await Promise.all([
+        markDayProtected(client, userId, data.plan_id, data.workout_date, true),
+        existingEntry?.workout_date && existingEntry.workout_date !== data.workout_date
+          ? markDayProtected(client, userId, data.plan_id, existingEntry.workout_date, true)
+          : Promise.resolve(),
+      ]);
+      dispatch({ type: "updated", payload: data });
+      return data;
+    },
+    [client, state.entries, userId],
+  );
+
+  const deleteEntry = useCallback(
+    async (id) => {
+      if (!client) throw new Error("Supabase is not configured");
+      const existingEntry = state.entries.find((entry) => entry.id === id);
+      dispatch({ type: "pending" });
+      const { error } = await client.from("workout_entries").delete().eq("id", id);
+      if (error) {
+        dispatch({ type: "error", payload: error });
+        throw error;
+      }
+      if (existingEntry) {
+        await markDayProtected(client, userId, existingEntry.plan_id, existingEntry.workout_date, true);
+      }
+      dispatch({ type: "deleted", payload: id });
+    },
+    [client, state.entries, userId],
+  );
+
+  const toggleCompleted = useCallback(
+    async (id, current) => {
+      if (!client) throw new Error("Supabase is not configured");
+      dispatch({ type: "pending" });
+      const { data, error } = await client
+        .from("workout_entries")
+        .update({ completed: !current, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
         .single();
@@ -222,27 +330,8 @@ export function useWorkoutEntries(userId) {
     [client],
   );
 
-  const deleteEntry = useCallback(
-    async (id) => {
-      if (!client) throw new Error("Supabase is not configured");
-      dispatch({ type: "pending" });
-      const { error } = await client.from("workout_entries").delete().eq("id", id);
-      if (error) {
-        dispatch({ type: "error", payload: error });
-        throw error;
-      }
-      dispatch({ type: "deleted", payload: id });
-    },
-    [client],
-  );
-
-  const toggleCompleted = useCallback(
-    (id, current) => updateEntry(id, { completed: !current }),
-    [updateEntry],
-  );
-
-  const applyStructuredPlan = useCallback(
-    async (planId, structuredPlan = []) => {
+  const previewStructuredPlanApply = useCallback(
+    async (planId, structuredPlan = [], options = {}) => {
       if (!client) throw new Error("Supabase is not configured");
       if (!userId) throw new Error("User is required to apply a workout plan");
       if (!planId) throw new Error("Plan is required to apply a workout plan");
@@ -262,21 +351,49 @@ export function useWorkoutEntries(userId) {
         (max, day) => (day.workout_date > max ? day.workout_date : max),
         normalized[0].workout_date,
       );
+      const protectedRows = await loadProtectedDays(client, userId, planId, startDate, endDate);
+      const preview = buildApplyPreview(normalized, protectedRows, options.forceOverwriteDates);
+      return {
+        ...preview,
+        startDate,
+        endDate,
+        existingProtectedEntries: state.entries.filter((entry) => preview.protectedDates.includes(entry.workout_date)),
+      };
+    },
+    [client, state.entries, userId],
+  );
+
+  const applyStructuredPlan = useCallback(
+    async (planId, structuredPlan = [], options = {}) => {
+      if (!client) throw new Error("Supabase is not configured");
+      if (!userId) throw new Error("User is required to apply a workout plan");
+      if (!planId) throw new Error("Plan is required to apply a workout plan");
+
+      const overwritePolicy = options.overwritePolicy ?? "preserve-protected";
+      const preview = await previewStructuredPlanApply(planId, structuredPlan, {
+        forceOverwriteDates: overwritePolicy === "force-specific" ? options.forceOverwriteDates : [],
+      });
+
+      if (overwritePolicy === "review-only") {
+        return preview;
+      }
 
       dispatch({ type: "pending" });
 
-      const { error: deleteError } = await client
-        .from("workout_entries")
-        .delete()
-        .eq("plan_id", planId)
-        .gte("workout_date", startDate)
-        .lte("workout_date", endDate);
-      if (deleteError) {
-        dispatch({ type: "error", payload: deleteError });
-        throw deleteError;
+      if (preview.replaceableDates.length > 0) {
+        const { error: deleteError } = await client
+          .from("workout_entries")
+          .delete()
+          .eq("plan_id", planId)
+          .in("workout_date", preview.replaceableDates);
+        if (deleteError) {
+          dispatch({ type: "error", payload: deleteError });
+          throw deleteError;
+        }
       }
 
-      const rowsToInsert = normalized
+      const rowsToInsert = preview.structuredPlan
+        .filter((day) => preview.replaceableDates.includes(day.workout_date))
         .filter((day) => day.workout_type !== "Rest")
         .map((day) => ({
           plan_id: planId,
@@ -297,20 +414,31 @@ export function useWorkoutEntries(userId) {
         inserted = data ?? [];
       }
 
+      const forcedDates = overwritePolicy === "force-specific"
+        ? uniqueIsoDates(options.forceOverwriteDates)
+        : [];
+      if (forcedDates.length > 0) {
+        await Promise.all(forcedDates.map((date) => markDayProtected(client, userId, planId, date, false)));
+      }
+
       const nextEntries = [
         ...state.entries.filter(
           (entry) =>
             entry.plan_id !== planId ||
-            entry.workout_date < startDate ||
-            entry.workout_date > endDate,
+            !preview.replaceableDates.includes(entry.workout_date),
         ),
         ...inserted,
       ].sort((a, b) => new Date(a.workout_date) - new Date(b.workout_date));
 
       dispatch({ type: "loaded", payload: nextEntries });
-      return inserted;
+      return {
+        inserted,
+        preservedDates: preview.protectedDates,
+        overwrittenDates: preview.replaceableDates,
+        reviewRequired: preview.reviewRequired,
+      };
     },
-    [client, userId, state.entries],
+    [client, previewStructuredPlanApply, state.entries, userId],
   );
 
   const applyLongTermWeeklyStructure = useCallback(
@@ -395,6 +523,7 @@ export function useWorkoutEntries(userId) {
     updateEntry,
     deleteEntry,
     toggleCompleted,
+    previewStructuredPlanApply,
     applyStructuredPlan,
     applyLongTermWeeklyStructure,
   };

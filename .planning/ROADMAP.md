@@ -1,50 +1,33 @@
-# Roadmap: v1.1 Strava Sync & Insight Trends
+# Roadmap: RunSmart
 
-**Created:** 2026-03-11
-**Project:** RunSmart
-**Total Requirements:** 7
-**Starting Phase:** 6
+## Milestones
 
-## Phase Overview
+- ✅ **v1.0 Coach Integration Foundations** — shipped 2026-03-08
+- ✅ **v1.2 Weekly Planning Intelligence** — phases 9-11 shipped 2026-03-13 ([archive](./milestones/v1.2-ROADMAP.md))
 
-| # | Phase | Goal | Requirements | Success Criteria |
-|---|-------|------|--------------|------------------|
-| 6 | Strava Robustness | Establish reliable, complete real-time data ingestion via Webhooks and pagination. | STRV-01, STRV-02, STRV-03, STRV-04 | 1. Webhook creates new activity in DB within 5s of upload.<br>2. Pagination loop successfully syncs history > 100 items.<br>3. Activity name change on Strava reflects in app via Update event. |
-| 7 | Advanced Analytics | Visualize aerobic efficiency trends to prove fitness gains independent of race results. | ANLY-01, ANLY-02 | 1. Chart displays individual "Easy Run" scatter points with regression trend line.<br>2. Filter logic correctly excludes short runs (<10m) and invalid HR (0).<br>3. Trend line updates reactively when data changes. |
-| 8 | Insight Reliability | Ensure coaching synthesis is always presented as clean, formatted Markdown. | INSG-03 | 1. Synthesis callout never renders raw JSON or code block syntax.<br>2. Sanitize pipeline strips artifacts before render.<br>3. AI response adheres to strict Markdown contract. |
+## Current Planning State
 
-## Phase Details
+No active milestone is open. Start the next one with `$gsd-new-milestone`.
 
-### Phase 6: Strava Robustness
-**Goal:** Establish reliable, complete real-time data ingestion via Webhooks and pagination.
-**Requirements:**
-- [x] **STRV-01**: User's new activities appear automatically via Webhook (Create event).
-- [x] **STRV-02**: User's activity updates (title, privacy) reflect automatically via Webhook (Update event).
-- [x] **STRV-03**: User's deleted activities are removed automatically via Webhook (Delete event).
-- [x] **STRV-04**: User can sync full activity history beyond the default 100-item limit (pagination support).
+## Archived Milestones
 
-**Success Criteria:**
-1. Webhook creates new activity in DB within 5s of upload.
-2. Pagination loop successfully syncs history > 100 items.
-3. Activity name change on Strava reflects in app via Update event.
+<details>
+<summary>✅ v1.2 Weekly Planning Intelligence — SHIPPED 2026-03-13</summary>
 
-### Phase 7: Advanced Analytics
-**Goal:** Visualize aerobic efficiency trends to prove fitness gains independent of race results.
-**Requirements:**
-- [x] **ANLY-01**: User can view an Aerobic Efficiency trend chart (Speed/HR over time) with regression line.
-- [x] **ANLY-02**: System filters analytics data to exclude non-runs, short durations (<10m), and invalid heart rate (0 or null).
+- [x] Phase 9: Ukeplan Ownership (2/2 plans)
+- [x] Phase 10: Recommendation Context (4/4 plans)
+- [x] Phase 11: Constraint-Aware Weekly Plans (4/4 plans)
 
-**Success Criteria:**
-1. Chart displays individual "Easy Run" scatter points with regression trend line.
-2. Filter logic correctly excludes short runs (<10m) and invalid HR (0).
-3. Trend line updates reactively when data changes.
+Audit:
+- [v1.2-MILESTONE-AUDIT.md](C:\Users\HP\Documents\Koding\Runsmart\runsmart\.planning\milestones\v1.2-MILESTONE-AUDIT.md)
 
-### Phase 8: Insight Reliability
-**Goal:** Ensure coaching synthesis is always presented as clean, formatted Markdown.
-**Requirements:**
-- [x] **INSG-03**: User sees a formatted Markdown coaching summary without JSON wrappers or raw code blocks.
+</details>
 
-**Success Criteria:**
-1. Synthesis callout never renders raw JSON or code block syntax.
-2. Sanitize pipeline strips artifacts before render.
-3. AI response adheres to strict Markdown contract.
+<details>
+<summary>✅ v1.0 Coach Integration Foundations — SHIPPED 2026-03-08</summary>
+
+- [v1.0-ROADMAP.md](C:\Users\HP\Documents\Koding\Runsmart\runsmart\.planning\milestones\v1.0-ROADMAP.md)
+- [v1.0-REQUIREMENTS.md](C:\Users\HP\Documents\Koding\Runsmart\runsmart\.planning\milestones\v1.0-REQUIREMENTS.md)
+- [v1.0-MILESTONE-AUDIT.md](C:\Users\HP\Documents\Koding\Runsmart\runsmart\.planning\milestones\v1.0-MILESTONE-AUDIT.md)
+
+</details>

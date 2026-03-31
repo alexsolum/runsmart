@@ -19,11 +19,42 @@ import { makeAppData, SAMPLE_WORKOUT_ENTRIES, SAMPLE_PLAN } from "./mockAppData"
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
+vi.mock("../../src/lib/coachPayload", () => ({
+  buildCoachPayload: vi.fn(),
+}));
+vi.mock("../../src/lib/supabaseClient", () => ({
+  getSupabaseClient: vi.fn(),
+}));
 
 import { useAppData } from "../../src/context/AppDataContext";
+import { buildCoachPayload } from "../../src/lib/coachPayload";
+import { getSupabaseClient } from "../../src/lib/supabaseClient";
+import { WEEKLY_PLAN_HANDOFF_KEY } from "../../src/lib/appNavigation";
+
+function currentMondayIso() {
+  const d = new Date();
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - day + 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+function isoDateOffset(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+function formatWeekLabel(weekStartIso) {
+  const start = new Date(`${weekStartIso}T00:00:00Z`);
+  const end = new Date(`${isoDateOffset(weekStartIso, 6)}T00:00:00Z`);
+  const opts = { day: "numeric", month: "short" };
+  return `${start.toLocaleDateString(undefined, opts)} — ${end.toLocaleDateString(undefined, opts)} ${end.getUTCFullYear()}`;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   // Suppress window.confirm calls in delete tests
   vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
 });
@@ -33,6 +64,632 @@ describe("Weekly Plan — page structure", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<WeeklyPlanPage />);
     expect(screen.getByRole("heading", { name: /Weekly Plan/i })).toBeInTheDocument();
+  });
+});
+
+describe("Weekly Plan — AI generation", () => {
+  it("shows the embedded AI week setup card", () => {
+    useAppData.mockReturnValue(makeAppData());
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText(/AI week setup/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Preferred long run day/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Preferred hard workout day/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Double threshold preference/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Replace With AI Week/i })).toBeInTheDocument();
+  });
+
+  it("shows generate-first copy when the focused week is empty", () => {
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText(/Start this week with an AI-generated structure/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Generate AI Week/i })).toBeInTheDocument();
+  });
+
+  it("invokes gemini-coach and applies the returned week into the focused grid week", async () => {
+    const user = userEvent.setup();
+    const applyStructuredPlan = vi.fn().mockResolvedValue([]);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          {
+            date: "2026-04-07",
+            workout_type: "Easy",
+            distance_km: 12,
+            duration_min: 70,
+            description: "Aerobic support",
+          },
+          {
+            date: "2026-04-12",
+            workout_type: "Long Run",
+            distance_km: 24,
+            duration_min: 150,
+            description: "Long run progression",
+          },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Keep the long run steady.",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          mode: "plan",
+        }),
+      }),
+    );
+    expect(applyStructuredPlan).toHaveBeenCalledWith(
+      SAMPLE_PLAN.id,
+      [
+        expect.objectContaining({
+          workout_date: isoDateOffset(currentMondayIso(), 1),
+          workout_type: "Easy",
+          distance_km: 12,
+        }),
+        expect.objectContaining({
+          workout_date: isoDateOffset(currentMondayIso(), 6),
+          workout_type: "Long Run",
+          distance_km: 24,
+        }),
+      ],
+      { overwritePolicy: "preserve-protected" },
+    );
+  });
+
+  it("requires confirmation before replacing a non-empty week", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: "2026-04-07", workout_type: "Easy", distance_km: 8, duration_min: 45, description: "Easy day" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Keep the long run steady.",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    globalThis.confirm.mockReturnValue(false);
+    const applyStructuredPlan = vi.fn();
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Replace With AI Week/i }));
+
+    expect(globalThis.confirm).toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+    expect(applyStructuredPlan).not.toHaveBeenCalled();
+  });
+
+  it("renders handoff intent from Training Plan when present in session storage", () => {
+    window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify({
+      planId: SAMPLE_PLAN.id,
+      weekStart: currentMondayIso(),
+      phase: "Build",
+      targetKm: 64,
+      notes: "Keep the long run steady and the midweek workout controlled.",
+    }));
+
+    useAppData.mockReturnValue(makeAppData());
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(screen.getByText("64 km")).toBeInTheDocument();
+    expect(screen.getByText(/Keep the long run steady/i)).toBeInTheDocument();
+  });
+
+  it("passes the same displayed current-week intent into buildCoachPayload and gemini-coach", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: currentMondayIso(), workout_type: "Easy", distance_km: 10, duration_min: 55, description: "Easy run" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(screen.getByText("65 km")).toBeInTheDocument();
+    expect(screen.getByText(/Introduce tempo and intervals/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Replace With AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalledWith(expect.objectContaining({
+      recommendationWeek: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+    }));
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          targetWeekStart: currentMondayIso(),
+          targetWeekEnd: isoDateOffset(currentMondayIso(), 6),
+          recommendationContext: expect.objectContaining({
+            trainingType: "Build",
+            targetMileageKm: 65,
+            notes: "Introduce tempo and intervals",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("keeps handoff-driven non-current intent aligned between the setup card and invoke payload", async () => {
+    const user = userEvent.setup();
+    const weekStart = isoDateOffset(currentMondayIso(), 7);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: weekStart, workout_type: "Easy", distance_km: 8, duration_min: 45, description: "Easy support" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart,
+        weekEnd: isoDateOffset(weekStart, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Travel Friday so move the quality work earlier.",
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify({
+      planId: SAMPLE_PLAN.id,
+      weekStart,
+      phase: "Taper",
+      targetKm: 42,
+      notes: "Travel Friday so move the quality work earlier.",
+    }));
+    useAppData.mockReturnValue(makeAppData());
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByText("Taper")).toBeInTheDocument();
+    expect(screen.getByText("42 km")).toBeInTheDocument();
+    expect(screen.getByText(/Travel Friday/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalledWith(expect.objectContaining({
+      recommendationWeek: {
+        weekStart,
+        weekEnd: isoDateOffset(weekStart, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Travel Friday so move the quality work earlier.",
+      },
+    }));
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          targetWeekStart: weekStart,
+          targetWeekEnd: isoDateOffset(weekStart, 6),
+          recommendationContext: expect.objectContaining({
+            weekStart,
+            trainingType: "Taper",
+            targetMileageKm: 42,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("lets the user target a non-first visible week for AI generation without shifting the 4-week window", async () => {
+    const user = userEvent.setup();
+    const secondVisibleWeek = isoDateOffset(currentMondayIso(), 7);
+    const thirdVisibleWeek = isoDateOffset(currentMondayIso(), 14);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: thirdVisibleWeek, workout_type: "Easy", distance_km: 9, duration_min: 54, description: "Easy support" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: thirdVisibleWeek,
+        weekEnd: isoDateOffset(thirdVisibleWeek, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Keep the taper compact.",
+      },
+      weekDirective: {
+        weekStart: thirdVisibleWeek,
+        weekEnd: isoDateOffset(thirdVisibleWeek, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Keep the taper compact.",
+        constraints: {
+          enforceTrainingType: true,
+          enforceTargetMileage: true,
+          mileageTolerancePct: 0.08,
+          overrideRequiresExplanation: true,
+        },
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    const applyStructuredPlan = vi.fn().mockResolvedValue([]);
+    useAppData.mockReturnValue(makeAppData({
+      trainingBlocks: {
+        blocks: [
+          {
+            id: "block-build",
+            plan_id: SAMPLE_PLAN.id,
+            phase: "Build",
+            start_date: currentMondayIso(),
+            end_date: isoDateOffset(secondVisibleWeek, 6),
+            target_km: 65,
+            notes: "Keep the work steady.",
+          },
+          {
+            id: "block-taper",
+            plan_id: SAMPLE_PLAN.id,
+            phase: "Taper",
+            start_date: thirdVisibleWeek,
+            end_date: isoDateOffset(thirdVisibleWeek, 6),
+            target_km: 42,
+            notes: "Keep the taper compact.",
+          },
+        ],
+      },
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+
+    expect(screen.getByRole("button", { name: formatWeekLabel(currentMondayIso()) })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: formatWeekLabel(secondVisibleWeek) })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: formatWeekLabel(thirdVisibleWeek) }));
+    expect(screen.getByText("Taper")).toBeInTheDocument();
+    expect(screen.getByText("42 km")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalledWith(expect.objectContaining({
+      recommendationWeek: {
+        weekStart: thirdVisibleWeek,
+        weekEnd: isoDateOffset(thirdVisibleWeek, 6),
+        trainingType: "Taper",
+        targetMileageKm: 42,
+        notes: "Keep the taper compact.",
+      },
+    }));
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          targetWeekStart: thirdVisibleWeek,
+          targetWeekEnd: isoDateOffset(thirdVisibleWeek, 6),
+          weekDirective: expect.objectContaining({
+            weekStart: thirdVisibleWeek,
+            trainingType: "Taper",
+            targetMileageKm: 42,
+          }),
+        }),
+      }),
+    );
+    expect(applyStructuredPlan).toHaveBeenCalledWith(
+      SAMPLE_PLAN.id,
+      [expect.objectContaining({ workout_date: thirdVisibleWeek })],
+      { overwritePolicy: "preserve-protected" },
+    );
+  });
+
+  it("serializes optional weekly constraints into the coach payload and invoke body", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        structured_plan: [
+          { date: currentMondayIso(), workout_type: "Easy", distance_km: 10, duration_min: 55, description: "Easy run" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+      weekDirective: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+        constraints: {
+          enforceTrainingType: true,
+          enforceTargetMileage: true,
+          mileageTolerancePct: 0.1,
+          overrideRequiresExplanation: true,
+        },
+      },
+      weeklyConstraints: {
+        preferredLongRunDay: "Sat",
+        preferredHardWorkoutDay: "Tue",
+        commuteDays: ["Wed", "Fri"],
+        doubleThresholdAllowed: false,
+      },
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+        applyStructuredPlan: vi.fn().mockResolvedValue([]),
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+
+    await user.selectOptions(screen.getByLabelText(/Preferred long run day/i), "Sat");
+    await user.selectOptions(screen.getByLabelText(/Preferred hard workout day/i), "Tue");
+    await user.click(screen.getByRole("button", { name: "Wed" }));
+    await user.click(screen.getByRole("button", { name: "Fri" }));
+    await user.selectOptions(screen.getByLabelText(/Double threshold preference/i), "avoid");
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(buildCoachPayload).toHaveBeenCalledWith(expect.objectContaining({
+      weeklyConstraints: {
+        preferredLongRunDay: "Sat",
+        preferredHardWorkoutDay: "Tue",
+        commuteDays: ["Wed", "Fri"],
+        doubleThresholdAllowed: false,
+      },
+    }));
+    expect(invoke).toHaveBeenCalledWith(
+      "gemini-coach",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          weeklyConstraints: {
+            preferredLongRunDay: "Sat",
+            preferredHardWorkoutDay: "Tue",
+            commuteDays: ["Wed", "Fri"],
+            doubleThresholdAllowed: false,
+          },
+        }),
+      }),
+    );
+  });
+
+  it("shows a protected-day review before applying a regenerated week", async () => {
+    const user = userEvent.setup();
+    const previewStructuredPlanApply = vi.fn().mockResolvedValue({
+      protectedDates: [isoDateOffset(currentMondayIso(), 2)],
+      replaceableDates: [isoDateOffset(currentMondayIso(), 3)],
+      reviewRequired: true,
+      structuredPlan: [],
+    });
+    const applyStructuredPlan = vi.fn().mockResolvedValue([]);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        coaching_feedback: "Travel changes the load placement this week.",
+        adaptation_summary: "Long run moved earlier because Friday is constrained.",
+        structured_plan: [
+          { date: currentMondayIso(), workout_type: "Easy", distance_km: 10, duration_min: 55, description: "Easy run" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+      weekDirective: null,
+      weeklyConstraints: null,
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+        previewStructuredPlanApply,
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+
+    expect(previewStructuredPlanApply).toHaveBeenCalled();
+    expect(applyStructuredPlan).not.toHaveBeenCalled();
+    expect(screen.getByText(/Protected day review/i)).toBeInTheDocument();
+    expect(screen.getByText(/Long run moved earlier because Friday is constrained/i)).toBeInTheDocument();
+  });
+
+  it("supports an explicit protected-day override after review", async () => {
+    const user = userEvent.setup();
+    const protectedDate = isoDateOffset(currentMondayIso(), 2);
+    const previewStructuredPlanApply = vi.fn().mockResolvedValue({
+      protectedDates: [protectedDate],
+      replaceableDates: [isoDateOffset(currentMondayIso(), 3)],
+      reviewRequired: true,
+      structuredPlan: [],
+    });
+    const applyStructuredPlan = vi.fn().mockResolvedValue([]);
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        coaching_feedback: "Travel changes the load placement this week.",
+        adaptation_summary: "Primary quality session moved to protect the commute day.",
+        structured_plan: [
+          { date: currentMondayIso(), workout_type: "Easy", distance_km: 10, duration_min: 55, description: "Easy run" },
+        ],
+      },
+      error: null,
+    });
+    buildCoachPayload.mockResolvedValue({
+      weeklySummary: [],
+      recentActivities: [],
+      latestCheckin: null,
+      recentCheckins: [],
+      planContext: { phase: "Build" },
+      recommendationContext: {
+        weekStart: currentMondayIso(),
+        weekEnd: isoDateOffset(currentMondayIso(), 6),
+        trainingType: "Build",
+        targetMileageKm: 65,
+        notes: "Introduce tempo and intervals",
+      },
+      weekDirective: null,
+      weeklyConstraints: null,
+      dailyLogs: [],
+      runnerProfile: null,
+      lang: "en",
+    });
+    getSupabaseClient.mockReturnValue({ functions: { invoke } });
+    globalThis.confirm.mockReturnValue(true);
+    useAppData.mockReturnValue(makeAppData({
+      workoutEntries: {
+        ...makeAppData().workoutEntries,
+        entries: [],
+        previewStructuredPlanApply,
+        applyStructuredPlan,
+      },
+    }));
+
+    render(<WeeklyPlanPage />);
+    await user.click(screen.getByRole("button", { name: /Generate AI Week/i }));
+    await user.click(screen.getByRole("button", { name: /Replace protected days too/i }));
+
+    expect(applyStructuredPlan).toHaveBeenCalledWith(
+      SAMPLE_PLAN.id,
+      [expect.objectContaining({ workout_date: currentMondayIso() })],
+      {
+        overwritePolicy: "force-specific",
+        forceOverwriteDates: [protectedDate],
+      },
+    );
   });
 });
 

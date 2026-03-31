@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import PageContainer from "../components/layout/PageContainer";
+import { getSupabaseClient } from "../lib/supabaseClient";
+import { buildCoachPayload } from "../lib/coachPayload";
+import { WEEKLY_PLAN_HANDOFF_KEY } from "../lib/appNavigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +40,11 @@ function formatWeekLabel(weekStartIso) {
   return `${start.toLocaleDateString(undefined, opts)} — ${end.toLocaleDateString(undefined, opts)} ${end.getUTCFullYear()}`;
 }
 
+function formatDayLabel(isoDate) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  return date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
 function isToday(isoDate) {
   return isoDate === new Date().toISOString().split("T")[0];
 }
@@ -52,6 +60,317 @@ function normalizeWeeklyEntry(entry) {
     description: entry?.description ?? null,
     completed: Boolean(entry?.completed),
   };
+}
+
+function startOfIsoWeek(isoDate) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - day + 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0];
+}
+
+function normalizeGeneratedStructuredPlan(structuredPlan, targetWeekStart) {
+  const normalizedDays = (Array.isArray(structuredPlan) ? structuredPlan : [])
+    .map((day, index) => {
+      const rawDate = String(day?.date ?? day?.workout_date ?? "").trim();
+      const parsedDate = rawDate ? new Date(`${rawDate}T00:00:00Z`) : null;
+      const resolvedDate = parsedDate && !Number.isNaN(parsedDate.getTime())
+        ? rawDate
+        : isoDateOffset(targetWeekStart, Math.min(index, 6));
+      const sourceWeekStart = startOfIsoWeek(resolvedDate);
+      const dayOffset = Math.max(
+        0,
+        Math.min(
+          6,
+          Math.round((new Date(`${resolvedDate}T00:00:00Z`) - new Date(`${sourceWeekStart}T00:00:00Z`)) / (1000 * 60 * 60 * 24)),
+        ),
+      );
+
+      return {
+        workout_date: isoDateOffset(targetWeekStart, dayOffset),
+        workout_type: String(day?.workout_type ?? "Easy"),
+        distance_km: day?.distance_km ?? null,
+        duration_min: day?.duration_min ?? null,
+        description: day?.description ?? null,
+      };
+    })
+    .filter((day) => day.workout_type);
+
+  return normalizedDays;
+}
+
+function getWeekIntent(blocks, planId, weekStartIso) {
+  const weekEndIso = isoDateOffset(weekStartIso, 6);
+  const matchingBlock = (blocks ?? []).find(
+    (block) =>
+      block.plan_id === planId &&
+      block.start_date <= weekEndIso &&
+      block.end_date >= weekStartIso,
+  );
+
+  if (!matchingBlock) return null;
+
+  return {
+    weekStart: weekStartIso,
+    weekEnd: weekEndIso,
+    trainingType: matchingBlock.phase ?? null,
+    targetMileageKm: matchingBlock.target_km ?? null,
+    notes: matchingBlock.notes ?? null,
+  };
+}
+
+function normalizeSelectedWeekIntent(intent, fallbackWeekStart) {
+  if (!intent) return null;
+
+  return {
+    weekStart: intent.weekStart ?? fallbackWeekStart,
+    weekEnd: intent.weekEnd ?? isoDateOffset(intent.weekStart ?? fallbackWeekStart, 6),
+    trainingType: intent.trainingType ?? intent.phase ?? null,
+    targetMileageKm: intent.targetMileageKm ?? intent.targetKm ?? null,
+    notes: intent.notes ?? null,
+  };
+}
+
+function isWeekVisible(visibleWeeks, weekStart) {
+  return Boolean(weekStart) && visibleWeeks.includes(weekStart);
+}
+
+function createEmptyWeeklyConstraints() {
+  return {
+    preferredLongRunDay: "",
+    preferredHardWorkoutDay: "",
+    commuteDays: [],
+    doubleThresholdPreference: "default",
+  };
+}
+
+function normalizeWeeklyConstraintsForPayload(weeklyConstraints) {
+  if (!weeklyConstraints) return null;
+
+  const commuteDays = Array.from(
+    new Set(
+      (Array.isArray(weeklyConstraints.commuteDays) ? weeklyConstraints.commuteDays : [])
+        .map((day) => String(day ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+  const doubleThresholdAllowed = weeklyConstraints.doubleThresholdPreference === "allow"
+    ? true
+    : weeklyConstraints.doubleThresholdPreference === "avoid"
+      ? false
+      : null;
+
+  if (
+    !weeklyConstraints.preferredLongRunDay &&
+    !weeklyConstraints.preferredHardWorkoutDay &&
+    commuteDays.length === 0 &&
+    doubleThresholdAllowed == null
+  ) {
+    return null;
+  }
+
+  return {
+    preferredLongRunDay: weeklyConstraints.preferredLongRunDay || null,
+    preferredHardWorkoutDay: weeklyConstraints.preferredHardWorkoutDay || null,
+    commuteDays,
+    doubleThresholdAllowed,
+  };
+}
+
+function WeeklyAiCard({
+  visibleWeeks,
+  selectedWeekStart,
+  onSelectWeek,
+  weekStart,
+  weekEntries,
+  weekIntent,
+  weeklyConstraints,
+  onConstraintChange,
+  latestGenerationFeedback,
+  pendingReview,
+  onApplyProtectedPlan,
+  onForceApplyProtectedPlan,
+  onGenerate,
+  loading,
+  error,
+}) {
+  const existingCount = weekEntries.length;
+  const targetKm = weekIntent?.targetMileageKm;
+  const hasConstraints = Boolean(
+    weeklyConstraints.preferredLongRunDay ||
+    weeklyConstraints.preferredHardWorkoutDay ||
+    weeklyConstraints.commuteDays.length > 0 ||
+    weeklyConstraints.doubleThresholdPreference !== "default",
+  );
+
+  const toggleCommuteDay = (day) => {
+    const nextCommuteDays = weeklyConstraints.commuteDays.includes(day)
+      ? weeklyConstraints.commuteDays.filter((value) => value !== day)
+      : [...weeklyConstraints.commuteDays, day];
+    onConstraintChange("commuteDays", nextCommuteDays);
+  };
+
+  return (
+    <Card className="mb-5 border-slate-200">
+      <CardHeader className="pb-2 px-4 pt-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">AI week setup</p>
+            <h3 className="m-0 mt-1 text-base font-bold text-slate-900">Plan {formatWeekLabel(weekStart)}</h3>
+            <p className="m-0 mt-1 text-sm text-slate-500">
+              {existingCount === 0
+                ? "Start this week with an AI-generated structure, then edit sessions directly in the grid."
+                : `This week already has ${existingCount} workout${existingCount === 1 ? "" : "s"}. Generating again will replace them after confirmation.`}
+            </p>
+          </div>
+          <Button type="button" onClick={onGenerate} disabled={loading} className="self-start">
+            {loading ? "Generating…" : existingCount === 0 ? "Generate AI Week" : "Replace With AI Week"}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {visibleWeeks.map((visibleWeekStart) => {
+            const isSelected = visibleWeekStart === selectedWeekStart;
+            return (
+              <Button
+                key={visibleWeekStart}
+                type="button"
+                variant={isSelected ? "default" : "outline"}
+                size="sm"
+                className="h-auto px-3 py-1.5 text-xs"
+                onClick={() => onSelectWeek(visibleWeekStart)}
+              >
+                {formatWeekLabel(visibleWeekStart)}
+              </Button>
+            );
+          })}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Week</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{formatWeekLabel(weekStart)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Training intent</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{weekIntent?.trainingType ?? "Not set yet"}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Target volume</p>
+            <p className="m-0 mt-1 text-sm font-semibold text-slate-900">
+              {targetKm != null ? `${Number(targetKm).toFixed(0)} km` : "Use plan context"}
+            </p>
+          </div>
+        </div>
+        {weekIntent?.notes && (
+          <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Coach note</p>
+            <p className="m-0 mt-1 text-sm text-slate-600">{weekIntent.notes}</p>
+          </div>
+        )}
+        {latestGenerationFeedback?.adaptationSummary && (
+          <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Constraint handling</p>
+            <p className="m-0 mt-1 text-sm text-emerald-900">{latestGenerationFeedback.adaptationSummary}</p>
+          </div>
+        )}
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <div>
+              <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Weekly constraints</p>
+              <p className="m-0 mt-1 text-sm text-slate-600">
+                Optional scheduling preferences for this week only. Leave blank for the fastest AI path.
+              </p>
+            </div>
+            {hasConstraints && (
+              <p className="m-0 text-xs font-medium text-slate-500">Preferences will be sent with this week request.</p>
+            )}
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <Label className="grid gap-1 text-[11px] font-medium text-slate-500">
+              Preferred long run day
+              <select
+                className={selectClass}
+                value={weeklyConstraints.preferredLongRunDay}
+                onChange={(event) => onConstraintChange("preferredLongRunDay", event.target.value)}
+                aria-label="Preferred long run day"
+              >
+                <option value="">No preference</option>
+                {DAY_NAMES.map((day) => <option key={`long-${day}`} value={day}>{day}</option>)}
+              </select>
+            </Label>
+            <Label className="grid gap-1 text-[11px] font-medium text-slate-500">
+              Preferred hard workout day
+              <select
+                className={selectClass}
+                value={weeklyConstraints.preferredHardWorkoutDay}
+                onChange={(event) => onConstraintChange("preferredHardWorkoutDay", event.target.value)}
+                aria-label="Preferred hard workout day"
+              >
+                <option value="">No preference</option>
+                {DAY_NAMES.map((day) => <option key={`hard-${day}`} value={day}>{day}</option>)}
+              </select>
+            </Label>
+          </div>
+          <div className="mt-3">
+            <p className="m-0 text-[11px] font-medium text-slate-500">Commute days</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {DAY_NAMES.map((day) => {
+                const selected = weeklyConstraints.commuteDays.includes(day);
+                return (
+                  <Button
+                    key={`commute-${day}`}
+                    type="button"
+                    variant={selected ? "default" : "outline"}
+                    size="sm"
+                    className="h-auto px-3 py-1.5 text-xs"
+                    onClick={() => toggleCommuteDay(day)}
+                    aria-pressed={selected}
+                  >
+                    {day}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+          <Label className="mt-3 grid gap-1 text-[11px] font-medium text-slate-500">
+            Double threshold
+            <select
+              className={selectClass}
+              value={weeklyConstraints.doubleThresholdPreference}
+              onChange={(event) => onConstraintChange("doubleThresholdPreference", event.target.value)}
+              aria-label="Double threshold preference"
+            >
+              <option value="default">No preference</option>
+              <option value="allow">Allowed</option>
+              <option value="avoid">Avoid this week</option>
+            </select>
+          </Label>
+        </div>
+        {pendingReview && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-amber-700">Protected day review</p>
+            <p className="m-0 mt-1 text-sm text-amber-900">
+              AI generation found protected days. The safe path keeps your manual edits on {pendingReview.protectedDates.length} day{pendingReview.protectedDates.length === 1 ? "" : "s"}.
+            </p>
+            <p className="m-0 mt-2 text-sm text-amber-900">
+              {pendingReview.protectedDates.map((date) => formatDayLabel(date)).join(", ")}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={onApplyProtectedPlan}>
+                Apply and keep protected days
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={onForceApplyProtectedPlan}>
+                Replace protected days too
+              </Button>
+            </div>
+          </div>
+        )}
+        {error && <p className="m-0 mt-3 text-sm text-red-600">{error}</p>}
+      </CardContent>
+    </Card>
+  );
 }
 
 // ── Workout type badge styles ─────────────────────────────────────────────────
@@ -301,13 +620,19 @@ function WeekSection({ weekStart, allEntries, addingTo, editingEntry, onAdd, onC
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function WeeklyPlanPage() {
-  const { plans, workoutEntries } = useAppData();
+  const { plans, workoutEntries, activities, dailyLogs, checkins, trainingBlocks, runnerProfile } = useAppData();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [planningStartDate, setPlanningStartDate] = useState(currentMondayIso);
+  const [selectedAiWeekStart, setSelectedAiWeekStart] = useState(currentMondayIso);
   const [addingTo, setAddingTo] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [pageError, setPageError] = useState(null);
+  const [planGenerationLoading, setPlanGenerationLoading] = useState(false);
+  const [handoffIntent, setHandoffIntent] = useState(null);
+  const [weeklyConstraints, setWeeklyConstraints] = useState(createEmptyWeeklyConstraints);
+  const [latestGenerationFeedback, setLatestGenerationFeedback] = useState(null);
+  const [pendingPlanReview, setPendingPlanReview] = useState(null);
 
   // Auto-select first plan
   useEffect(() => {
@@ -315,6 +640,24 @@ export default function WeeklyPlanPage() {
       setSelectedPlanId(plans.plans[0].id);
     }
   }, [plans.plans, selectedPlanId]);
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(WEEKLY_PLAN_HANDOFF_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.weekStart) {
+        setPlanningStartDate(parsed.weekStart);
+        setSelectedAiWeekStart(parsed.weekStart);
+      }
+      if (parsed?.planId) {
+        setSelectedPlanId(parsed.planId);
+      }
+      setHandoffIntent(parsed);
+    } catch {
+      window.sessionStorage.removeItem(WEEKLY_PLAN_HANDOFF_KEY);
+    }
+  }, []);
 
   // 4-week visible window
   const visibleWeeks = useMemo(() => [
@@ -324,10 +667,38 @@ export default function WeeklyPlanPage() {
     isoDateOffset(planningStartDate, 21),
   ], [planningStartDate]);
 
+  useEffect(() => {
+    if (!isWeekVisible(visibleWeeks, selectedAiWeekStart)) {
+      setSelectedAiWeekStart(planningStartDate);
+    }
+  }, [planningStartDate, selectedAiWeekStart, visibleWeeks]);
+
   const normalizedEntries = useMemo(
     () => workoutEntries.entries.map(normalizeWeeklyEntry),
     [workoutEntries.entries],
   );
+  const activePlan = useMemo(
+    () => plans.plans.find((plan) => plan.id === selectedPlanId) ?? null,
+    [plans.plans, selectedPlanId],
+  );
+  const selectedAiWeekEntries = useMemo(
+    () => normalizedEntries.filter((entry) => entry.workout_date >= selectedAiWeekStart && entry.workout_date <= isoDateOffset(selectedAiWeekStart, 6)),
+    [normalizedEntries, selectedAiWeekStart],
+  );
+  const selectedAiWeekIntentFromPlan = useMemo(
+    () => getWeekIntent(trainingBlocks.blocks, selectedPlanId, selectedAiWeekStart),
+    [trainingBlocks.blocks, selectedPlanId, selectedAiWeekStart],
+  );
+  const selectedWeekIntent = useMemo(() => {
+    if (
+      handoffIntent &&
+      handoffIntent.planId === selectedPlanId &&
+      handoffIntent.weekStart === selectedAiWeekStart
+    ) {
+      return normalizeSelectedWeekIntent(handoffIntent, selectedAiWeekStart);
+    }
+    return normalizeSelectedWeekIntent(selectedAiWeekIntentFromPlan, selectedAiWeekStart);
+  }, [handoffIntent, selectedAiWeekIntentFromPlan, selectedAiWeekStart, selectedPlanId]);
 
   // Load entries for entire 4-week range
   useEffect(() => {
@@ -338,7 +709,9 @@ export default function WeeklyPlanPage() {
   }, [selectedPlanId, planningStartDate, workoutEntries.loadEntriesForRange]);
 
   const resetToToday = useCallback(() => {
-    setPlanningStartDate(currentMondayIso());
+    const todayMonday = currentMondayIso();
+    setPlanningStartDate(todayMonday);
+    setSelectedAiWeekStart(todayMonday);
     setAddingTo(null);
     setEditingEntry(null);
   }, []);
@@ -403,6 +776,146 @@ export default function WeeklyPlanPage() {
     [workoutEntries],
   );
 
+  const handleConstraintChange = useCallback((field, value) => {
+    setWeeklyConstraints((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }, []);
+
+  const clearPlanReview = useCallback(() => {
+    setPendingPlanReview(null);
+  }, []);
+
+  const handleApplyProtectedPlan = useCallback(async () => {
+    if (!pendingPlanReview || !activePlan?.id) return;
+    setPlanGenerationLoading(true);
+    setPageError(null);
+    try {
+      await workoutEntries.applyStructuredPlan(activePlan.id, pendingPlanReview.structuredPlan, {
+        overwritePolicy: "preserve-protected",
+      });
+      clearPlanReview();
+    } catch (err) {
+      setPageError(err.message || "Failed to apply the reviewed plan.");
+    } finally {
+      setPlanGenerationLoading(false);
+    }
+  }, [activePlan?.id, clearPlanReview, pendingPlanReview, workoutEntries]);
+
+  const handleForceApplyProtectedPlan = useCallback(async () => {
+    if (!pendingPlanReview || !activePlan?.id) return;
+    const protectedCount = pendingPlanReview.protectedDates.length;
+    const confirmed = window.confirm(
+      `Replace ${protectedCount} protected day${protectedCount === 1 ? "" : "s"} for ${formatWeekLabel(selectedAiWeekStart)}?`,
+    );
+    if (!confirmed) return;
+
+    setPlanGenerationLoading(true);
+    setPageError(null);
+    try {
+      await workoutEntries.applyStructuredPlan(activePlan.id, pendingPlanReview.structuredPlan, {
+        overwritePolicy: "force-specific",
+        forceOverwriteDates: pendingPlanReview.protectedDates,
+      });
+      clearPlanReview();
+    } catch (err) {
+      setPageError(err.message || "Failed to override protected days.");
+    } finally {
+      setPlanGenerationLoading(false);
+    }
+  }, [activePlan?.id, clearPlanReview, pendingPlanReview, selectedAiWeekStart, workoutEntries]);
+
+  const handleGenerateWeek = useCallback(async () => {
+    if (!activePlan?.id) return;
+    const client = getSupabaseClient();
+    if (!client) {
+      setPageError("Supabase is not configured.");
+      return;
+    }
+
+    if (selectedAiWeekEntries.length > 0) {
+      const confirmed = window.confirm(
+        `Replace ${selectedAiWeekEntries.length} existing workout${selectedAiWeekEntries.length === 1 ? "" : "s"} in ${formatWeekLabel(selectedAiWeekStart)}?`,
+      );
+      if (!confirmed) return;
+    }
+
+    setPlanGenerationLoading(true);
+    setPageError(null);
+    clearPlanReview();
+
+    try {
+      const basePayload = await buildCoachPayload({
+        activities,
+        dailyLogs,
+        checkins,
+        activePlan,
+        trainingBlocks,
+        runnerProfile,
+        recommendationWeek: selectedWeekIntent,
+        weeklyConstraints: normalizeWeeklyConstraintsForPayload(weeklyConstraints),
+        lang: "en",
+        mode: "default",
+      });
+      const targetWeekStart = selectedWeekIntent?.weekStart ?? selectedAiWeekStart;
+      const targetWeekEnd = selectedWeekIntent?.weekEnd ?? isoDateOffset(targetWeekStart, 6);
+      const { data, error } = await client.functions.invoke("gemini-coach", {
+        body: {
+          mode: "plan",
+          targetWeekStart,
+          targetWeekEnd,
+          ...basePayload,
+        },
+      });
+
+      if (error) throw new Error(`Plan generation failed: ${error.message}`);
+      if (data?.error) throw new Error(data.error);
+
+      const structuredPlan = normalizeGeneratedStructuredPlan(data?.structured_plan, targetWeekStart);
+      if (structuredPlan.length === 0) {
+        throw new Error("No plan returned from coach.");
+      }
+
+      setLatestGenerationFeedback({
+        targetWeekStart,
+        coachingFeedback: data?.coaching_feedback ?? "",
+        adaptationSummary: data?.adaptation_summary ?? "",
+      });
+
+      const preview = await workoutEntries.previewStructuredPlanApply(activePlan.id, structuredPlan);
+      if (preview.reviewRequired) {
+        setPendingPlanReview({
+          targetWeekStart,
+          structuredPlan,
+          protectedDates: preview.protectedDates,
+        });
+        return;
+      }
+
+      await workoutEntries.applyStructuredPlan(activePlan.id, structuredPlan, {
+        overwritePolicy: "preserve-protected",
+      });
+    } catch (err) {
+      setPageError(err.message || "Failed to generate weekly plan.");
+    } finally {
+      setPlanGenerationLoading(false);
+    }
+  }, [
+    activePlan,
+    activities,
+    checkins,
+    clearPlanReview,
+    dailyLogs,
+    selectedAiWeekEntries.length,
+    selectedAiWeekStart,
+    runnerProfile,
+    selectedWeekIntent,
+    trainingBlocks,
+    weeklyConstraints,
+    workoutEntries,
+  ]);
+
   return (
     <PageContainer>
       <div className="w-full max-w-screen-xl mx-auto overflow-x-hidden">
@@ -439,6 +952,34 @@ export default function WeeklyPlanPage() {
             </div>
           </div>
         </div>
+
+        {selectedPlanId && (
+          <WeeklyAiCard
+            visibleWeeks={visibleWeeks}
+            selectedWeekStart={selectedAiWeekStart}
+            onSelectWeek={setSelectedAiWeekStart}
+            weekStart={selectedAiWeekStart}
+            weekEntries={selectedAiWeekEntries}
+            weekIntent={selectedWeekIntent}
+            weeklyConstraints={weeklyConstraints}
+            onConstraintChange={handleConstraintChange}
+            latestGenerationFeedback={
+              latestGenerationFeedback?.targetWeekStart === selectedAiWeekStart
+                ? latestGenerationFeedback
+                : null
+            }
+            pendingReview={
+              pendingPlanReview?.targetWeekStart === selectedAiWeekStart
+                ? pendingPlanReview
+                : null
+            }
+            onApplyProtectedPlan={handleApplyProtectedPlan}
+            onForceApplyProtectedPlan={handleForceApplyProtectedPlan}
+            onGenerate={handleGenerateWeek}
+            loading={planGenerationLoading}
+            error={pageError}
+          />
+        )}
 
         {/* Four-week rolling view */}
         {!selectedPlanId ? (

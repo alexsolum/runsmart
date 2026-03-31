@@ -106,4 +106,108 @@ describe("buildCoachPayload synthesis windows", () => {
     expect(payload.recentActivities).toHaveLength(7);
     expect(payload.dailyLogs).toHaveLength(7);
   });
+
+  it("returns a normalized recommendationContext when a focused week is provided", async () => {
+    const payload = await buildCoachPayload({
+      ...makeInput(),
+      activePlan: {
+        id: "plan-1",
+        race_date: "2026-06-01",
+        current_mileage: 55,
+      },
+      trainingBlocks: { blocks: [] },
+      recommendationWeek: {
+        weekStart: "2026-03-16",
+        trainingType: "Build",
+        targetKm: 68,
+        notes: "Protect the long run after travel.",
+      },
+    });
+
+    expect(payload.recommendationContext).toEqual({
+      weekStart: "2026-03-16",
+      weekEnd: "2026-03-22",
+      trainingType: "Build",
+      targetMileageKm: 68,
+      notes: "Protect the long run after travel.",
+    });
+    expect(payload.weekDirective).toEqual({
+      weekStart: "2026-03-16",
+      weekEnd: "2026-03-22",
+      trainingType: "Build",
+      targetMileageKm: 68,
+      notes: "Protect the long run after travel.",
+      constraints: {
+        enforceTrainingType: true,
+        enforceTargetMileage: true,
+        mileageTolerancePct: 0.1,
+        overrideRequiresExplanation: true,
+      },
+    });
+    expect(payload.weeklyConstraints).toBeNull();
+  });
+
+  it("keeps recommendationContext null when no focused week is provided", async () => {
+    const payload = await buildCoachPayload({
+      ...makeInput(),
+    });
+
+    expect(payload.recommendationContext).toBeNull();
+    expect(payload.weekDirective).toBeNull();
+    expect(payload.weeklyConstraints).toBeNull();
+  });
+
+  it("normalizes a distinct weeklyConstraints payload when day preferences are supplied", async () => {
+    const payload = await buildCoachPayload({
+      ...makeInput(),
+      recommendationWeek: {
+        weekStart: "2026-03-16",
+        trainingType: "Build",
+        targetKm: 68,
+      },
+      weeklyConstraints: {
+        preferredLongRunDay: "sat",
+        preferredHardWorkoutDay: " Tue ",
+        commuteDays: ["Wed", "fri", "Wed", ""],
+        doubleThresholdAllowed: false,
+      },
+    });
+
+    expect(payload.weekDirective).toEqual(expect.objectContaining({
+      weekStart: "2026-03-16",
+      trainingType: "Build",
+    }));
+    expect(payload.weeklyConstraints).toEqual({
+      preferredLongRunDay: "Sat",
+      preferredHardWorkoutDay: "Tue",
+      commuteDays: ["Wed", "Fri"],
+      doubleThresholdAllowed: false,
+    });
+  });
+
+  it("keeps weeklyConstraints separate from weekDirective when both are present", async () => {
+    const payload = await buildCoachPayload({
+      ...makeInput(),
+      recommendationWeek: {
+        weekStart: "2026-03-16",
+        trainingType: "Taper",
+        targetKm: 42,
+      },
+      weeklyConstraints: {
+        preferredLongRunDay: "Sun",
+      },
+    });
+
+    expect(payload.weekDirective).toEqual(expect.objectContaining({
+      trainingType: "Taper",
+      targetMileageKm: 42,
+    }));
+    expect(payload.weekDirective).not.toHaveProperty("preferredLongRunDay");
+    expect(payload.weeklyConstraints).toEqual({
+      preferredLongRunDay: "Sun",
+      preferredHardWorkoutDay: null,
+      commuteDays: [],
+      doubleThresholdAllowed: null,
+    });
+  });
 });

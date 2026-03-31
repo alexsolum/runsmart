@@ -12,7 +12,7 @@ function formatMetric(workout) {
   return "Details in workout";
 }
 
-export function PlanWorkoutCard({ workout, onWorkoutSelect, isOverlay = false }) {
+export function PlanWorkoutCard({ workout, dayDate, onWorkoutSelect, isOverlay = false }) {
   const typeKey = normalizeWorkoutType(workout?.type);
   const meta = WORKOUT_TYPES[typeKey] ?? WORKOUT_TYPES.EASY;
 
@@ -25,6 +25,7 @@ export function PlanWorkoutCard({ workout, onWorkoutSelect, isOverlay = false })
     id: workout.id,
     data: {
       workout,
+      dayDate,
     },
     disabled: isOverlay, // Overlay doesn't need to be draggable itself
   });

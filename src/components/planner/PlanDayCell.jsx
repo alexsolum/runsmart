@@ -44,6 +44,7 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
             <PlanWorkoutCard
               key={workout.id}
               workout={workout}
+              dayDate={day.date}
               onWorkoutSelect={() => onWorkoutSelect?.(workout, { week, day })}
             />
           ))}

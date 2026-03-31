@@ -53,9 +53,9 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
 
     const workoutId = active.id;
     const toDate = over.id;
-    const fromDate = active.data.current.workout.date;
+    const fromDate = active.data.current?.dayDate;
 
-    if (fromDate === toDate) return;
+    if (!fromDate || fromDate === toDate) return;
 
     try {
       await hierarchicalPlan.moveWorkout(workoutId, fromDate, toDate);

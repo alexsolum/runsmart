@@ -22,17 +22,17 @@ Conversational coaching chat powered by Claude that integrates with the hierarch
 
 ### Context Injection Strategy
 - **D-04: +/- Window Context.** Claude receives a focused slice of the training plan:
-  - Last 2 weeks of completed/skipped workouts.
+  - Last 4 weeks of completed/skipped workouts.
   - Current week.
-  - Next 4 weeks of scheduled workouts.
-- **D-05: Activity Context.** Recent Strava activity data (last 7-14 days) is included in the payload to help Claude understand actual performance vs. the plan.
+  - Next 6 weeks of scheduled workouts.
+- **D-05: Activity Context.** Recent Strava activity data (last 24 days) is included in the payload to help Claude understand actual performance vs. the plan.
 
 ### Legacy Transition
 - **D-06: Remove Legacy 'Weekly Plan' Tab.** The "Weekly Plan" tab in `CoachPage.jsx` (which uses Gemini and `workout_entries`) is removed. The `LongTermPlanPage` is now the primary destination for plan management.
 - **D-07: Claude as Primary Backend.** The `gemini-coach` invocation path is replaced by `claude-coach` for all conversational coaching features.
 
 ### Coach Personality & Capability
-- **D-08: Future-Only Authority.** Claude is authorized to suggest patches only for the **current week and next 4 weeks**. Historic plan data is read-only for context.
+- **D-08: Future-Only Authority.** Claude is authorized to suggest patches only for the **current week and the weeks up to the goal race**. Historic plan data is read-only for context.
 - **D-09: Tweak over Overhaul.** Claude focuses on targeted patches (moving workouts, adjusting duration/distance). For a "whole new plan," it should recommend the user use the "Regenerate Plan" feature in the `LongTermPlanPage`.
 
 </decisions>

@@ -712,6 +712,75 @@ The plan JSON must follow this running-only schema (no swim or bike fields):
 Here is a concrete example of the expected output structure (condensed to 1 week):
 ${FEW_SHOT_EXAMPLE}`;
 
+const CHAT_MAX_OUTPUT_TOKENS = 4096;
+
+const CHAT_SYSTEM_PROMPT = `You are Marius AI Bakken, an expert endurance running coach. You are having a conversation with your athlete about their training plan.
+
+## Key Coaching Principles
+${KEY_COACHING_PRINCIPLES}
+
+## Your Authority
+- You can suggest modifications to workouts in the CURRENT WEEK and any FUTURE weeks up to the goal race.
+- Past weeks are READ-ONLY context — never suggest changes to completed or past workouts.
+- Focus on targeted tweaks: adjusting duration, distance, type, or moving workouts. For a complete plan overhaul, recommend the athlete use the "Regenerate Plan" feature.
+
+## Response Format
+You MUST respond with a single valid JSON object. No markdown fences, no text before or after.
+
+The JSON must have this exact shape:
+{
+  "text": "Your coaching advice in plain text. Be conversational, explain your reasoning.",
+  "patch": null or [
+    {
+      "week": <weekNumber integer>,
+      "dayDate": "<YYYY-MM-DD>",
+      "workoutId": "<existing workout id string>",
+      "fields": {
+        // Only include fields that change. Valid fields:
+        // "sport": string, "type": string, "name": string,
+        // "description": string, "durationMinutes": number,
+        // "distanceKm": number, "primaryZone": string,
+        // "humanReadable": string
+      }
+    }
+  ],
+  "patchSummary": null or "Human-readable one-line summary of changes"
+}
+
+Rules for the patch array:
+- "patch" is null when you are giving advice without proposing a modification.
+- "patch" is an array when you propose specific workout changes.
+- "week" MUST be the weekNumber integer from the plan data.
+- "dayDate" MUST be the exact ISO date string from the plan data.
+- "workoutId" MUST be an existing workout id from the plan data.
+- "fields" contains ONLY the fields that change — do not include unchanged fields.
+- Keep patches minimal — tweak, do not overhaul.
+- "patchSummary" is null when patch is null, otherwise a brief human-readable description.
+
+Example response with a patch:
+{
+  "text": "Given your fatigue signals this week, I'd recommend reducing Monday's easy run to 45 minutes instead of 60. This gives you more recovery while keeping the aerobic stimulus.",
+  "patch": [
+    {
+      "week": 3,
+      "dayDate": "2026-04-14",
+      "workoutId": "w3-mon-easy",
+      "fields": {
+        "durationMinutes": 45,
+        "description": "Reduced to 45 min for recovery — fatigue signals elevated"
+      }
+    }
+  ],
+  "patchSummary": "Mon Apr 14: Easy Run reduced from 60 min to 45 min for recovery"
+}
+
+Example response without a patch:
+{
+  "text": "Your training load looks well balanced this week. The long run on Sunday is appropriately placed after two easy days...",
+  "patch": null,
+  "patchSummary": null
+}`;
+
 // ── Helper functions ─────────────────────────────────────────────────────────
 
 function getBearerToken(req: Request): string | null {
@@ -750,6 +819,85 @@ Max sessions per week: ${payload.constraints.maxSessions}
 
 ## Background
 ${payload.background}`;
+}
+
+function buildChatMessages(payload: any): Array<{role: string; content: string}> {
+  const messages: Array<{role: string; content: string}> = [];
+
+  // Build the context preamble as the first user message
+  let contextBlock = "## Your Athlete's Training Plan Context\n\n";
+
+  if (payload.hierarchicalPlanWindow) {
+    const w = payload.hierarchicalPlanWindow;
+    if (w.currentWeek) {
+      contextBlock += `### Current Week (Week ${w.currentWeek.weekNumber} — ${w.currentWeek.phase})\n`;
+      contextBlock += `Focus: ${w.currentWeek.focus}\n`;
+      contextBlock += JSON.stringify(w.currentWeek.days, null, 2) + "\n\n";
+    }
+    if (w.pastWeeks?.length) {
+      contextBlock += `### Recent Completed Weeks (last ${w.pastWeeks.length} weeks)\n`;
+      contextBlock += JSON.stringify(w.pastWeeks, null, 2) + "\n\n";
+    }
+    if (w.futureWeeks?.length) {
+      contextBlock += `### Upcoming Scheduled Weeks (next ${w.futureWeeks.length} weeks)\n`;
+      contextBlock += JSON.stringify(w.futureWeeks, null, 2) + "\n\n";
+    }
+  }
+
+  if (payload.recentActivities?.length) {
+    contextBlock += "### Recent Strava Activities (last 24 days)\n";
+    contextBlock += JSON.stringify(payload.recentActivities, null, 2) + "\n\n";
+  }
+
+  if (payload.dailyLogs?.length) {
+    contextBlock += "### Recent Daily Wellness Logs\n";
+    contextBlock += JSON.stringify(payload.dailyLogs, null, 2) + "\n\n";
+  }
+
+  if (payload.latestCheckin) {
+    contextBlock += "### Latest Weekly Check-in\n";
+    contextBlock += JSON.stringify(payload.latestCheckin, null, 2) + "\n\n";
+  }
+
+  if (payload.runnerProfile) {
+    contextBlock += "### Runner Profile\n";
+    contextBlock += JSON.stringify(payload.runnerProfile, null, 2) + "\n\n";
+  }
+
+  // Add context as first user message
+  messages.push({ role: "user", content: contextBlock + "\n(This is context about my training — please acknowledge it briefly and wait for my question.)" });
+  messages.push({ role: "assistant", content: JSON.stringify({ text: "I've reviewed your training plan and recent activity data. What would you like to discuss?", patch: null, patchSummary: null }) });
+
+  // Add conversation history
+  if (payload.conversationHistory?.length) {
+    for (const msg of payload.conversationHistory) {
+      messages.push({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
+      });
+    }
+  }
+
+  // Add current user message
+  if (payload.userMessage) {
+    messages.push({ role: "user", content: payload.userMessage });
+  }
+
+  return messages;
+}
+
+function validatePatchArray(patch: any): boolean {
+  if (patch === null || patch === undefined) return true;
+  if (!Array.isArray(patch)) return false;
+  return patch.every((p: any) =>
+    typeof p.week === "number" &&
+    typeof p.dayDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(p.dayDate) &&
+    typeof p.workoutId === "string" &&
+    p.workoutId.length > 0 &&
+    typeof p.fields === "object" &&
+    p.fields !== null
+  );
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -791,10 +939,117 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
 
     // 2. Parse request body
-    const payload: AthletePayload = await req.json();
+    const payload = await req.json();
+
+    // ── MODE DISPATCH ──
+    if (payload.mode === "chat") {
+      // Chat mode: conversational coaching with optional patch suggestions
+      const chatMessages = buildChatMessages(payload);
+
+      const totalInputChars = CHAT_SYSTEM_PROMPT.length +
+        chatMessages.reduce((sum, m) => sum + m.content.length, 0);
+      if (totalInputChars > MAX_INPUT_CHARS) {
+        return new Response(
+          JSON.stringify({
+            error: "Chat payload too large. Try a shorter conversation or reduce plan context.",
+            estimatedTokens: estimateTokens(String(totalInputChars)),
+          }),
+          { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthropicKey) {
+        return new Response(
+          JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiResponse = await fetch(ANTHROPIC_URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: ANTHROPIC_MODEL,
+          max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+          system: CHAT_SYSTEM_PROMPT,
+          messages: chatMessages,
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errBody = await aiResponse.text();
+        return new Response(
+          JSON.stringify({ error: "Claude API error", status: aiResponse.status, detail: errBody }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiResult = await aiResponse.json();
+
+      if (aiResult.stop_reason !== "end_turn") {
+        return new Response(
+          JSON.stringify({ error: "Chat response was truncated.", stop_reason: aiResult.stop_reason }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const rawText = aiResult.content?.[0]?.text;
+      if (!rawText) {
+        return new Response(
+          JSON.stringify({ error: "Empty response from Claude" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      let chatData;
+      try {
+        chatData = JSON.parse(rawText);
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Failed to parse chat JSON from Claude", rawPreview: rawText.slice(0, 500) }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate response structure
+      if (typeof chatData.text !== "string") {
+        return new Response(
+          JSON.stringify({ error: "Chat response missing 'text' field" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate patch array if present
+      if (chatData.patch !== null && chatData.patch !== undefined) {
+        if (!validatePatchArray(chatData.patch)) {
+          return new Response(
+            JSON.stringify({ error: "Invalid patch array structure in chat response", patch: chatData.patch }),
+            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          text: chatData.text,
+          patch: chatData.patch ?? null,
+          patchSummary: chatData.patchSummary ?? null,
+          usage: aiResult.usage,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── GENERATE MODE (existing behavior, mode === "generate" or no mode field) ──
+    const athletePayload = payload as AthletePayload;
 
     // 3. Build user prompt
-    const userPrompt = buildUserPrompt(payload);
+    const userPrompt = buildUserPrompt(athletePayload);
 
     // 4. Token limit pre-check
     const totalInputChars = SYSTEM_PROMPT.length + userPrompt.length;

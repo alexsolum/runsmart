@@ -27,10 +27,65 @@ const PAYLOAD_WINDOWS_BY_MODE = {
     activityDays: 84,
     logDays: 84,
   },
+  chat: {
+    summaryWeeks: 4,
+    activityDays: 24,
+    logDays: 7,
+  },
 };
 
 function getPayloadWindows(mode) {
   return PAYLOAD_WINDOWS_BY_MODE[mode] ?? PAYLOAD_WINDOWS_BY_MODE.default;
+}
+
+export function buildHierarchicalPlanWindow(planData, todayIso, weeksBack = 4, weeksForward = 6) {
+  if (!planData?.weeks || planData.weeks.length === 0) return null;
+
+  const weeks = planData.weeks;
+
+  // Find current week index: week where startDate <= todayIso <= endDate
+  let currentIdx = weeks.findIndex((w) => w.startDate <= todayIso && todayIso <= w.endDate);
+
+  // If not found, determine if todayIso is before or after all weeks
+  if (currentIdx === -1) {
+    if (todayIso < weeks[0].startDate) {
+      // Before all weeks — treat first week as current
+      currentIdx = 0;
+    } else {
+      // After all weeks
+      const pastWeeks = weeks.slice(-weeksBack).map(stripWeek);
+      return { pastWeeks, currentWeek: null, futureWeeks: [] };
+    }
+  }
+
+  // Build past weeks (up to weeksBack before currentIdx)
+  const pastStart = Math.max(0, currentIdx - weeksBack);
+  const pastWeeks = weeks.slice(pastStart, currentIdx).map(stripWeek);
+
+  // Current week: full objects
+  const currentWeek = weeks[currentIdx];
+
+  // Build future weeks (up to weeksForward after currentIdx)
+  const futureWeeks = weeks.slice(currentIdx + 1, currentIdx + 1 + weeksForward);
+
+  return { pastWeeks, currentWeek, futureWeeks };
+}
+
+function stripWeek(week) {
+  return {
+    weekNumber: week.weekNumber,
+    startDate: week.startDate,
+    phase: week.phase,
+    focus: week.focus,
+    days: (week.days ?? []).map((d) => ({
+      date: d.date,
+      workouts: (d.workouts ?? []).map((w) => ({
+        id: w.id,
+        name: w.name,
+        completed: w.completed,
+      })),
+    })),
+  };
 }
 
 function toTime(value) {
@@ -263,6 +318,7 @@ export async function buildCoachPayload({
   weeklyConstraints,
   lang,
   mode = "default",
+  hierarchicalPlanData,
 }) {
   const windows = getPayloadWindows(mode);
   const [freshActivities, freshLogs, freshCheckins] = await Promise.all([
@@ -273,7 +329,7 @@ export async function buildCoachPayload({
   const background = runnerProfile.background;
   const goal = activePlan?.goal ?? null;
   const runnerProfilePayload = (background || goal) ? { background: background || null, goal } : null;
-  return {
+  const payload = {
     weeklySummary: buildWeeklySummaries(freshActivities, windows.summaryWeeks),
     recentActivities: getRecentActivities(freshActivities, windows.activityDays),
     latestCheckin: normalizeCheckin(freshCheckins[0] ?? null),
@@ -286,4 +342,11 @@ export async function buildCoachPayload({
     runnerProfile: runnerProfilePayload,
     lang,
   };
+
+  if (mode === "chat" && hierarchicalPlanData) {
+    const todayIso = new Date().toISOString().split("T")[0];
+    payload.hierarchicalPlanWindow = buildHierarchicalPlanWindow(hierarchicalPlanData, todayIso);
+  }
+
+  return payload;
 }

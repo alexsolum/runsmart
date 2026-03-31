@@ -67,7 +67,7 @@ Audit:
 | 18. Hierarchical Plan Hook Layer | v2.0 | 2/2 | Complete | 2026-03-30 |
 | 19. Plan Viewer UI | v2.0 | 2/2 | Complete | 2026-03-30 |
 | 20. Drag-and-Drop Rescheduling | v2.0 | 1/1 | Complete | 2026-03-31 |
-| 21. Coach Chat + Plan Patch | v2.0 | 0/? | Not started | - |
+| 21. Coach Chat + Plan Patch | v2.0 | 0/3 | Planned | - |
 | 22. Cleanup + Deprecation | v2.0 | 0/? | Not started | - |
 
 ## Phase Details
@@ -109,7 +109,7 @@ Plans:
   1. User sees a color-coded phase timeline bar at the top of the plan — Base, Build, Peak, and Taper phases are visually distinct with correct date spans
   2. User sees scrollable week rows with 7 day columns, a week focus label, and a weekly hours + km summary column per row
   3. User can click a workout card to open a detail modal showing the workout name, zone, duration, sport type, and humanReadable structure breakdown
-  4. User can edit a workout from the detail modal (sport, type, name, description, duration, distance) and see the saved changes reflected in the grid
+  4. User can edit a workout from the detail modal (sport, type, name, description, duration, distance) and save changes
 **Plans**: 2 plans
 Plans:
 - [x] 19-01-PLAN.md — Full-plan viewer layout: sticky phase timeline, continuous week cards, explicit day states, and LongTermPlanPage integration (completed 2026-03-30)
@@ -136,7 +136,11 @@ Plans:
   1. User can open the coach page and ask questions about their training plan — Claude responds with advice grounded in the user's specific plan phases, upcoming workouts, and recent Strava activity data
   2. When Claude suggests a plan modification, a confirmation card appears showing the proposed change — the user can accept or dismiss it without the change being applied automatically
   3. Accepting a suggested plan change updates the stored plan document — the change is immediately visible in the plan viewer without a page reload
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 21-01-PLAN.md — Edge Function chat mode + coachPayload hierarchical plan window extension
+- [ ] 21-02-PLAN.md — CoachPage rework (remove gemini/weekly plan tab), ChatPanel and ChangeCard components
+- [ ] 21-03-PLAN.md — CoachFAB contextual chat on LongTermPlanPage + end-to-end verification
 
 ### Phase 22: Cleanup + Deprecation
 **Goal**: All orphaned code from the migration window is removed — the codebase has one AI backend, one plan data path, and no dead references
@@ -147,4 +151,3 @@ Plans:
   2. The old per-week AI generation flow (WeeklyAiCard and plan mode) is removed — the only plan generation path is the full-plan claude-coach flow
   3. A full audit confirms zero remaining imports of useCoachPhilosophy, gemini-coach, or the old weekly AI generation components
 **Plans**: TBD
-

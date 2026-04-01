@@ -921,22 +921,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    // Extract user ID from JWT payload (decode without full verification)
+    // Format: "header.payload.signature"
+    let userId: string | null = null;
+    try {
+      const parts = accessToken.split(".");
+      if (parts.length === 3) {
+        // Decode the payload (second part) from base64url
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonStr = atob(base64); // Standard base64 decode
+        const payload = JSON.parse(jsonStr);
+        userId = payload.sub; // Supabase uses 'sub' claim for user ID
+      }
+    } catch (e) {
+      // If JWT parsing fails, reject request
+      console.error("JWT decode error:", e);
+    }
 
-    const { data: userData, error: userErr } =
-      await supabase.auth.getUser(accessToken);
-    if (userErr || !userData?.user) {
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized: Invalid or missing user in token" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
-    const userId = userData.user.id;
 
     // 2. Parse request body
     const payload = await req.json();

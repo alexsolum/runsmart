@@ -71,13 +71,24 @@ export function ChatPanel({
   const [inputText, setInputText] = useState("");
   const [dismissedPatches, setDismissedPatches] = useState(new Set());
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   useEffect(() => {
     setLocalMessages(externalMessages ?? []);
   }, [externalMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    // Only auto-scroll if user is already near the bottom (within 100px)
+    // This allows users to scroll up to read longer messages
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const isNearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    }
   }, [localMessages]);
 
   const persistMessage = useCallback(async (conv, role, content) => {
@@ -203,7 +214,7 @@ export function ChatPanel({
   return (
     <div className={`flex flex-col ${className}`} data-testid="chat-panel">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3">
         {localMessages.length === 0 && !sending ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-12">
             <CoachAvatar size={56} />

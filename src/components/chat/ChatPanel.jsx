@@ -142,9 +142,13 @@ export function ChatPanel({
       const session = sessionData?.session;
       if (!session) throw new Error("No active session. Please sign in first.");
 
+      // Manually pass the JWT token in Authorization header
+      // (functions.invoke() doesn't always auto-inject it in all environments)
       const { data, error: invokeError } = await client.functions.invoke("claude-coach", {
         body: payload,
-        headers: { Authorization: "Bearer " + session.access_token },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (invokeError) throw new Error(`Coach request failed: ${invokeError.message}`);

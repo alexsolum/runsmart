@@ -212,7 +212,7 @@ export function ChatPanel({
   }, [localMessages]);
 
   return (
-    <div className={`flex flex-col ${className}`} data-testid="chat-panel">
+    <div className={`flex flex-col min-h-0 ${className}`} data-testid="chat-panel">
       {/* Messages area */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3">
         {localMessages.length === 0 && !sending ? (

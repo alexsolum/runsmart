@@ -38,8 +38,8 @@ const corsHeaders = {
 };
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
-const MAX_OUTPUT_TOKENS = 32000;
+const ANTHROPIC_MODEL = "claude-3-5-sonnet-20240620";
+const MAX_OUTPUT_TOKENS = 8192;
 const MAX_INPUT_CHARS = 400000; // ~100k tokens * 4 chars/token — conservative limit for pre-check
 
 // ── Embedded coaching context ─────────────────────────────────────────────────
@@ -590,11 +590,10 @@ const FEW_SHOT_EXAMPLE = `{
               "sport": "run",
               "type": "aerobic",
               "name": "Easy Run",
-              "description": "Easy aerobic running. Keep it relaxed, no pushing.",
               "durationMinutes": 60,
               "distanceKm": 13,
               "primaryZone": "Zone 1",
-              "humanReadable": "60 min easy run. Zone 1, conversational pace.",
+              "humanReadable": "60 min easy run at conversational pace.",
               "completed": false
             }
           ]
@@ -608,11 +607,11 @@ const FEW_SHOT_EXAMPLE = `{
               "sport": "run",
               "type": "intervals",
               "name": "Taper Sharpener",
-              "description": "Short, snappy efforts to keep legs feeling quick. Neuromuscular activation.",
+              "description": "Short efforts for neuromuscular activation.",
               "durationMinutes": 50,
               "distanceKm": 10,
               "primaryZone": "Zone 1-4",
-              "humanReadable": "Warm-up: 15 min easy\\nMain: 6 x 1 min @ Zone 4 (sub-threshold), 2 min easy jog recovery\\nCool-down: 15 min easy",
+              "humanReadable": "WU: 15m. Main: 6x1m @ Z4, 2m recovery. CD: 15m.",
               "completed": false
             }
           ]
@@ -626,11 +625,10 @@ const FEW_SHOT_EXAMPLE = `{
               "sport": "run",
               "type": "long",
               "name": "Moderate Long Run",
-              "description": "Easy long run to maintain aerobic base without accumulating fatigue before race.",
               "durationMinutes": 90,
               "distanceKm": 18,
               "primaryZone": "Zone 2",
-              "humanReadable": "90 min easy. Zone 2 only — no pushing.",
+              "humanReadable": "90 min easy Zone 2. No pushing.",
               "completed": false
             }
           ]
@@ -649,7 +647,7 @@ const FEW_SHOT_EXAMPLE = `{
     "pacing": {
       "run": {
         "target": "Conservative start — 6:40-7:30/km terrain adjusted",
-        "notes": "Start conservatively for the first 30% of the race. Feel-based middle section. Push only in final 20%."
+        "notes": "Start conservatively. Feel-based middle. Push final 20%."
       }
     },
     "nutrition": {
@@ -659,12 +657,12 @@ const FEW_SHOT_EXAMPLE = `{
         "fluidPerHour": "750ml",
         "products": ["Gels", "Real food at aid stations"]
       },
-      "notes": "Practice race nutrition in all long training runs. Start with 60g/hr in early training, build to 80-90g/hr by peak phase."
+      "notes": "Practice nutrition in all long runs."
     },
     "taper": {
       "startDate": "2026-03-30",
       "volumeReduction": 40,
-      "notes": "Maintain intensity with short sharpeners, reduce total volume 40%"
+      "notes": "Maintain intensity, reduce total volume 40%."
     }
   }
 }`;
@@ -701,12 +699,15 @@ ${RACE_DAY_CONTEXT}
 ## Output Format
 You MUST respond with a single valid JSON object and nothing else. No markdown fences, no explanation, no text before or after the JSON.
 
+## Plan Generation Constraints
+Keep workout descriptions and "humanReadable" fields extremely concise (max 2 sentences). The description field is optional and should only be used for complex workouts.
+
 The plan JSON must follow this running-only schema (no swim or bike fields):
 - meta: { id, athlete, event, eventDate, planStartDate, planEndDate, createdAt, updatedAt, totalWeeks, generatedBy }
 - assessment: { foundation: { raceHistory, peakTrainingLoad, foundationLevel, yearsInSport }, currentForm: { weeklyKm, longestRun, consistency }, strengths, limiters, constraints }
 - zones: { run: { hr: { lthr, zones: [{ zone, name, percentLow, percentHigh, hrLow, hrHigh }] }, pace: [{ zone, name, paceRange }] } }
 - phases: [{ name, startWeek, endWeek, focus, weeklyHoursRange: { low, high }, keyWorkouts, physiologicalGoals }]
-- weeks: [{ weekNumber, startDate, endDate, phase, focus, targetHours, isRecoveryWeek, days: [{ date, dayOfWeek, workouts: [{ id, sport, type, name, description, durationMinutes, distanceKm, primaryZone, humanReadable, completed }] }], summary: { totalHours, totalKm, sessions } }]
+- weeks: [{ weekNumber, startDate, endDate, phase, focus, targetHours, isRecoveryWeek, days: [{ date, dayOfWeek, workouts: [{ id, sport, type, name, description (optional), durationMinutes, distanceKm, primaryZone, humanReadable, completed }] }], summary: { totalHours, totalKm, sessions } }]
 - raceStrategy: { event: { name, date, type, distance }, pacing: { run: { target, notes } }, nutrition: { preRace, during: { carbsPerHour, fluidPerHour, products }, notes }, taper: { startDate, volumeReduction, notes } }
 
 Here is a concrete example of the expected output structure (condensed to 1 week):
@@ -900,6 +901,50 @@ function validatePatchArray(patch: any): boolean {
   );
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  initialDelay = 1000
+): Promise<Response> {
+  let lastError: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        console.log(`Retry attempt ${attempt} after ${delay}ms delay...`);
+        await sleep(delay);
+      }
+
+      const response = await fetch(url, options);
+
+      // Retry on 499 (Client disconnected), 529 (Overloaded), 429 (Rate Limit), or 5xx (Server Error)
+      if (
+        response.status === 499 ||
+        response.status === 529 ||
+        response.status === 429 ||
+        (response.status >= 500 && response.status <= 599)
+      ) {
+        if (attempt < maxRetries) {
+          console.warn(`Claude API returned ${response.status}. Retrying...`);
+          continue;
+        }
+      }
+
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        console.warn(`Fetch error: ${err}. Retrying...`);
+        continue;
+      }
+    }
+  }
+  throw lastError || new Error("Max retries reached");
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -977,7 +1022,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const aiResponse = await fetch(ANTHROPIC_URL, {
+      const aiResponse = await fetchWithRetry(ANTHROPIC_URL, {
         method: "POST",
         headers: {
           "x-api-key": anthropicKey,
@@ -1090,7 +1135,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const aiResponse = await fetch(ANTHROPIC_URL, {
+    const aiResponse = await fetchWithRetry(ANTHROPIC_URL, {
       method: "POST",
       headers: {
         "x-api-key": anthropicKey,

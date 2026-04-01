@@ -324,7 +324,7 @@ export default function CoachPage() {
         </aside>
 
         {/* Chat area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className="px-4 pt-4 pb-0 shrink-0">
             {activePlan ? (
               <PlanBanner plan={activePlan} blocks={trainingBlocks.blocks} />

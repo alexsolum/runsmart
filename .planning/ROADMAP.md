@@ -150,4 +150,7 @@ Plans:
   1. The gemini-coach Edge Function is removed — no frontend code references it and no Supabase deployment serves it
   2. The old per-week AI generation flow (WeeklyAiCard and plan mode) is removed — the only plan generation path is the full-plan claude-coach flow
   3. A full audit confirms zero remaining imports of useCoachPhilosophy, gemini-coach, or the old weekly AI generation components
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 22-01-PLAN.md — Migrate Insights synthesis to claude-coach and retire WeeklyPlanPage runtime wiring
+- [ ] 22-02-PLAN.md — Delete gemini-coach, replace legacy tests/docs, and verify zero active references

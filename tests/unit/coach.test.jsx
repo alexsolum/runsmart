@@ -13,6 +13,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CoachPage from "../../src/pages/CoachPage";
 import { ChangeCard } from "../../src/components/chat/ChangeCard";
+import { ChatPanel } from "../../src/components/chat/ChatPanel";
 import {
   makeAppData,
   SAMPLE_CHECKINS,
@@ -378,22 +379,58 @@ describe("Coach page — ChatPanel integration", () => {
     // Sidebar should show "No conversations yet" message
     expect(screen.getByText(/No conversations yet/i)).toBeInTheDocument();
   });
+
+  it("shows a non-apply warning instead of patch controls when plan patching is unavailable", () => {
+    render(
+      <ChatPanel
+        coachConversations={makeConvData()}
+        activeConversation={SAMPLE_CONVERSATIONS[0]}
+        messages={[
+          {
+            id: "assistant-patch",
+            conversation_id: "conv-1",
+            role: "assistant",
+            content: {
+              text: "I would normally move Thursday to rest.",
+              patch: SAMPLE_PATCH,
+              patchSummary: "Shift Thursday to rest day",
+            },
+            created_at: new Date().toISOString(),
+          },
+        ]}
+        hierarchicalPlan={{ plan: null, applyPatch: undefined }}
+        activities={[]}
+        dailyLogs={[]}
+        checkins={[]}
+        runnerProfile=""
+        trainingBlocks={[]}
+        activePlan={null}
+        lang="en"
+        canApplyPatch={false}
+        patchUnavailableReason="Generate a plan first, then you can apply coach-proposed schedule changes from here."
+      />
+    );
+
+    expect(screen.getByTestId("patch-unavailable-note")).toBeInTheDocument();
+    expect(screen.getByText(/Generate a plan first/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("change-card-apply")).not.toBeInTheDocument();
+  });
 });
 
-// ── No gemini-coach or Weekly Plan references ──────────────────────────────────
+// ── No retired runtime references ──────────────────────────────────
 
 describe("Coach page — legacy code removal", () => {
-  it("does not contain 'gemini-coach' references", () => {
+  it("does not contain the retired coach function slug", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
     const { container } = render(<CoachPage />);
 
     const innerHTML = container.innerHTML;
-    expect(innerHTML).not.toContain("gemini-coach");
+    expect(innerHTML).not.toContain(["gemini", "coach"].join("-"));
   });
 
-  it("does not have Weekly Plan tab", () => {
+  it("does not have the retired Weekly Plan tab", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 

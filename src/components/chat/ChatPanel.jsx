@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseClient } from "../../lib/supabaseClient";
-import { buildCoachPayload } from "../../lib/coachPayload";
 import { ChangeCard } from "./ChangeCard";
 import CoachAvatar from "../CoachAvatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-function ChatMessage({ msg, onApplyPatch, onDismissPatch }) {
+function ChatMessage({ msg, canApplyPatch, patchUnavailableReason, onApplyPatch, onDismissPatch }) {
   if (msg.role === "user") {
-    const text = typeof msg.content === "string" ? msg.content : msg.content?.text ?? "";
+    const text = extractText(msg.content);
     if (!text) return null;
     return (
       <div className="flex justify-end mb-4">
@@ -19,14 +18,12 @@ function ChatMessage({ msg, onApplyPatch, onDismissPatch }) {
     );
   }
 
-  // Assistant message
-  const content = typeof msg.content === "string"
-    ? (() => { try { return JSON.parse(msg.content); } catch { return { text: msg.content }; } })()
-    : msg.content;
-
-  const text = content?.text ?? "";
-  const patch = content?.patch ?? null;
-  const patchSummary = content?.patchSummary ?? null;
+  // Assistant message — parse envelope from content
+  const envelope = parseAssistantContent(msg.content);
+  const text = envelope.content ?? "";
+  const patches = envelope.patches ?? null;
+  const patchSummary = envelope.patchSummary ?? null;
+  const planUpdated = envelope.planUpdated ?? false;
 
   return (
     <div className="flex gap-3 mb-4">
@@ -37,13 +34,25 @@ function ChatMessage({ msg, onApplyPatch, onDismissPatch }) {
             <p className="m-0 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{text}</p>
           </div>
         )}
-        {patch && patch.length > 0 && (
-          <ChangeCard
-            patch={patch}
-            patchSummary={patchSummary}
-            onAccept={onApplyPatch}
-            onDismiss={onDismissPatch}
-          />
+        {planUpdated && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700">
+            <span>✓</span> Plan updated
+          </div>
+        )}
+        {patches && patches.length > 0 && !planUpdated && (
+          canApplyPatch ? (
+            <ChangeCard
+              patch={patches}
+              patchSummary={patchSummary}
+              onAccept={onApplyPatch}
+              onDismiss={onDismissPatch}
+            />
+          ) : (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-testid="patch-unavailable-note">
+              {patchSummary && <p className="m-0 mb-1 font-semibold">{patchSummary}</p>}
+              <p className="m-0">{patchUnavailableReason}</p>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -51,129 +60,85 @@ function ChatMessage({ msg, onApplyPatch, onDismissPatch }) {
 }
 
 export function ChatPanel({
-  coachConversations,
-  activeConversation,
-  messages: externalMessages,
-  hierarchicalPlan,
-  activities,
-  dailyLogs,
-  checkins,
-  runnerProfile,
-  trainingBlocks,
-  activePlan,
-  lang,
-  onConversationCreated,
-  className = "",
+  sessionId,
+  messages,
+  buildAthleteContext,
+  onMessageSent,
+  canApplyPatch,
+  patchUnavailableReason,
+  onApplyPatch,
+  onPlanRefresh,
 }) {
-  const [localMessages, setLocalMessages] = useState(externalMessages ?? []);
+  const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState(null);
-  const [inputText, setInputText] = useState("");
-  const [dismissedPatches, setDismissedPatches] = useState(new Set());
-  const messagesEndRef = useRef(null);
+  const [optimisticMessages, setOptimisticMessages] = useState([]);
+  const scrollRef = useRef(null);
+  const textareaRef = useRef(null);
 
+  const allMessages = [...messages, ...optimisticMessages];
+
+  // Auto-scroll to bottom
   useEffect(() => {
-    setLocalMessages(externalMessages ?? []);
-  }, [externalMessages]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
-  }, [localMessages]);
-
-  const persistMessage = useCallback(async (conv, role, content) => {
-    const tempId = `temp-${Date.now()}-${Math.random()}`;
-    const tempMsg = { id: tempId, conversation_id: conv.id, role, content, created_at: new Date().toISOString() };
-    setLocalMessages((prev) => [...prev, tempMsg]);
-    const saved = await coachConversations.addMessage(conv.id, role, content);
-    if (saved?.id) {
-      setLocalMessages((prev) => prev.map((m) => (m.id === tempId ? saved : m)));
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-    return saved;
-  }, [coachConversations]);
+  }, [allMessages.length]);
 
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || sending) return;
-    const client = getSupabaseClient();
-    if (!client) { setError("Supabase is not configured."); return; }
+    const text = input.trim();
+    if (!text || !sessionId || sending) return;
 
-    const userText = inputText.trim();
-    setInputText("");
+    setInput("");
     setSending(true);
-    setError(null);
+
+    // Optimistic user message
+    const optimisticUser = {
+      id: `opt-${Date.now()}`,
+      role: "user",
+      content: [{ type: "text", text }],
+      created_at: new Date().toISOString(),
+    };
+    setOptimisticMessages([optimisticUser]);
 
     try {
-      // Ensure conversation exists
-      let conv = activeConversation;
-      if (!conv) {
-        conv = await coachConversations.createConversation("New coaching chat");
-        if (!conv) throw new Error("Failed to create conversation.");
-        onConversationCreated?.(conv);
+      const client = getSupabaseClient();
+      const session = (await client.auth.getSession()).data.session;
+      if (!session?.access_token) throw new Error("Not authenticated");
+
+      const { data, error } = await client.functions.invoke("claude-coach", {
+        body: {
+          sessionId,
+          newMessage: text,
+          athleteContext: buildAthleteContext(),
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+
+      // If plan was updated, refresh plan data
+      if (data?.planUpdated) {
+        await onPlanRefresh?.();
       }
 
-      // Persist user message
-      await persistMessage(conv, "user", { text: userText });
-
-      // Build conversation history for API
-      const historyForApi = localMessages
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({
-          role: m.role,
-          content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-        }));
-
-      // Build payload
-      const planData = hierarchicalPlan?.plan?.plan_data ?? null;
-      const basePayload = await buildCoachPayload({
-        activities, dailyLogs, checkins,
-        activePlan, trainingBlocks, runnerProfile,
-        lang, mode: "chat",
-        hierarchicalPlanData: planData,
-      });
-
-      const payload = {
-        mode: "chat",
-        userMessage: userText,
-        conversationHistory: historyForApi,
-        ...basePayload,
-      };
-
-      // Get session for auth
-      const { data: sessionData } = await client.auth.getSession();
-      const session = sessionData?.session;
-      if (!session) throw new Error("No active session. Please sign in first.");
-
-      const { data, error: invokeError } = await client.functions.invoke("claude-coach", {
-        body: payload,
-        headers: { Authorization: "Bearer " + session.access_token },
-      });
-
-      if (invokeError) throw new Error(`Coach request failed: ${invokeError.message}`);
-      if (data?.error) throw new Error(data.error);
-      if (!data?.text) throw new Error("No response from coach.");
-
-      // Persist assistant message (store the full response as content)
-      await persistMessage(conv, "assistant", {
-        text: data.text,
-        patch: data.patch ?? null,
-        patchSummary: data.patchSummary ?? null,
-      });
-
-      // Update title for new conversations (first exchange)
-      if (localMessages.length <= 2) {
-        const title = userText.slice(0, 50) || "Coaching chat";
-        await coachConversations.updateConversationTitle(conv.id, title);
-      }
+      // Reload messages from DB to get the persisted versions
+      await onMessageSent?.();
     } catch (err) {
-      setError(err.message);
+      // Add error as optimistic assistant message
+      setOptimisticMessages((prev) => [
+        ...prev,
+        {
+          id: `opt-err-${Date.now()}`,
+          role: "assistant",
+          content: [{ type: "text", text: JSON.stringify({ type: "conversation", content: `Error: ${err.message}` }) }],
+          created_at: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setSending(false);
+      setOptimisticMessages([]);
     }
-  }, [
-    inputText, sending, activeConversation, localMessages,
-    coachConversations, hierarchicalPlan, activities, dailyLogs,
-    checkins, activePlan, trainingBlocks, runnerProfile, lang,
-    persistMessage, onConversationCreated,
-  ]);
+  }, [input, sessionId, sending, buildAthleteContext, onMessageSent, onPlanRefresh]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -182,95 +147,90 @@ export function ChatPanel({
     }
   }, [handleSend]);
 
-  const handleApplyPatch = useCallback(async (patch) => {
-    await hierarchicalPlan.applyPatch(patch);
-  }, [hierarchicalPlan]);
-
-  const handleDismissPatch = useCallback(() => {
-    // Mark the latest patch as dismissed (by message id)
-    const lastPatchMsg = [...localMessages].reverse().find(
-      (m) => m.role === "assistant" && (m.content?.patch || (typeof m.content === "object" && m.content?.patch))
-    );
-    if (lastPatchMsg) {
-      setDismissedPatches((prev) => new Set([...prev, lastPatchMsg.id]));
-    }
-  }, [localMessages]);
-
   return (
-    <div className={`flex flex-col ${className}`} data-testid="chat-panel">
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        {localMessages.length === 0 && !sending ? (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-12">
-            <CoachAvatar size={56} />
-            <p className="m-0 text-sm text-slate-500 max-w-xs">
-              Ask your coach about your training plan, workouts, or recovery.
-            </p>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Message list */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+        {allMessages.length === 0 && !sending && (
+          <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm">
+            <CoachAvatar size={48} className="mb-3 opacity-50" />
+            <p>Ask your coach anything about your training.</p>
           </div>
-        ) : (
-          <div>
-            {localMessages.map((msg) => {
-              const isDismissed = dismissedPatches.has(msg.id);
-              const msgForRender = isDismissed
-                ? { ...msg, content: { ...(typeof msg.content === "object" ? msg.content : {}), patch: null } }
-                : msg;
-              return (
-                <ChatMessage
-                  key={msg.id}
-                  msg={msgForRender}
-                  onApplyPatch={handleApplyPatch}
-                  onDismissPatch={handleDismissPatch}
-                />
-              );
-            })}
-            {sending && (
-              <div className="flex gap-3 mb-4" role="status" aria-live="polite">
-                <CoachAvatar size={32} className="shrink-0 mt-0.5 opacity-60" />
-                <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin shrink-0" aria-hidden="true" />
-                  <p className="m-0 text-sm text-slate-500">Thinking...</p>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+        )}
+        {allMessages.map((msg) => (
+          <ChatMessage
+            key={msg.id}
+            msg={msg}
+            canApplyPatch={canApplyPatch}
+            patchUnavailableReason={patchUnavailableReason}
+            onApplyPatch={onApplyPatch}
+            onDismissPatch={() => {}}
+          />
+        ))}
+        {sending && optimisticMessages.length > 0 && (
+          <div className="flex gap-3 mb-4">
+            <CoachAvatar size={32} className="shrink-0 mt-0.5 animate-pulse" />
+            <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3">
+              <span className="text-sm text-slate-400">Thinking...</span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Error display */}
-      {error && (
-        <div className="mx-4 mb-2 bg-red-50 border border-red-200 rounded-xl p-3 text-red-800 text-sm flex gap-3 items-start" role="alert">
-          <p className="m-0 flex-1">{error}</p>
-          <Button type="button" variant="ghost" size="sm" className="self-start text-xs shrink-0 h-auto py-0.5 px-2" onClick={() => setError(null)}>
-            Dismiss
-          </Button>
-        </div>
-      )}
-
       {/* Input area */}
-      <div className="px-4 pb-4 pt-2 border-t border-slate-100 shrink-0">
+      <div className="border-t border-slate-200 px-4 py-3 bg-white">
         <div className="flex gap-2">
           <Textarea
-            className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl font-inherit text-sm text-slate-900 bg-slate-50 resize-none leading-relaxed focus:outline-none focus:border-blue-600 focus:bg-white placeholder:text-slate-400 disabled:opacity-60"
-            rows={2}
-            placeholder="Ask your coach anything..."
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            placeholder="Ask your coach..."
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+            rows={1}
             disabled={sending}
-            data-testid="chat-input"
           />
-          <Button
-            type="button"
-            className="self-end"
-            onClick={handleSend}
-            disabled={sending || !inputText.trim()}
-            data-testid="chat-send"
-          >
-            {sending ? "..." : "Send"}
+          <Button onClick={handleSend} disabled={!input.trim() || sending}>
+            Send
           </Button>
         </div>
       </div>
     </div>
   );
+}
+
+function extractText(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (block.type === "text" && block.text) return block.text;
+    }
+  }
+  if (content?.text) return content.text;
+  return null;
+}
+
+function parseAssistantContent(content) {
+  // Content is stored as JSONB — may be an array of content blocks from the API
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (block.type === "text") {
+        try {
+          return JSON.parse(block.text);
+        } catch {
+          return { type: "conversation", content: block.text };
+        }
+      }
+    }
+    return { type: "conversation", content: "" };
+  }
+  if (typeof content === "string") {
+    try {
+      return JSON.parse(content);
+    } catch {
+      return { type: "conversation", content };
+    }
+  }
+  if (content?.type) return content;
+  return { type: "conversation", content: content?.text ?? "" };
 }

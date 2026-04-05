@@ -8,7 +8,7 @@ function daysAgo(n) {
 }
 
 // Returns the ISO date of a given weekday (1=Mon…7=Sun) in the CURRENT week.
-// Guarantees dates always fall within the WeeklyPlanPage's current-week grid.
+// Guarantees dates always fall within the current test week's date grid.
 function weekdayIso(targetDay /* 1=Mon, 2=Tue, …, 7=Sun */) {
   const d = new Date();
   const day = d.getUTCDay() || 7; // convert Sun(0) → 7
@@ -294,43 +294,32 @@ export const SAMPLE_DAILY_LOGS = [
   },
 ];
 
-export const SAMPLE_CONVERSATIONS = [
+export const SAMPLE_SESSIONS = [
   {
-    id: "conv-1",
-    user_id: "user-1",
-    title: "Good training consistency",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    session_id: "session-1",
+    firstMessage: "How should I adjust my training this week?",
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
-    id: "conv-2",
-    user_id: "user-1",
-    title: "Pre-race tapering advice",
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    session_id: "session-2",
+    firstMessage: "Pre-race tapering advice",
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
-export const SAMPLE_MESSAGES = [
+export const SAMPLE_CHAT_MESSAGES = [
   {
     id: "msg-1",
-    conversation_id: "conv-1",
+    session_id: "session-1",
     role: "user",
-    content: { type: "initial_request" },
+    content: [{ type: "text", text: "How should I adjust my training this week?" }],
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "msg-2",
-    conversation_id: "conv-1",
+    session_id: "session-1",
     role: "assistant",
-    content: [
-      {
-        type: "positive",
-        icon: "trending",
-        title: "Good training consistency",
-        body: "Your running has been consistent this week. Keep building aerobic base.",
-      },
-    ],
+    content: [{ type: "text", text: JSON.stringify({ type: "conversation", content: "Based on your recent fatigue levels, I'd recommend reducing intensity." }) }],
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
@@ -794,6 +783,15 @@ export const SAMPLE_HIERARCHICAL_PLAN = {
  * Pass overrides to customise individual slices for a specific test.
  */
 export function makeAppData(overrides = {}) {
+  const invokeInsightsSynthesis = vi.fn().mockResolvedValue({
+    synthesis: [
+      "Mileage Trend: volume is stable and gradually rising.",
+      "Intensity Distribution: intensity remains mostly aerobic with one quality focus.",
+      "Long-Run Progression: long runs are progressing with manageable fatigue cost.",
+      "Race Readiness: consistency and recovery suggest readiness is improving.",
+    ].join("\n"),
+  });
+
   return {
     auth: {
       user: { id: "user-1", email: "athlete@example.com" },
@@ -863,26 +861,15 @@ export function makeAppData(overrides = {}) {
       toggleCompleted: vi.fn().mockResolvedValue(undefined),
     },
     coachConversations: {
-      conversations: [],
-      activeConversation: null,
+      sessions: [],
       messages: [],
+      activeSessionId: null,
       loading: false,
       error: null,
-      loadConversations: vi.fn().mockResolvedValue([]),
-      loadMessages: vi.fn().mockResolvedValue([]),
-      createConversation: vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]),
-      addMessage: vi.fn().mockImplementation((convId, role, content) =>
-        Promise.resolve({
-          id: `msg-${Date.now()}`,
-          conversation_id: convId,
-          role,
-          content,
-          created_at: new Date().toISOString(),
-        })
-      ),
-      updateConversationTitle: vi.fn().mockResolvedValue(undefined),
-      deleteConversation: vi.fn().mockResolvedValue(undefined),
-      setActiveConversation: vi.fn().mockResolvedValue(undefined),
+      setActiveSessionId: vi.fn().mockResolvedValue(undefined),
+      startNewSession: vi.fn().mockReturnValue("new-session-id"),
+      reload: vi.fn().mockResolvedValue(undefined),
+      loadSessions: vi.fn().mockResolvedValue([]),
     },
     hierarchicalPlan: {
       plan: SAMPLE_HIERARCHICAL_PLAN,
@@ -899,6 +886,7 @@ export function makeAppData(overrides = {}) {
       ),
       getPhases: vi.fn().mockReturnValue(SAMPLE_HIERARCHICAL_PLAN.plan_data.phases),
     },
+    invokeInsightsSynthesis,
     ...overrides,
   };
 }

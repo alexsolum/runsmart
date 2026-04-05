@@ -1,9 +1,9 @@
 /**
- * AI Coach sanity tests (TST-009) — run manually only.
+ * Claude coach sanity tests (TST-009) — run manually only.
  *
- * Validates that the Gemini coaching endpoint returns coherent, non-empty
- * responses that contain expected coaching keywords. These tests make live
- * calls to the gemini-coach Supabase Edge Function.
+ * Validates that the Claude-backed coaching flow returns coherent, non-empty
+ * responses that contain expected coaching keywords. These tests exercise the
+ * live coach experience through the surviving chat runtime.
  *
  * Run with:
  *   npm run test:ai

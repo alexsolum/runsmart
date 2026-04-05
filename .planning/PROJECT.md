@@ -3,13 +3,13 @@
 ## Current State
 
 **Shipped version:** v1.2 (2026-03-13)
-**v2.0 progress:** Phase 18 complete — Hierarchical plan hook layer with intake modal
+**v2.0 progress:** Phase 22 complete — deprecated Gemini and weekly-plan runtime paths removed
 
-RunSmart now ships an end-to-end weekly planning workflow that fits the product’s athlete-first coaching model:
-- `Ukeplan` owns AI-powered weekly generation and editing
-- `Treningsplan` provides read-only week intent and handoff context
-- Weekly planning respects selected-week type, mileage target, admin coaching philosophy, and day-level athlete constraints
-- Manual edits are protected during regeneration with explicit review-before-replace flow
+RunSmart now centers the active training experience on a single hierarchical plan path:
+- `Treningsplan` is the surviving plan-management surface
+- Insights and coach chat both run through the same Claude-backed Edge Function
+- The retired weekly planner runtime is no longer part of the active shell
+- Manual plan edits and coach patches stay within the hierarchical plan viewer flow
 
 Current codebase snapshot:
 - Static React/Vite frontend with direct Supabase integration
@@ -25,7 +25,7 @@ The coaching guidance must produce practical, tailored training decisions that f
 **Goal:** Replace the Gemini AI backend with Claude API using the endurance coaching skill, adopt a hierarchical plan data model (plan → phases → weeks → days → workouts), and rebuild the weekly plan UI inspired by the claude-coach HTML viewer.
 
 **Target features:**
-- Claude API Edge Function replacing gemini-coach with SKILL.md coaching methodology
+- Claude API Edge Function as the single surviving AI backend with SKILL.md coaching methodology
 - Full training plan generation (all phases + weeks) in a single AI call
 - Conversational coaching chat powered by Claude
 - Hierarchical plan model: plan → phases → weeks → days → workouts (JSON-native)
@@ -89,4 +89,4 @@ Archived planning artifacts:
 </details>
 
 ---
-*Last updated: 2026-03-30 after Phase 18 completion*
+*Last updated: 2026-04-05 after Phase 22 cleanup completion*

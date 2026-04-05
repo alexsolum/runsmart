@@ -13,16 +13,12 @@ vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
-vi.mock("../../src/lib/supabaseClient.js", () => ({
-  getSupabaseClient: vi.fn(),
-}));
-
 vi.mock("../../src/lib/coachPayload.js", () => ({
   buildCoachPayload: vi.fn().mockResolvedValue({}),
 }));
 
 import { useAppData } from "../../src/context/AppDataContext";
-import { getSupabaseClient } from "../../src/lib/supabaseClient.js";
+import { buildCoachPayload } from "../../src/lib/coachPayload.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -290,7 +286,7 @@ describe("Insights — synthesis callout (INSG-02)", () => {
     vi.clearAllMocks();
   });
 
-  it("strips wrapper artifacts and renders cleaned synthesis callout", async () => {
+  it("requests synthesis through AppDataContext and renders the returned text", async () => {
     const wrappedSynthesis = [
       "```json",
       JSON.stringify({
@@ -303,15 +299,17 @@ describe("Insights — synthesis callout (INSG-02)", () => {
       }),
       "```",
     ].join("\n");
-    const mockInvoke = vi.fn().mockResolvedValue({
-      data: { synthesis: wrappedSynthesis },
-      error: null,
+    const invokeInsightsSynthesis = vi.fn().mockResolvedValue({
+      synthesis: wrappedSynthesis,
     });
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
-    useAppData.mockReturnValue(makeAppData());
+    useAppData.mockReturnValue(makeAppData({ invokeInsightsSynthesis }));
 
     render(<InsightsPage />);
     const callout = await screen.findByTestId("synthesis-callout");
+    expect(invokeInsightsSynthesis).toHaveBeenCalledTimes(1);
+    expect(buildCoachPayload).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "insights_synthesis" }),
+    );
     expect(callout).toBeInTheDocument();
     expect(callout).toHaveTextContent("Mileage Trend:");
     expect(callout).toHaveTextContent("Race Readiness:");
@@ -326,12 +324,11 @@ describe("Insights — synthesis callout (INSG-02)", () => {
       "Long-Run Progression: long runs are progressing with manageable fatigue cost.",
       "Race Readiness: consistency and recovery suggest readiness is improving.",
     ].join("\n");
-    const mockInvoke = vi.fn().mockResolvedValue({
-      data: { synthesis: validSynthesis },
-      error: null,
-    });
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
-    useAppData.mockReturnValue(makeAppData());
+    useAppData.mockReturnValue(makeAppData({
+      invokeInsightsSynthesis: vi.fn().mockResolvedValue({
+        synthesis: validSynthesis,
+      }),
+    }));
 
     render(<InsightsPage />);
     const callout = await screen.findByTestId("synthesis-callout");
@@ -342,25 +339,22 @@ describe("Insights — synthesis callout (INSG-02)", () => {
   });
 
   it("omits synthesis callout when synthesis is invalid after sanitization", async () => {
-    const mockInvoke = vi.fn().mockResolvedValue({
-      data: { synthesis: "This is generic text with no required headings." },
-      error: null,
+    const invokeInsightsSynthesis = vi.fn().mockResolvedValue({
+      synthesis: "This is generic text with no required headings.",
     });
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
-    useAppData.mockReturnValue(makeAppData());
+    useAppData.mockReturnValue(makeAppData({ invokeInsightsSynthesis }));
 
     render(<InsightsPage />);
-    await waitFor(() => expect(mockInvoke).toHaveBeenCalled());
+    await waitFor(() => expect(invokeInsightsSynthesis).toHaveBeenCalled());
     expect(screen.queryByTestId("synthesis-callout")).toBeNull();
   });
 
   it("parses wrapped JSON-string synthesis payloads", async () => {
-    const mockInvoke = vi.fn().mockResolvedValue({
-      data: { synthesis: "\"{ \\\"synthesis\\\": \\\"You've made a significant leap in volume this past week.\\\"}\"" },
-      error: null,
-    });
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
-    useAppData.mockReturnValue(makeAppData());
+    useAppData.mockReturnValue(makeAppData({
+      invokeInsightsSynthesis: vi.fn().mockResolvedValue({
+        synthesis: "\"{ \\\"synthesis\\\": \\\"You've made a significant leap in volume this past week.\\\"}\"",
+      }),
+    }));
 
     render(<InsightsPage />);
     const callout = await screen.findByTestId("synthesis-callout");
@@ -370,22 +364,17 @@ describe("Insights — synthesis callout (INSG-02)", () => {
   });
 
   it("omits synthesis callout when edge function returns an error", async () => {
-    const mockInvoke = vi.fn().mockResolvedValue({
-      data: null,
-      error: new Error("fail"),
-    });
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
-    useAppData.mockReturnValue(makeAppData());
+    const invokeInsightsSynthesis = vi.fn().mockRejectedValue(new Error("fail"));
+    useAppData.mockReturnValue(makeAppData({ invokeInsightsSynthesis }));
 
     render(<InsightsPage />);
-    await waitFor(() => expect(mockInvoke).toHaveBeenCalled());
+    await waitFor(() => expect(invokeInsightsSynthesis).toHaveBeenCalled());
     expect(screen.queryByTestId("synthesis-callout")).toBeNull();
   });
 
   it("shows skeleton while synthesis is loading", async () => {
-    const mockInvoke = vi.fn().mockReturnValue(new Promise(() => {})); // never resolves
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
-    useAppData.mockReturnValue(makeAppData());
+    const invokeInsightsSynthesis = vi.fn().mockReturnValue(new Promise(() => {}));
+    useAppData.mockReturnValue(makeAppData({ invokeInsightsSynthesis }));
 
     render(<InsightsPage />);
     const skeleton = await screen.findByTestId("synthesis-skeleton");
@@ -393,15 +382,15 @@ describe("Insights — synthesis callout (INSG-02)", () => {
   });
 
   it("omits synthesis callout when activities list is empty (hasData false)", () => {
-    const mockInvoke = vi.fn();
-    getSupabaseClient.mockReturnValue({ functions: { invoke: mockInvoke } });
+    const invokeInsightsSynthesis = vi.fn();
     useAppData.mockReturnValue(makeAppData({
+      invokeInsightsSynthesis,
       activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
     }));
 
     render(<InsightsPage />);
     expect(screen.queryByTestId("synthesis-callout")).toBeNull();
     expect(screen.queryByTestId("synthesis-skeleton")).toBeNull();
-    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(invokeInsightsSynthesis).not.toHaveBeenCalled();
   });
 });

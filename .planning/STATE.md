@@ -2,33 +2,33 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Claude Coach + Plan Overhaul
-current_phase: 21
-current_plan: 1
-status: executing
-last_updated: "2026-03-31T18:55:01.578Z"
-last_activity: 2026-03-31
+current_phase: 22
+current_plan: Not started
+status: completed
+last_updated: "2026-04-05T18:39:47.036Z"
+last_activity: 2026-04-05
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 8
+  completed_phases: 5
+  total_plans: 13
+  completed_plans: 13
 ---
 
 # State
 
 **Initialized:** 2026-03-29
-**Current Phase:** 21
-**Current Plan:** 1
-**Status:** Ready to execute
+**Current Phase:** 22
+**Current Plan:** Not started
+**Status:** Milestone complete
 
-Last activity: 2026-03-31
+Last activity: 2026-04-05
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-29)
+See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** The coaching guidance must produce practical, tailored training decisions that fit real life while preserving long-term progression and injury prevention.
-**Current focus:** Phase 21 — Coach Chat + Plan Patch
+**Current focus:** Phase 22 complete — cleanup-deprecation
 
 ## Artifacts
 
@@ -43,8 +43,8 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 21 (Coach Chat + Plan Patch) — EXECUTING
-Plan: 3 of 3
+Phase: 22 (cleanup-deprecation) — COMPLETE
+Plan: 2 of 2 complete
 
 ## Performance Metrics
 
@@ -104,7 +104,7 @@ Plan: 3 of 3
 
 ## Session Continuity
 
-Last session: 2026-03-31T12:39:00.823Z
-Completed: Phase 19 Plan 02 (Workout detail modal with completion toggle and hierarchical edit flow)
-Summary: .planning/phases/19-plan-viewer-ui/19-02-SUMMARY.md
-Next: Phase 20 (Drag-and-Drop Rescheduling)
+Last session: 2026-04-05T15:43:00.230Z
+Completed: Phase 22 (Cleanup + Deprecation)
+Summary: .planning/phases/22-cleanup-deprecation/22-02-SUMMARY.md
+Next: Milestone wrap-up / follow-up verification on earlier pending requirements

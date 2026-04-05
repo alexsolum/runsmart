@@ -50,6 +50,33 @@ export function AppDataProvider({ children }) {
   const runnerProfile = useRunnerProfile(userId);
   const coachConversations = useCoachConversations(userId);
   const hierarchicalPlan = useHierarchicalPlan(userId);
+  const invokeInsightsSynthesis = useCallback(
+    async (payload) => {
+      const client = auth.client;
+      if (!client) {
+        throw new Error("Supabase is not configured.");
+      }
+
+      const session = auth.session ?? (await client.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        throw new Error("No active session. Please sign in first.");
+      }
+
+      const { data, error } = await client.functions.invoke("claude-coach", {
+        body: { mode: "insights_synthesis", ...payload },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+    [auth.client, auth.session],
+  );
 
   const value = useMemo(
     () => ({
@@ -64,10 +91,11 @@ export function AppDataProvider({ children }) {
       runnerProfile,
       coachConversations,
       hierarchicalPlan,
+      invokeInsightsSynthesis,
       showToast,
       dismissToast,
     }),
-    [auth, plans, activities, normalizedCheckins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, hierarchicalPlan, showToast, dismissToast],
+    [auth, plans, activities, normalizedCheckins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, hierarchicalPlan, invokeInsightsSynthesis, showToast, dismissToast],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

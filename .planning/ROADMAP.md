@@ -49,8 +49,8 @@ Audit:
 - [x] **Phase 18: Hierarchical Plan Hook Layer** - useHierarchicalPlan and supporting data utilities wired into AppDataContext, PlanIntakeModal with form intake and generation UI (completed 2026-03-30)
 - [x] **Phase 19: Plan Viewer UI** - Phase bar, scrollable week grid, workout cards, detail modal, and weekly summary (completed 2026-03-30)
 - [x] **Phase 20: Drag-and-Drop Rescheduling** - Within-week workout drag-and-drop backed by an atomic Postgres RPC (completed 2026-03-31)
-- [ ] **Phase 21: Coach Chat + Plan Patch** - Conversational coaching chat with plan context injection and AI-suggested plan modifications
-- [ ] **Phase 22: Cleanup + Deprecation** - gemini-coach and old AI generation flow retired after new system is proven
+- [x] **Phase 21: Coach Chat + Plan Patch** - Conversational coaching chat with plan context injection and AI-suggested plan modifications (completed 2026-04-05)
+- [x] **Phase 22: Cleanup + Deprecation** - gemini-coach and old AI generation flow retired after new system is proven (completed 2026-04-05)
 
 ## Phase Progress
 
@@ -67,8 +67,8 @@ Audit:
 | 18. Hierarchical Plan Hook Layer | v2.0 | 2/2 | Complete | 2026-03-30 |
 | 19. Plan Viewer UI | v2.0 | 2/2 | Complete | 2026-03-30 |
 | 20. Drag-and-Drop Rescheduling | v2.0 | 1/1 | Complete | 2026-03-31 |
-| 21. Coach Chat + Plan Patch | v2.0 | 0/3 | Planned | - |
-| 22. Cleanup + Deprecation | v2.0 | 0/? | Not started | - |
+| 21. Coach Chat + Plan Patch | v2.0 | 4/4 | Complete    | 2026-04-05 |
+| 22. Cleanup + Deprecation | v2.0 | 0/? | Complete    | 2026-04-05 |
 
 ## Phase Details
 
@@ -138,9 +138,9 @@ Plans:
   3. Accepting a suggested plan change updates the stored plan document — the change is immediately visible in the plan viewer without a page reload
 **Plans**: 3 plans
 Plans:
-- [ ] 21-01-PLAN.md — Edge Function chat mode + coachPayload hierarchical plan window extension
-- [ ] 21-02-PLAN.md — CoachPage rework (remove gemini/weekly plan tab), ChatPanel and ChangeCard components
-- [ ] 21-03-PLAN.md — CoachFAB contextual chat on LongTermPlanPage + end-to-end verification
+- [x] 21-01-PLAN.md — Edge Function chat mode + coachPayload hierarchical plan window extension
+- [x] 21-02-PLAN.md — CoachPage rework (remove gemini/weekly plan tab), ChatPanel and ChangeCard components
+- [x] 21-03-PLAN.md — CoachFAB contextual chat on LongTermPlanPage + end-to-end verification
 
 ### Phase 22: Cleanup + Deprecation
 **Goal**: All orphaned code from the migration window is removed — the codebase has one AI backend, one plan data path, and no dead references
@@ -150,4 +150,7 @@ Plans:
   1. The gemini-coach Edge Function is removed — no frontend code references it and no Supabase deployment serves it
   2. The old per-week AI generation flow (WeeklyAiCard and plan mode) is removed — the only plan generation path is the full-plan claude-coach flow
   3. A full audit confirms zero remaining imports of useCoachPhilosophy, gemini-coach, or the old weekly AI generation components
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 22-01-PLAN.md — Migrate Insights synthesis to claude-coach and retire WeeklyPlanPage runtime wiring
+- [ ] 22-02-PLAN.md — Delete gemini-coach, replace legacy tests/docs, and verify zero active references

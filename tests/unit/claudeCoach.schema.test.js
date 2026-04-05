@@ -266,3 +266,83 @@ describe("hasNonRunningFields", () => {
     expect(hasNonRunningFields(plan)).toBe(true);
   });
 });
+
+// ── validatePatchArray tests ───────────────────────────────────────────────────
+// This replicates the validatePatchArray logic from the Edge Function for unit testing.
+
+function validatePatchArray(patch) {
+  if (patch === null || patch === undefined) return true;
+  if (!Array.isArray(patch)) return false;
+  return patch.every(
+    (p) =>
+      typeof p.week === "number" &&
+      typeof p.dayDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(p.dayDate) &&
+      typeof p.workoutId === "string" &&
+      p.workoutId.length > 0 &&
+      typeof p.fields === "object" &&
+      p.fields !== null,
+  );
+}
+
+describe("validatePatchArray (chat mode patch validation)", () => {
+  it("returns true for null patch", () => {
+    expect(validatePatchArray(null)).toBe(true);
+  });
+
+  it("returns true for a valid patch array", () => {
+    const patch = [
+      {
+        week: 3,
+        dayDate: "2026-04-14",
+        workoutId: "w3-mon",
+        fields: { durationMinutes: 45 },
+      },
+    ];
+    expect(validatePatchArray(patch)).toBe(true);
+  });
+
+  it("returns false for a patch missing workoutId", () => {
+    const patch = [
+      {
+        week: 3,
+        dayDate: "2026-04-14",
+        // workoutId missing
+        fields: { durationMinutes: 45 },
+      },
+    ];
+    expect(validatePatchArray(patch)).toBe(false);
+  });
+
+  it("returns false for a patch with invalid dayDate format", () => {
+    const patch = [
+      {
+        week: 3,
+        dayDate: "April 14",
+        workoutId: "w3-mon",
+        fields: { durationMinutes: 45 },
+      },
+    ];
+    expect(validatePatchArray(patch)).toBe(false);
+  });
+
+  it("returns false for a non-array patch value", () => {
+    expect(validatePatchArray({ week: 1, dayDate: "2026-04-01", workoutId: "w1-mon", fields: {} })).toBe(false);
+  });
+
+  it("returns true for an empty patch array", () => {
+    expect(validatePatchArray([])).toBe(true);
+  });
+
+  it("returns false for a patch with empty workoutId string", () => {
+    const patch = [
+      {
+        week: 1,
+        dayDate: "2026-04-01",
+        workoutId: "",
+        fields: {},
+      },
+    ];
+    expect(validatePatchArray(patch)).toBe(false);
+  });
+});

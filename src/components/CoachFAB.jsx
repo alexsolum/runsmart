@@ -13,6 +13,7 @@ export function CoachFAB({
   trainingBlocks,
   activePlan,
   lang,
+  canPatchPlan = true,
 }) {
   const [open, setOpen] = useState(false);
   const [fabConversation, setFabConversation] = useState(null);
@@ -75,7 +76,9 @@ export function CoachFAB({
             <CoachAvatar size={28} />
             <div className="flex-1 min-w-0">
               <h3 className="m-0 text-sm font-bold text-slate-900">Coach Chat</h3>
-              <p className="m-0 text-[11px] text-slate-500">Ask about your plan</p>
+              <p className="m-0 text-[11px] text-slate-500">
+                {canPatchPlan ? "Ask about your plan" : "Ask questions while you set up your first plan"}
+              </p>
             </div>
             <Button
               type="button"
@@ -106,6 +109,8 @@ export function CoachFAB({
             lang={lang}
             onConversationCreated={handleConversationCreated}
             className="flex-1 min-h-0"
+            canApplyPatch={canPatchPlan}
+            patchUnavailableReason="Generate a plan first, then you can apply coach-proposed schedule changes from here."
           />
         </div>
       )}

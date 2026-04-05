@@ -29,9 +29,9 @@ Requirements for the Claude Coach + Plan Overhaul milestone. Each maps to roadma
 
 ### Cleanup
 
-- [ ] **CLEAN-01**: The gemini-coach Edge Function is removed after Claude replacement is validated
+- [x] **CLEAN-01**: The gemini-coach Edge Function is removed after Claude replacement is validated
 - [x] **CLEAN-02**: The admin philosophy editor, coach_philosophy_documents table, and playbook system are removed — coaching context lives in SKILL.md reference files
-- [ ] **CLEAN-03**: The old per-week AI generation flow (WeeklyAiCard, plan mode) is removed since full plan generation replaces it
+- [x] **CLEAN-03**: The old per-week AI generation flow (WeeklyAiCard, plan mode) is removed since full plan generation replaces it
 
 ## v2.1 Requirements
 
@@ -72,8 +72,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | VIEW-05 | Phase 20 | Pending |
 | COACH-02 | Phase 21 | Pending |
 | COACH-03 | Phase 21 | Pending |
-| CLEAN-01 | Phase 22 | Pending |
-| CLEAN-03 | Phase 22 | Pending |
+| CLEAN-01 | Phase 22 | Complete |
+| CLEAN-03 | Phase 22 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 14 total
@@ -82,4 +82,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-03-30*
-*Last updated: 2026-03-29 — traceability mapped after roadmap creation*
+*Last updated: 2026-04-05 — Phase 22 cleanup requirements verified complete*

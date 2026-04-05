@@ -67,7 +67,7 @@ Audit:
 | 18. Hierarchical Plan Hook Layer | v2.0 | 2/2 | Complete | 2026-03-30 |
 | 19. Plan Viewer UI | v2.0 | 2/2 | Complete | 2026-03-30 |
 | 20. Drag-and-Drop Rescheduling | v2.0 | 1/1 | Complete | 2026-03-31 |
-| 21. Coach Chat + Plan Patch | v2.0 | 4/4 | Complete   | 2026-04-05 |
+| 21. Coach Chat + Plan Patch | v2.0 | 4/4 | Complete    | 2026-04-05 |
 | 22. Cleanup + Deprecation | v2.0 | 0/? | Not started | - |
 
 ## Phase Details

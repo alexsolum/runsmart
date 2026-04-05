@@ -10,7 +10,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = path.resolve(__dirname, "../docs/running_coach");
 const API_URL = "https://api.anthropic.com/v1/skills";
 const BETA_HEADER = "skills-2025-10-02";
@@ -43,10 +45,27 @@ async function main() {
   }
 
   const files = collectFiles(SKILL_DIR);
+  // Sort so top-level files (no /) appear before subdirectory files
+  files.sort((a, b) => {
+    const aDepth = (a.path.match(/\//g) ?? []).length;
+    const bDepth = (b.path.match(/\//g) ?? []).length;
+    return aDepth - bDepth;
+  });
   console.error(`Collected ${files.length} files from ${SKILL_DIR}`);
 
   for (const f of files) {
     console.error(`  - ${f.path} (${f.content.length} chars)`);
+  }
+
+  // All files need a common root directory prefix (e.g. "running_coach/SKILL.md")
+  const rootDir = path.basename(SKILL_DIR); // "running_coach"
+  const formData = new FormData();
+  formData.append("display_title", "Running Coach");
+  for (const f of files) {
+    const filePath = `${rootDir}/${f.path}`;
+    const file = new File([f.content], filePath, { type: "text/plain" });
+    console.error(`  -> File name sent: "${file.name}"`);
+    formData.append("files[]", file);
   }
 
   const response = await fetch(API_URL, {
@@ -55,13 +74,9 @@ async function main() {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
       "anthropic-beta": BETA_HEADER,
-      "content-type": "application/json",
+      // Note: do NOT set content-type — fetch sets it automatically with boundary for FormData
     },
-    body: JSON.stringify({
-      name: "running-coach",
-      description: "Expert endurance running coach for marathon and ultramarathon training plans, coaching conversations, and plan modifications.",
-      files,
-    }),
+    body: formData,
   });
 
   if (!response.ok) {

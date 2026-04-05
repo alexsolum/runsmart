@@ -1,3 +1,8 @@
+---
+name: running-coach
+description: Expert endurance running coach for ultramarathon and marathon training plans, coaching conversations, and plan modifications.
+---
+
 # Running Coach Skill
 
 A specialized Claude skill for generating and adapting endurance training plans using evidence-based coaching principles.

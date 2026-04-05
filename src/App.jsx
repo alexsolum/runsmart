@@ -5,7 +5,6 @@ import { useI18n } from "./i18n/translations";
 import AuthPage from "./pages/AuthPage";
 import HeroPage from "./pages/HeroPage";
 import LongTermPlanPage from "./pages/LongTermPlanPage";
-import WeeklyPlanPage from "./pages/WeeklyPlanPage";
 import CoachPage from "./pages/CoachPage";
 import RoadmapPage from "./pages/RoadmapPage";
 import DataPage from "./pages/DataPage";
@@ -18,7 +17,6 @@ import { APP_NAVIGATE_EVENT } from "./lib/appNavigation";
 import {
   LayoutDashboard,
   Calendar,
-  CalendarDays,
   MessageSquare,
   BarChart3,
   ClipboardList,
@@ -37,7 +35,6 @@ const NAV_GROUPS = [
     items: [
       { key: "dashboard", labelKey: "sidebar.dashboard", icon: LayoutDashboard, component: HeroPage },
       { key: "training-plan", labelKey: "nav.trainingPlan", icon: Calendar, component: LongTermPlanPage },
-      { key: "weekly-plan", labelKey: "nav.weeklyPlan", icon: CalendarDays, component: WeeklyPlanPage },
       { key: "coach", labelKey: "sidebar.coach", icon: MessageSquare, component: CoachPage },
       { key: "insights", labelKey: "sidebar.insights", icon: BarChart3, component: InsightsPage },
     ],

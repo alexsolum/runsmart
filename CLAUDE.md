@@ -4,7 +4,7 @@
 
 RunSmart is a web-first training planning application for endurance runners. It combines AI-assisted training planning with real-life schedule awareness, training analytics, and continuous adaptation recommendations. The product emphasizes practical periodization, explainable AI coaching insights, and privacy-first data handling.
 
-**Current status:** Full-stack React + Vite app with Supabase backend, deployed to Vercel. Authentication, Strava sync, AI coaching, and core training management features are live.
+**Current status:** Full-stack React + Vite app with Supabase backend, deployed to Vercel. Authentication, Strava sync, Claude-backed coaching, hierarchical plan management, and analytics are live.
 
 ## Repository Structure
 
@@ -21,9 +21,8 @@ runsmart/
 │   ├── pages/                  # One component per route/section
 │   │   ├── AuthPage.jsx
 │   │   ├── HeroPage.jsx        # Dashboard — KPIs, activity feed, trend charts
-│   │   ├── LongTermPlanPage.jsx # Training plan + phase blocks (Supabase CRUD)
-│   │   ├── WeeklyPlanPage.jsx  # 7-day workout grid (Supabase CRUD)
-│   │   ├── CoachPage.jsx       # AI insights (Gemini Edge Function)
+│   │   ├── LongTermPlanPage.jsx # Training plan viewer + phase blocks
+│   │   ├── CoachPage.jsx       # Conversational Claude coaching
 │   │   ├── InsightsPage.jsx    # Analytics: volume, pace, heart rate zones
 │   │   ├── DailyLogPage.jsx    # Daily wellness log (Supabase CRUD)
 │   │   ├── DataPage.jsx        # Data explorer + Strava sync trigger
@@ -38,7 +37,8 @@ runsmart/
 │   │   ├── usePlans.js         # Training plan CRUD
 │   │   ├── useStrava.js        # Strava OAuth flow + sync trigger
 │   │   ├── useTrainingBlocks.js # Long-term phase blocks
-│   │   └── useWorkoutEntries.js # Weekly plan day-by-day entries
+│   │   ├── useWorkoutEntries.js # Legacy workout entry CRUD still used by supporting flows
+│   │   └── useHierarchicalPlan.js # Hierarchical plan loading, mutations, and patch apply
 │   ├── lib/
 │   │   └── supabaseClient.js   # Singleton Supabase JS client
 │   ├── config/
@@ -55,14 +55,14 @@ runsmart/
 │   └── functions/
 │       ├── strava-auth/        # OAuth token exchange (Deno Edge Function)
 │       ├── strava-sync/        # Activity + HR zone sync (Deno Edge Function)
-│       └── gemini-coach/       # AI coaching via Gemini 2.5-flash (Deno Edge Function)
+│       └── claude-coach/       # Claude-backed plan generation, chat, and insights
 ├── tests/
 │   ├── compute.test.js         # Unit tests for domain/compute.js
 │   ├── dashboard.test.jsx      # HeroPage component tests
 │   ├── dailylog.test.jsx       # DailyLogPage component tests
 │   ├── insights.test.jsx       # InsightsPage component tests
 │   ├── trainingplan.test.jsx   # LongTermPlanPage component tests
-│   ├── weeklyplan.test.jsx     # WeeklyPlanPage component tests
+│   ├── trainingplan.test.jsx   # LongTermPlanPage and plan viewer component tests
 │   ├── mockAppData.js          # Shared test fixtures + makeAppData() factory
 │   └── setup.js                # Vitest + React Testing Library setup
 ├── public/
@@ -86,9 +86,9 @@ runsmart/
 | Build tool | Vite 7 | `npm run dev` / `npm run build` |
 | Package manager | npm | `package.json` present |
 | Backend / DB | Supabase (PostgreSQL + Auth) | Row-level security on all tables |
-| Serverless | Supabase Edge Functions (Deno) | 3 deployed: strava-auth, strava-sync, gemini-coach |
+| Serverless | Supabase Edge Functions (Deno) | Active functions: strava-auth, strava-sync, claude-coach |
 | Auth | Supabase Auth | Email/password + Google OAuth |
-| External APIs | Strava v3, Google Gemini 2.5-flash | Both routed via Edge Functions |
+| External APIs | Strava v3, Anthropic Claude API | Both routed via Edge Functions |
 | Hosting | Vercel | Primary deployment |
 | Testing | Vitest + React Testing Library | Unit + component tests |
 | Styling | Tailwind and shadcn/ui |
@@ -139,7 +139,7 @@ The app loads config in priority order:
 Supabase Edge Functions require these secrets (set in Supabase dashboard):
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`
-- `GEMINI_API_KEY`
+- `ANTHROPIC_API_KEY`
 
 **Never put secrets in frontend code.** All Strava and AI calls go through Edge Functions.
 
@@ -153,7 +153,7 @@ All data lives in `AppDataContext` (`src/context/AppDataContext.jsx`), which com
 
 ```
 User action → Page component → useAppData() hook → Supabase JS client → PostgreSQL
-                                                 ↘ Edge Function → Strava API / Gemini
+                                                 ↘ Edge Function → Strava API / Claude
 ```
 
 ### Database tables (PostgreSQL with RLS)
@@ -162,7 +162,7 @@ User action → Page component → useAppData() hook → Supabase JS client → 
 |-------|---------|
 | `training_plans` | Goal race, availability, current mileage |
 | `training_blocks` | Phase blocks (Base/Build/Peak/Taper/Recovery) |
-| `weekly_plan_entries` | Day-by-day workout entries per plan/week |
+| `weekly_plan_entries` | Legacy day-by-day workout entries retained for compatibility |
 | `activities` | Strava-synced + manual activities with HR zone data |
 | `athlete_feedback` | Weekly check-ins (fatigue, sleep, motivation) |
 | `strava_connections` | OAuth tokens per user (service-role write only) |
@@ -174,7 +174,7 @@ User action → Page component → useAppData() hook → Supabase JS client → 
 |----------|---------|------|
 | `strava-auth` | Frontend OAuth callback | Exchanges auth code for tokens; stores in `strava_connections` |
 | `strava-sync` | Manual user action | Fetches 90 days of activities + HR zone data from Strava |
-| `gemini-coach` | Coach page load | Sends training summary to Gemini; returns structured coaching insights |
+| `claude-coach` | Coach and insights flows | Serves chat, full-plan generation, and insights synthesis through Claude |
 
 ## Code Conventions
 

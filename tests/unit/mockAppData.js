@@ -8,7 +8,7 @@ function daysAgo(n) {
 }
 
 // Returns the ISO date of a given weekday (1=Mon…7=Sun) in the CURRENT week.
-// Guarantees dates always fall within the WeeklyPlanPage's current-week grid.
+// Guarantees dates always fall within the current test week's date grid.
 function weekdayIso(targetDay /* 1=Mon, 2=Tue, …, 7=Sun */) {
   const d = new Date();
   const day = d.getUTCDay() || 7; // convert Sun(0) → 7

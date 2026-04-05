@@ -5,7 +5,6 @@ import PageContainer from "../components/layout/PageContainer";
 import KoopTimeline from "../components/KoopTimeline";
 import { PlanViewer } from "../components/planner/PlanViewer";
 import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
-import { APP_NAVIGATE_EVENT, WEEKLY_PLAN_HANDOFF_KEY } from "../lib/appNavigation";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
 import { CoachFAB } from "../components/CoachFAB";
 import { Button } from "@/components/ui/button";
@@ -28,27 +27,6 @@ function formatDateRange(start, end) {
 
 function todayIso() {
   return new Date().toISOString().split("T")[0];
-}
-
-function currentMondayIso() {
-  const d = new Date();
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - day + 1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString().split("T")[0];
-}
-
-function isoDateOffset(isoDate, days) {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().split("T")[0];
-}
-
-function formatPlanDate(isoDate) {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${dayNames[d.getUTCDay()]} ${d.getUTCDate()} ${monthNames[d.getUTCMonth()]}`;
 }
 
 function normalizeNumberField(value) {
@@ -369,34 +347,6 @@ export default function LongTermPlanPage() {
     }
   }, [selectedPlanId, goalDraft, plans]);
 
-  const weeklyPlanIntent = useMemo(() => {
-    const weekStart = currentMondayIso();
-    const weekEnd = isoDateOffset(weekStart, 6);
-    const matchingBlock = trainingBlocks.blocks.find(
-      (block) =>
-        block.plan_id === selectedPlanId &&
-        block.start_date <= weekEnd &&
-        block.end_date >= weekStart,
-    );
-
-    return {
-      planId: selectedPlanId,
-      weekStart,
-      weekEnd,
-      phase: matchingBlock?.phase ?? null,
-      targetKm: matchingBlock?.target_km ?? selectedPlan?.current_mileage ?? null,
-      notes: matchingBlock?.notes ?? null,
-    };
-  }, [selectedPlan, selectedPlanId, trainingBlocks.blocks]);
-
-  const handleOpenWeeklyPlan = useCallback(() => {
-    if (!weeklyPlanIntent.planId) return;
-    window.sessionStorage.setItem(WEEKLY_PLAN_HANDOFF_KEY, JSON.stringify(weeklyPlanIntent));
-    window.dispatchEvent(new CustomEvent(APP_NAVIGATE_EVENT, {
-      detail: { pageKey: "weekly-plan" },
-    }));
-  }, [weeklyPlanIntent]);
-
   const daysToRace = selectedPlan
     ? Math.max(0, Math.round((new Date(selectedPlan.race_date) - new Date()) / (1000 * 60 * 60 * 24)))
     : null;
@@ -582,39 +532,6 @@ export default function LongTermPlanPage() {
                 <p className="text-[11px] text-slate-400 mt-0.5 mb-0">
                   Sent to the AI coach. Saved automatically on blur.
                 </p>
-              </div>
-
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Weekly intent handoff</p>
-                    <p className="m-0 mt-1 text-sm font-semibold text-slate-900">
-                      {formatPlanDate(weeklyPlanIntent.weekStart)} - {formatPlanDate(weeklyPlanIntent.weekEnd)}
-                    </p>
-                    <p className="m-0 mt-1 text-[13px] text-slate-600">
-                      `Ukeplan` owns AI week generation and day-by-day edits. `Treningsplan` only frames the target week.
-                    </p>
-                  </div>
-                  <Button type="button" size="sm" onClick={handleOpenWeeklyPlan}>
-                    Open in Weekly Plan
-                  </Button>
-                </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Week type</p>
-                    <p className="m-0 mt-1 text-sm font-semibold text-slate-900">{weeklyPlanIntent.phase ?? "Not set yet"}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Target km</p>
-                    <p className="m-0 mt-1 text-sm font-semibold text-slate-900">
-                      {weeklyPlanIntent.targetKm != null ? `${Number(weeklyPlanIntent.targetKm).toFixed(0)} km` : "Not set yet"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <p className="m-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Notes</p>
-                    <p className="m-0 mt-1 text-sm text-slate-600">{weeklyPlanIntent.notes ?? "No notes for this week yet."}</p>
-                  </div>
-                </div>
               </div>
             </div>
           )}

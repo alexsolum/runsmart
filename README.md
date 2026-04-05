@@ -1,6 +1,6 @@
 # RunSmart
 
-RunSmart is an AI-guided endurance training planner. This repo is on a **Vite-first migration** with deployment on Vercel.
+RunSmart is an AI-guided endurance training planner. The active app runs on React + Vite, deploys to Vercel, and uses Supabase Edge Functions for secure Strava and Claude-backed coaching flows.
 
 ## Current frontend runtime
 
@@ -142,17 +142,18 @@ curl -i \
 - `401 + JWT validation failed`: frontend-token hører ikke til samme Supabase-prosjekt eller er utløpt.
 - `500 + missing required Edge Function secrets`: secrets mangler i Supabase.
 
-## Feilsøking: `{"code":401,"message":"Invalid JWT"}` i `gemini-coach`
+## AI Coach runtime
 
-Hvis AI Coach feiler med akkurat denne responsen, blir requesten avvist av Supabase Edge-gatewayen *før* funksjonskoden kjører.
+The active AI surface is the `claude-coach` Supabase Edge Function.
 
-Løsning:
+- Insights synthesis is requested through `useAppData()` and forwarded to `claude-coach`.
+- Coach chat also runs through the same Claude-backed function.
+- The retired weekly planner runtime and legacy AI function are no longer part of the active app shell.
 
-1. Sett `verify_jwt = false` i `supabase/functions/gemini-coach/config.toml`.
-2. Deploy funksjonen på nytt:
+Useful commands:
 
 ```bash
-supabase functions deploy gemini-coach
+supabase functions deploy claude-coach
+supabase functions list
+supabase functions logs --name claude-coach
 ```
-
-`gemini-coach` verifiserer fortsatt bruker-token i funksjonskoden via `supabase.auth.getUser(...)`, så autentisering er fortsatt påkrevd.

@@ -13,7 +13,6 @@ import KoopTimeline from "../../src/components/KoopTimeline";
 import { CoachFAB } from "../../src/components/CoachFAB";
 import { ChatPanel } from "../../src/components/chat/ChatPanel";
 import { makeAppData, SAMPLE_BLOCKS, SAMPLE_HIERARCHICAL_PLAN, SAMPLE_PLAN } from "./mockAppData";
-import { APP_NAVIGATE_EVENT, WEEKLY_PLAN_HANDOFF_KEY } from "../../src/lib/appNavigation";
 import { PlanViewer } from "../../src/components/planner/PlanViewer";
 import { WorkoutDetailModal } from "../../src/components/planner/WorkoutDetailModal";
 import { getSupabaseClient } from "../../src/lib/supabaseClient";
@@ -191,43 +190,21 @@ describe("PlanViewer", () => {
   });
 });
 
-describe("Training Plan - weekly handoff", () => {
-  it("shows the weekly handoff trigger when a plan is selected", () => {
+describe("Training Plan - surviving plan viewer surface", () => {
+  it("does not render the retired weekly planner handoff trigger", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<LongTermPlanPage />);
-    expect(screen.getByRole("button", { name: /Open in Weekly Plan/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Open in Weekly Plan/i })).not.toBeInTheDocument();
   });
 
-  it("surfaces read-only intent instead of a replan preview/apply flow", () => {
+  it("keeps the selected plan summary focused on race metadata and goal editing", () => {
     useAppData.mockReturnValue(makeAppData());
     render(<LongTermPlanPage />);
 
-    expect(screen.getByText(/Weekly intent handoff/i)).toBeInTheDocument();
-    expect(screen.getByText(/owns AI week generation and day-by-day edits/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Replan with AI Coach/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Manual Replan Preview/i)).not.toBeInTheDocument();
-  });
-
-  it("stores week intent and dispatches app navigation to Weekly Plan", async () => {
-    const user = userEvent.setup();
-    useAppData.mockReturnValue(makeAppData());
-    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-    render(<LongTermPlanPage />);
-
-    await user.click(screen.getByRole("button", { name: /Open in Weekly Plan/i }));
-
-    const stored = JSON.parse(window.sessionStorage.getItem(WEEKLY_PLAN_HANDOFF_KEY));
-    expect(stored).toEqual(
-      expect.objectContaining({
-        planId: SAMPLE_PLAN.id,
-        targetKm: expect.any(Number),
-      }),
-    );
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: APP_NAVIGATE_EVENT,
-      }),
-    );
+    expect(screen.getByText(/Goal for this plan/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(SAMPLE_PLAN.goal)).toBeInTheDocument();
+    expect(screen.queryByText(/Weekly intent handoff/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/owns AI week generation and day-by-day edits/i)).not.toBeInTheDocument();
   });
 });
 

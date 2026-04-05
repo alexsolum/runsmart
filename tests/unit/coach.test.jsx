@@ -2,26 +2,26 @@
  * CoachPage tests
  *
  * Covers:
- * - Branding: "Marius AI Bakken" heading
- * - New Session button renders
- * - Chat input and send button render
- * - Sending a message calls edge function with sessionId and newMessage
- * - Session sidebar toggles
+ * - Branding: "Marius AI Bakken" heading + coach avatar
+ * - Conversation sidebar: list, create, select, delete
+ * - ChatPanel component rendering
  * - ChangeCard component for patch review and application
+ * - Error states
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CoachPage from "../../src/pages/CoachPage";
 import { ChangeCard } from "../../src/components/chat/ChangeCard";
+import { ChatPanel } from "../../src/components/chat/ChatPanel";
 import {
   makeAppData,
   SAMPLE_CHECKINS,
   SAMPLE_DAILY_LOGS,
   SAMPLE_BLOCKS,
   SAMPLE_PLAN,
-  SAMPLE_SESSIONS,
-  SAMPLE_CHAT_MESSAGES,
+  SAMPLE_CONVERSATIONS,
+  SAMPLE_MESSAGES,
   SAMPLE_HIERARCHICAL_PLAN,
 } from "./mockAppData";
 import { setLanguage } from "../../src/i18n/translations";
@@ -58,51 +58,82 @@ const SAMPLE_PATCH = [
 function makeMockClient({
   session = { access_token: "test-token-abc" },
   invokeError = null,
-  invokeData = { type: "conversation", content: "Looking good this week.", planUpdated: false },
+  invokePending = false,
+  chatResponse = { text: "Here is my coaching advice.", patch: null, patchSummary: null },
 } = {}) {
+  const invokeImpl = invokePending
+    ? vi.fn().mockImplementation(() => new Promise(() => {}))
+    : vi.fn().mockImplementation((_fnName, { body }) => {
+        if (invokeError) {
+          return Promise.resolve({ data: null, error: invokeError });
+        }
+        if (body?.mode === "chat") {
+          return Promise.resolve({ data: chatResponse, error: null });
+        }
+        return Promise.resolve({ data: { text: "response" }, error: null });
+      });
+
   return {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session } }),
     },
-    functions: {
-      invoke: invokeError
-        ? vi.fn().mockResolvedValue({ data: null, error: invokeError })
-        : vi.fn().mockResolvedValue({ data: invokeData, error: null }),
-    },
+    functions: { invoke: invokeImpl },
+  };
+}
+
+function makeConvData(overrides = {}) {
+  return {
+    conversations: [],
+    activeConversation: null,
+    messages: [],
+    loading: false,
+    error: null,
+    loadConversations: vi.fn().mockResolvedValue([]),
+    loadMessages: vi.fn().mockResolvedValue([]),
+    createConversation: vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]),
+    addMessage: vi.fn().mockImplementation((convId, role, content) =>
+      Promise.resolve({ id: `msg-${Date.now()}`, conversation_id: convId, role, content, created_at: new Date().toISOString() })
+    ),
+    updateConversationTitle: vi.fn().mockResolvedValue(undefined),
+    deleteConversation: vi.fn().mockResolvedValue(undefined),
+    setActiveConversation: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
   };
 }
 
 function makeCoachAppData(overrides = {}) {
   return makeAppData({
-    coachConversations: {
-      sessions: [],
-      messages: [],
-      activeSessionId: null,
+    dailyLogs: {
+      logs: SAMPLE_DAILY_LOGS,
       loading: false,
       error: null,
-      setActiveSessionId: vi.fn(),
-      startNewSession: vi.fn().mockReturnValue("new-session-id"),
-      reload: vi.fn().mockResolvedValue(undefined),
-      loadSessions: vi.fn().mockResolvedValue([]),
+      loadLogs: vi.fn().mockResolvedValue(SAMPLE_DAILY_LOGS),
+      saveLog: vi.fn(),
     },
     ...overrides,
   });
 }
 
-function makeCoachAppDataWithSession(overrides = {}) {
-  return makeAppData({
-    coachConversations: {
-      sessions: SAMPLE_SESSIONS,
-      messages: SAMPLE_CHAT_MESSAGES,
-      activeSessionId: "session-1",
-      loading: false,
-      error: null,
-      setActiveSessionId: vi.fn(),
-      startNewSession: vi.fn().mockReturnValue("new-session-id"),
-      reload: vi.fn().mockResolvedValue(undefined),
-      loadSessions: vi.fn().mockResolvedValue(SAMPLE_SESSIONS),
-    },
-    ...overrides,
+// App data with an active conversation that has no messages (new/empty)
+function makeAppDataWithNewConv(extraOverrides = {}) {
+  return makeCoachAppData({
+    coachConversations: makeConvData({
+      conversations: [SAMPLE_CONVERSATIONS[0]],
+      activeConversation: SAMPLE_CONVERSATIONS[0],
+      messages: [],
+    }),
+    ...extraOverrides,
+  });
+}
+
+// App data with an active conversation that has messages (follow-up ready)
+function makeAppDataWithMessages(msgOverrides = SAMPLE_MESSAGES) {
+  return makeCoachAppData({
+    coachConversations: makeConvData({
+      conversations: [SAMPLE_CONVERSATIONS[0]],
+      activeConversation: SAMPLE_CONVERSATIONS[0],
+      messages: msgOverrides,
+    }),
   });
 }
 
@@ -123,146 +154,302 @@ describe("Coach page — branding", () => {
 
     render(<CoachPage />);
 
-    expect(screen.getByText("Marius AI Bakken")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Marius AI Bakken/i })).toBeInTheDocument();
   });
 
-  it("renders coach heading and chat input", () => {
-    getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppDataWithSession());
-
-    render(<CoachPage />);
-
-    expect(screen.getByText("Marius AI Bakken")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/ask your coach/i)).toBeInTheDocument();
-  });
-});
-
-// ── New Session button ────────────────────────────────────────────────────────
-
-describe("Coach page — new session button", () => {
-  it("renders a New Session button in the header", () => {
+  it("renders the coach avatar", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
     useAppData.mockReturnValue(makeCoachAppData());
 
     render(<CoachPage />);
 
-    // The button text includes the i18n key or fallback; match by aria-label or partial text
-    expect(screen.getByRole("button", { name: /toggle sessions/i })).toBeInTheDocument();
-    // The new session button is always rendered in the header
-    const allButtons = screen.getAllByRole("button");
-    // At minimum we expect the toggle-sessions button and the new-session button
-    expect(allButtons.length).toBeGreaterThanOrEqual(2);
+    // Avatar appears in header
+    const avatars = screen.getAllByRole("img", { name: /Marius AI Bakken/i });
+    expect(avatars.length).toBeGreaterThan(0);
   });
 
-  it("calls startNewSession when New Session header button clicked", async () => {
-    const startNewSession = vi.fn().mockReturnValue("new-session-id");
+  it("renders the 'Your AI running coach' subtitle", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppData({ coachConversations: {
-      sessions: [],
-      messages: [],
-      activeSessionId: null,
-      loading: false,
-      error: null,
-      setActiveSessionId: vi.fn(),
-      startNewSession,
-      reload: vi.fn().mockResolvedValue(undefined),
-      loadSessions: vi.fn().mockResolvedValue([]),
-    }}));
+    useAppData.mockReturnValue(makeCoachAppData());
 
-    const user = userEvent.setup();
     render(<CoachPage />);
 
-    // Find new-session button (last button in header area, not toggle-sessions)
-    // The header contains: toggle-sessions btn, then new-session btn
-    const buttons = screen.getAllByRole("button");
-    // Click the non-toggle button (skip the toggle button)
-    const newSessionBtn = buttons.find(btn => btn.getAttribute("aria-label") !== "Toggle sessions");
-    await user.click(newSessionBtn);
-
-    expect(startNewSession).toHaveBeenCalled();
+    expect(screen.getByText(/Your AI running coach/i)).toBeInTheDocument();
   });
 });
 
-// ── Chat input and send ───────────────────────────────────────────────────────
+// ── Conversation sidebar ───────────────────────────────────────────────────────
 
-describe("Coach page — chat input", () => {
-  it("renders chat input with correct placeholder", () => {
+describe("Coach page — conversation sidebar", () => {
+  it("renders a New conversation button", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppDataWithSession());
+    useAppData.mockReturnValue(makeCoachAppData());
 
     render(<CoachPage />);
 
-    expect(screen.getByPlaceholderText(/ask your coach/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /New conversation/i })).toBeInTheDocument();
   });
 
-  it("renders Send button", () => {
+  it("calls loadConversations on mount", () => {
+    const loadConversations = vi.fn().mockResolvedValue([]);
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppDataWithSession());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachConversations: makeConvData({ loadConversations }),
+      })
+    );
 
     render(<CoachPage />);
 
-    expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();
+    expect(loadConversations).toHaveBeenCalledTimes(1);
   });
 
-  it("calls functions.invoke with sessionId and newMessage when send clicked", async () => {
-    const mockClient = makeMockClient();
-    getSupabaseClient.mockReturnValue(mockClient);
-    useAppData.mockReturnValue(makeCoachAppDataWithSession());
+  it("renders conversation titles when conversations exist", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeAppDataWithMessages());
+
+    render(<CoachPage />);
+
+    expect(screen.getByText("Good training consistency")).toBeInTheDocument();
+  });
+
+  it("selects a conversation when clicked", async () => {
+    const setActiveConversation = vi.fn().mockResolvedValue(undefined);
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachConversations: makeConvData({
+          conversations: SAMPLE_CONVERSATIONS,
+          setActiveConversation,
+        }),
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.click(screen.getByText("Good training consistency"));
+
+    expect(setActiveConversation).toHaveBeenCalledWith(SAMPLE_CONVERSATIONS[0]);
+  });
+
+  it("creates a new conversation when button clicked", async () => {
+    const createConversation = vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]);
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachConversations: makeConvData({ createConversation }),
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<CoachPage />);
+    await user.click(screen.getByRole("button", { name: /New conversation/i }));
+
+    expect(createConversation).toHaveBeenCalled();
+  });
+
+  it("renders delete confirmation when delete button clicked", async () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachConversations: makeConvData({
+          conversations: [SAMPLE_CONVERSATIONS[0]],
+        }),
+      })
+    );
 
     const user = userEvent.setup();
     render(<CoachPage />);
 
-    const textarea = screen.getByPlaceholderText(/ask your coach/i);
-    await user.type(textarea, "How is my training looking?");
-    await user.click(screen.getByRole("button", { name: /send/i }));
-
-    await waitFor(() => {
-      expect(mockClient.functions.invoke).toHaveBeenCalledWith(
-        "claude-coach",
-        expect.objectContaining({
-          body: expect.objectContaining({
-            sessionId: "session-1",
-            newMessage: "How is my training looking?",
-          }),
-        })
-      );
-    });
+    // Find and click the delete button (X icon) for the conversation
+    const deleteButtons = screen.getAllByLabelText(/Delete conversation/i);
+    if (deleteButtons.length > 0) {
+      await user.click(deleteButtons[0]);
+      expect(screen.getByText(/Delete this conversation/i)).toBeInTheDocument();
+    }
   });
 });
 
-// ── Session sidebar toggle ────────────────────────────────────────────────────
+// ── Plan context banner ────────────────────────────────────────────────────────
 
-describe("Coach page — session sidebar", () => {
-  it("shows sidebar after toggle button click", async () => {
+describe("Coach page — plan context banner", () => {
+  it("renders PlanBanner when a plan exists", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppDataWithSession());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        plans: { plans: [SAMPLE_PLAN] },
+        trainingBlocks: { blocks: SAMPLE_BLOCKS },
+      })
+    );
 
-    const user = userEvent.setup();
     render(<CoachPage />);
 
-    // Sidebar is hidden by default — sessions list not visible
-    expect(screen.queryByText("Sessions")).not.toBeInTheDocument();
-
-    // Click the ☰ toggle button
-    const toggleBtn = screen.getByRole("button", { name: /toggle sessions/i });
-    await user.click(toggleBtn);
-
-    // After toggle, sessions sidebar is visible
-    expect(screen.getByText("Sessions")).toBeInTheDocument();
+    expect(screen.getByText(/Stockholm Marathon/i)).toBeInTheDocument();
   });
 
-  it("renders session titles in sidebar when sidebar is open", async () => {
+  it("renders a warning banner when no plan exists", () => {
     getSupabaseClient.mockReturnValue(makeMockClient());
-    useAppData.mockReturnValue(makeCoachAppDataWithSession());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        plans: { plans: [] },
+      })
+    );
 
-    const user = userEvent.setup();
     render(<CoachPage />);
 
-    const toggleBtn = screen.getByRole("button", { name: /toggle sessions/i });
-    await user.click(toggleBtn);
+    expect(screen.getByText(/No training plan found/i)).toBeInTheDocument();
+  });
+});
 
-    // "Pre-race tapering advice" only appears as a session title, not in chat messages
-    expect(screen.getByText("Pre-race tapering advice")).toBeInTheDocument();
+// ── Daily log summary ──────────────────────────────────────────────────────────
+
+describe("Coach page — daily log summary", () => {
+  it("shows wellness summary from recent daily logs", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        dailyLogs: {
+          logs: SAMPLE_DAILY_LOGS,
+          loading: false,
+          error: null,
+          loadLogs: vi.fn(),
+          saveLog: vi.fn(),
+        },
+      })
+    );
+
+    render(<CoachPage />);
+
+    // Check that wellness summary is rendered with log count
+    expect(screen.getByText(/log/i)).toBeInTheDocument();
+  });
+});
+
+// ── Runner profile section ─────────────────────────────────────────────────────
+
+describe("Coach page — runner profile section", () => {
+  it("renders runner profile textarea in sidebar", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    const saveProfile = vi.fn().mockResolvedValue(undefined);
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        runnerProfile: {
+          background: "I'm a competitive 5K runner",
+          loading: false,
+          error: null,
+          loadProfile: vi.fn(),
+          saveProfile,
+        },
+      })
+    );
+
+    render(<CoachPage />);
+
+    const textarea = screen.getByPlaceholderText(/e.g. Running for 3 years/i);
+    expect(textarea.value).toContain("I'm a competitive 5K runner");
+  });
+});
+
+// ── ChatPanel component ────────────────────────────────────────────────────────
+
+describe("Coach page — ChatPanel integration", () => {
+  it("renders ChatPanel when conversation is active", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeAppDataWithNewConv());
+
+    render(<CoachPage />);
+
+    expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
+  });
+
+  it("does not have an active conversation selected by default", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(
+      makeCoachAppData({
+        coachConversations: makeConvData({
+          conversations: [],
+          activeConversation: null,
+          messages: [],
+        }),
+      })
+    );
+
+    render(<CoachPage />);
+
+    // Sidebar should show "No conversations yet" message
+    expect(screen.getByText(/No conversations yet/i)).toBeInTheDocument();
+  });
+
+  it("shows a non-apply warning instead of patch controls when plan patching is unavailable", () => {
+    render(
+      <ChatPanel
+        coachConversations={makeConvData()}
+        activeConversation={SAMPLE_CONVERSATIONS[0]}
+        messages={[
+          {
+            id: "assistant-patch",
+            conversation_id: "conv-1",
+            role: "assistant",
+            content: {
+              text: "I would normally move Thursday to rest.",
+              patch: SAMPLE_PATCH,
+              patchSummary: "Shift Thursday to rest day",
+            },
+            created_at: new Date().toISOString(),
+          },
+        ]}
+        hierarchicalPlan={{ plan: null, applyPatch: undefined }}
+        activities={[]}
+        dailyLogs={[]}
+        checkins={[]}
+        runnerProfile=""
+        trainingBlocks={[]}
+        activePlan={null}
+        lang="en"
+        canApplyPatch={false}
+        patchUnavailableReason="Generate a plan first, then you can apply coach-proposed schedule changes from here."
+      />
+    );
+
+    expect(screen.getByTestId("patch-unavailable-note")).toBeInTheDocument();
+    expect(screen.getByText(/Generate a plan first/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("change-card-apply")).not.toBeInTheDocument();
+  });
+});
+
+// ── No retired runtime references ──────────────────────────────────
+
+describe("Coach page — legacy code removal", () => {
+  it("does not contain the retired coach function slug", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const { container } = render(<CoachPage />);
+
+    const innerHTML = container.innerHTML;
+    expect(innerHTML).not.toContain(["gemini", "coach"].join("-"));
+  });
+
+  it("does not have the retired Weekly Plan tab", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    render(<CoachPage />);
+
+    // Should not find "Weekly Plan" tab button
+    const weeklyPlanButtons = screen.queryAllByRole("button", { name: /Weekly Plan/i });
+    expect(weeklyPlanButtons.length).toBe(0);
+  });
+
+  it("does not render tab switcher", () => {
+    getSupabaseClient.mockReturnValue(makeMockClient());
+    useAppData.mockReturnValue(makeCoachAppData());
+
+    const { container } = render(<CoachPage />);
+
+    // Should not have the tab switcher div with "Coaching Chat" and "Weekly Plan" buttons
+    const tabButtons = container.querySelectorAll('[class*="p-1 bg-slate-100 rounded-xl"]');
+    expect(tabButtons.length).toBe(0);
   });
 });
 

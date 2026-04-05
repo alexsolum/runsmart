@@ -324,48 +324,6 @@ export const SAMPLE_CHAT_MESSAGES = [
   },
 ];
 
-// Legacy aliases for backward compatibility with existing tests
-export const SAMPLE_CONVERSATIONS = [
-  {
-    id: "session-1",
-    user_id: "user-1",
-    title: "How should I adjust my training this week?",
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "session-2",
-    user_id: "user-1",
-    title: "Pre-race tapering advice",
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-export const SAMPLE_MESSAGES = [
-  {
-    id: "msg-1",
-    conversation_id: "session-1",
-    role: "user",
-    content: { type: "initial_request" },
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "msg-2",
-    conversation_id: "session-1",
-    role: "assistant",
-    content: [
-      {
-        type: "positive",
-        icon: "trending",
-        title: "Good training consistency",
-        body: "Your running has been consistent this week. Keep building aerobic base.",
-      },
-    ],
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 export const SAMPLE_CHECKINS = [
   {
     id: "chk-1",

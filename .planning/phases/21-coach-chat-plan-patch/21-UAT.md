@@ -1,9 +1,9 @@
 ---
-status: partial
+status: diagnosed
 phase: 21-coach-chat-plan-patch
 source: [21-01-SUMMARY.md, 21-02-SUMMARY.md, 21-03-SUMMARY.md, 21-03-EXECUTION-SUMMARY.md]
 started: 2026-04-05T15:39:28.5065220+02:00
-updated: 2026-04-05T16:09:53.8441991+02:00
+updated: 2026-04-05T16:27:19.5228926+02:00
 ---
 
 ## Current Test
@@ -61,7 +61,13 @@ blocked: 3
   reason: "User reported: There is no CoachFAB on the training plan page"
   severity: major
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "LongTermPlanPage only mounts CoachFAB when hierarchicalPlan.plan exists. In the user's empty-plan state, hierarchicalPlan.plan is null, so the FAB is never rendered and cross-surface coach access is unavailable."
+  artifacts:
+    - path: "src/pages/LongTermPlanPage.jsx"
+      issue: "CoachFAB render is guarded by `hierarchicalPlan.plan &&`, so the FAB disappears entirely when no generated hierarchical plan is loaded."
+    - path: "src/components/CoachFAB.jsx"
+      issue: "Component exists and is functional; parent mount condition prevents it from rendering."
+  missing:
+    - "Render CoachFAB on the training plan page even when hierarchical plan data is absent, or intentionally gate it with explicit UX copy and aligned acceptance criteria."
+    - "Ensure ChatPanel handles null/empty plan context without blocking basic conversation continuity."
+  debug_session: ".planning/debug/coachfab-missing-on-training-plan.md"

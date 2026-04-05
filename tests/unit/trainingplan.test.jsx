@@ -10,13 +10,20 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
 import KoopTimeline from "../../src/components/KoopTimeline";
+import { CoachFAB } from "../../src/components/CoachFAB";
+import { ChatPanel } from "../../src/components/chat/ChatPanel";
 import { makeAppData, SAMPLE_BLOCKS, SAMPLE_HIERARCHICAL_PLAN, SAMPLE_PLAN } from "./mockAppData";
 import { APP_NAVIGATE_EVENT, WEEKLY_PLAN_HANDOFF_KEY } from "../../src/lib/appNavigation";
 import { PlanViewer } from "../../src/components/planner/PlanViewer";
 import { WorkoutDetailModal } from "../../src/components/planner/WorkoutDetailModal";
+import { getSupabaseClient } from "../../src/lib/supabaseClient";
 
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
+}));
+
+vi.mock("../../src/lib/supabaseClient", () => ({
+  getSupabaseClient: vi.fn(),
 }));
 
 import { useAppData } from "../../src/context/AppDataContext";
@@ -25,6 +32,22 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.sessionStorage.clear();
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  useAppData.mockReturnValue(makeAppData());
+  getSupabaseClient.mockReturnValue({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: "test-token" } } }),
+    },
+    functions: {
+      invoke: vi.fn().mockResolvedValue({
+        data: {
+          text: "General guidance",
+          patch: [{ week: 1, dayDate: "2026-03-02", workoutId: "w-1", fields: { durationMinutes: 40 } }],
+          patchSummary: "Ease off Monday.",
+        },
+        error: null,
+      }),
+    },
+  });
   window.matchMedia = vi.fn().mockImplementation((query) => ({
     matches: query.includes("min-width: 768px"),
     media: query,
@@ -233,6 +256,64 @@ describe("Training Plan — page structure", () => {
     }));
     render(<LongTermPlanPage />);
     expect(screen.getByText("Loading plan...")).toBeInTheDocument();
+  });
+
+  it("keeps CoachFAB visible in the empty-plan state", async () => {
+    const user = userEvent.setup();
+    useAppData.mockReturnValue(makeAppData({
+      hierarchicalPlan: {
+        ...makeAppData().hierarchicalPlan,
+        plan: null,
+        loading: false,
+      },
+    }));
+
+    render(<LongTermPlanPage />);
+
+    expect(screen.getByText(/No training plan yet/i)).toBeInTheDocument();
+    expect(screen.getByTestId("coach-fab-button")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("coach-fab-button"));
+
+    expect(screen.getByTestId("coach-fab-panel")).toBeInTheDocument();
+    expect(screen.getByText(/Ask questions while you set up your first plan/i)).toBeInTheDocument();
+  });
+
+  it("shows patch-unavailable guidance instead of apply controls when plan context is unavailable", async () => {
+    const baseAppData = makeAppData();
+    const assistantMessage = {
+      id: "msg-assistant",
+      conversation_id: "conv-1",
+      role: "assistant",
+      content: {
+        text: "General guidance",
+        patch: [{ week: 1, dayDate: "2026-03-02", workoutId: "w-1", fields: { durationMinutes: 40 } }],
+        patchSummary: "Ease off Monday.",
+      },
+      created_at: new Date().toISOString(),
+    };
+
+    render(
+      <ChatPanel
+        coachConversations={baseAppData.coachConversations}
+        activeConversation={{ id: "conv-1", title: "Existing conversation" }}
+        messages={[assistantMessage]}
+        hierarchicalPlan={{ ...baseAppData.hierarchicalPlan, plan: null }}
+        activities={baseAppData.activities}
+        dailyLogs={baseAppData.dailyLogs}
+        checkins={baseAppData.checkins}
+        runnerProfile={baseAppData.runnerProfile}
+        trainingBlocks={baseAppData.trainingBlocks}
+        activePlan={null}
+        lang="en"
+        canApplyPatch={false}
+        patchUnavailableReason="Generate a plan first, then you can apply coach-proposed schedule changes from here."
+      />
+    );
+
+    expect(screen.getByTestId("patch-unavailable-note")).toBeInTheDocument();
+    expect(screen.queryByTestId("change-card-apply")).not.toBeInTheDocument();
+    expect(screen.getByText(/Generate a plan first/i)).toBeInTheDocument();
   });
 
   it("opens a workout detail modal in summary mode with completion actions kept off the grid", async () => {

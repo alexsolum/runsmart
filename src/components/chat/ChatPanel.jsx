@@ -6,7 +6,7 @@ import CoachAvatar from "../CoachAvatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-function ChatMessage({ msg, onApplyPatch, onDismissPatch }) {
+function ChatMessage({ msg, canApplyPatch, patchUnavailableReason, onApplyPatch, onDismissPatch }) {
   if (msg.role === "user") {
     const text = typeof msg.content === "string" ? msg.content : msg.content?.text ?? "";
     if (!text) return null;
@@ -38,12 +38,22 @@ function ChatMessage({ msg, onApplyPatch, onDismissPatch }) {
           </div>
         )}
         {patch && patch.length > 0 && (
-          <ChangeCard
-            patch={patch}
-            patchSummary={patchSummary}
-            onAccept={onApplyPatch}
-            onDismiss={onDismissPatch}
-          />
+          canApplyPatch ? (
+            <ChangeCard
+              patch={patch}
+              patchSummary={patchSummary}
+              onAccept={onApplyPatch}
+              onDismiss={onDismissPatch}
+            />
+          ) : (
+            <div
+              className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              data-testid="patch-unavailable-note"
+            >
+              {patchSummary && <p className="m-0 mb-1 font-semibold">{patchSummary}</p>}
+              <p className="m-0">{patchUnavailableReason}</p>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -64,6 +74,8 @@ export function ChatPanel({
   lang,
   onConversationCreated,
   className = "",
+  canApplyPatch = true,
+  patchUnavailableReason = "Generate a plan before applying coach-proposed changes.",
 }) {
   const [localMessages, setLocalMessages] = useState(externalMessages ?? []);
   const [sending, setSending] = useState(false);
@@ -198,8 +210,11 @@ export function ChatPanel({
   }, [handleSend]);
 
   const handleApplyPatch = useCallback(async (patch) => {
+    if (!canApplyPatch || typeof hierarchicalPlan?.applyPatch !== "function") {
+      throw new Error(patchUnavailableReason);
+    }
     await hierarchicalPlan.applyPatch(patch);
-  }, [hierarchicalPlan]);
+  }, [canApplyPatch, hierarchicalPlan, patchUnavailableReason]);
 
   const handleDismissPatch = useCallback(() => {
     // Mark the latest patch as dismissed (by message id)
@@ -233,6 +248,8 @@ export function ChatPanel({
                 <ChatMessage
                   key={msg.id}
                   msg={msgForRender}
+                  canApplyPatch={canApplyPatch}
+                  patchUnavailableReason={patchUnavailableReason}
                   onApplyPatch={handleApplyPatch}
                   onDismissPatch={handleDismissPatch}
                 />

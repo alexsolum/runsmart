@@ -275,7 +275,7 @@ function CreatePlanForm({ onSave, onCancel, loading }) {
 }
 
 export default function LongTermPlanPage() {
-  const { plans, trainingBlocks, hierarchicalPlan, coachConversations, activities, dailyLogs, checkins, runnerProfile } = useAppData();
+  const { auth, plans, trainingBlocks, hierarchicalPlan, coachConversations, activities, dailyLogs, checkins, runnerProfile } = useAppData();
   const { lang } = useI18n();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
@@ -722,8 +722,8 @@ export default function LongTermPlanPage() {
         </div>
       </div>
 
-      {/* Coach FAB — contextual chat overlay */}
-      {hierarchicalPlan.plan && (
+      {/* Coach FAB — keep coach entry reachable even before a plan exists */}
+      {auth?.user && (
         <CoachFAB
           coachConversations={coachConversations}
           hierarchicalPlan={hierarchicalPlan}
@@ -734,6 +734,7 @@ export default function LongTermPlanPage() {
           trainingBlocks={trainingBlocks}
           activePlan={plans.plans[0] ?? null}
           lang={lang}
+          canPatchPlan={Boolean(hierarchicalPlan.plan)}
         />
       )}
     </PageContainer>

@@ -2,7 +2,6 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { useAppData } from "../context/AppDataContext";
 import { useI18n } from "../i18n/translations.js";
-import { getSupabaseClient } from "../lib/supabaseClient.js";
 import { buildCoachPayload } from "../lib/coachPayload.js";
 import PageContainer from "../components/layout/PageContainer";
 import {
@@ -403,7 +402,16 @@ export function __resetInsightsSynthesisCacheForTests() {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
-  const { activities, checkins, plans, strava, dailyLogs, trainingBlocks, runnerProfile } = useAppData();
+  const {
+    activities,
+    checkins,
+    plans,
+    strava,
+    dailyLogs,
+    trainingBlocks,
+    runnerProfile,
+    invokeInsightsSynthesis,
+  } = useAppData();
   const { lang } = useI18n();
   const locale = lang === "no" ? "nb-NO" : undefined;
   const copy = useMemo(
@@ -766,7 +774,6 @@ export default function InsightsPage() {
 
     (async () => {
       try {
-        const client = getSupabaseClient();
         const payload = await buildCoachPayload({
           activities,
           dailyLogs,
@@ -777,10 +784,8 @@ export default function InsightsPage() {
           lang,
           mode: "insights_synthesis",
         });
-        const { data, error } = await client.functions.invoke("gemini-coach", {
-          body: { mode: "insights_synthesis", ...payload },
-        });
-        if (!error && data?.synthesis) {
+        const data = await invokeInsightsSynthesis(payload);
+        if (data?.synthesis) {
           const { text, isTrusted } = sanitizeSynthesisText(data.synthesis);
           if (isTrusted || hasRequiredSynthesisHeadings(text, lang)) {
             // Store in module-level cache before setting state
@@ -794,7 +799,7 @@ export default function InsightsPage() {
         setSynthesisLoading(false);
       }
     })();
-  }, [activities, checkins, dailyLogs, hasData, lang, plans.plans, runnerProfile, trainingBlocks]);
+  }, [activities, checkins, dailyLogs, hasData, invokeInsightsSynthesis, lang, plans.plans, runnerProfile, trainingBlocks]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 

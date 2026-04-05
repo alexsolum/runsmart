@@ -794,6 +794,15 @@ export const SAMPLE_HIERARCHICAL_PLAN = {
  * Pass overrides to customise individual slices for a specific test.
  */
 export function makeAppData(overrides = {}) {
+  const invokeInsightsSynthesis = vi.fn().mockResolvedValue({
+    synthesis: [
+      "Mileage Trend: volume is stable and gradually rising.",
+      "Intensity Distribution: intensity remains mostly aerobic with one quality focus.",
+      "Long-Run Progression: long runs are progressing with manageable fatigue cost.",
+      "Race Readiness: consistency and recovery suggest readiness is improving.",
+    ].join("\n"),
+  });
+
   return {
     auth: {
       user: { id: "user-1", email: "athlete@example.com" },
@@ -899,6 +908,7 @@ export function makeAppData(overrides = {}) {
       ),
       getPhases: vi.fn().mockReturnValue(SAMPLE_HIERARCHICAL_PLAN.plan_data.phases),
     },
+    invokeInsightsSynthesis,
     ...overrides,
   };
 }

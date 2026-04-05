@@ -38,8 +38,8 @@ const corsHeaders = {
 };
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-3-5-sonnet-20240620";
-const MAX_OUTPUT_TOKENS = 8192;
+const ANTHROPIC_MODEL = "claude-3-7-sonnet-latest";
+const MAX_OUTPUT_TOKENS = 20000;
 const MAX_INPUT_CHARS = 400000; // ~100k tokens * 4 chars/token — conservative limit for pre-check
 
 // ── Embedded coaching context ─────────────────────────────────────────────────
@@ -697,10 +697,12 @@ ${WORKOUTS_CONTEXT}
 ${RACE_DAY_CONTEXT}
 
 ## Output Format
-You MUST respond with a single valid JSON object and nothing else. No markdown fences, no explanation, no text before or after the JSON.
+You MUST respond with a single valid JSON object and nothing else. No markdown fences, no explanation, no text before or after the JSON. 
+If any data points seem missing or misaligned (e.g., longest run is 0), make reasonable conservative assumptions based on the rest of the profile and proceed with plan generation. DO NOT ask clarifying questions or output anything other than the JSON object.
 
 ## Plan Generation Constraints
-Keep workout descriptions and "humanReadable" fields extremely concise (max 2 sentences). The description field is optional and should only be used for complex workouts.
+Keep workout descriptions and "humanReadable" fields extremely concise (max 2 sentences). The description field is optional and should only be used for complex workouts. 
+IMPORTANT: To prevent timeouts, keep the JSON structure as lean as possible while still being complete.
 
 The plan JSON must follow this running-only schema (no swim or bike fields):
 - meta: { id, athlete, event, eventDate, planStartDate, planEndDate, createdAt, updatedAt, totalWeeks, generatedBy }
@@ -781,6 +783,18 @@ Example response without a patch:
   "patch": null,
   "patchSummary": null
 }`;
+
+const INSIGHTS_SYNTHESIS_SYSTEM_PROMPT = `You are an expert endurance running coach writing a concise training synthesis.
+
+Return plain text only. Do not use markdown code fences or JSON.
+
+Write exactly four labeled lines in this order:
+Mileage Trend:
+Intensity Distribution:
+Long-Run Progression:
+Race Readiness:
+
+Each line should be 1-2 sentences grounded in the supplied training data. If the data is incomplete, say so briefly and stay conservative.`;
 
 // ── Helper functions ─────────────────────────────────────────────────────────
 
@@ -887,6 +901,51 @@ function buildChatMessages(payload: any): Array<{role: string; content: string}>
   return messages;
 }
 
+function buildInsightsSynthesisPrompt(payload: any): string {
+  const sections: string[] = [
+    "Summarize this athlete's recent training using the required four headings.",
+  ];
+
+  if (payload.weeklySummary?.length) {
+    sections.push("## Weekly Summary");
+    sections.push(JSON.stringify(payload.weeklySummary, null, 2));
+  }
+
+  if (payload.recentActivities?.length) {
+    sections.push("## Recent Activities");
+    sections.push(JSON.stringify(payload.recentActivities, null, 2));
+  }
+
+  if (payload.recentCheckins?.length) {
+    sections.push("## Recent Check-ins");
+    sections.push(JSON.stringify(payload.recentCheckins, null, 2));
+  } else if (payload.latestCheckin) {
+    sections.push("## Latest Check-in");
+    sections.push(JSON.stringify(payload.latestCheckin, null, 2));
+  }
+
+  if (payload.dailyLogs?.length) {
+    sections.push("## Daily Logs");
+    sections.push(JSON.stringify(payload.dailyLogs, null, 2));
+  }
+
+  if (payload.planContext) {
+    sections.push("## Plan Context");
+    sections.push(JSON.stringify(payload.planContext, null, 2));
+  }
+
+  if (payload.runnerProfile) {
+    sections.push("## Runner Profile");
+    sections.push(JSON.stringify(payload.runnerProfile, null, 2));
+  }
+
+  if (payload.lang) {
+    sections.push(`## Language\n${payload.lang}`);
+  }
+
+  return sections.join("\n\n");
+}
+
 function validatePatchArray(patch: any): boolean {
   if (patch === null || patch === undefined) return true;
   if (!Array.isArray(patch)) return false;
@@ -906,8 +965,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function fetchWithRetry(
   url: string,
   options: RequestInit,
-  maxRetries = 3,
-  initialDelay = 1000
+  maxRetries = 1,
+  initialDelay = 500
 ): Promise<Response> {
   let lastError: any;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -945,6 +1004,240 @@ async function fetchWithRetry(
   throw lastError || new Error("Max retries reached");
 }
 
+// ── API Payload Building ─────────────────────────────────────────────────────
+
+function buildGeneratePayload(userPrompt: string) {
+  return {
+    model: ANTHROPIC_MODEL,
+    max_tokens: MAX_OUTPUT_TOKENS,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+    tools: [
+      {
+        name: "generate_training_plan",
+        description: "Generates a complete, structured endurance training plan for an athlete based on their profile and goals.",
+        input_schema: {
+          type: "object",
+          properties: {
+            meta: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                athlete: { type: "string" },
+                event: { type: "string" },
+                eventDate: { type: "string", format: "date" },
+                planStartDate: { type: "string", format: "date" },
+                planEndDate: { type: "string", format: "date" },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+                totalWeeks: { type: "integer" },
+                generatedBy: { type: "string" }
+              },
+              required: ["id", "athlete", "event", "eventDate", "planStartDate", "planEndDate", "totalWeeks", "generatedBy"]
+            },
+            assessment: {
+              type: "object",
+              properties: {
+                foundation: {
+                  type: "object",
+                  properties: {
+                    raceHistory: { type: "array", items: { type: "string" } },
+                    peakTrainingLoad: { type: "number" },
+                    foundationLevel: { type: "string" },
+                    yearsInSport: { type: "number" }
+                  }
+                },
+                currentForm: {
+                  type: "object",
+                  properties: {
+                    weeklyKm: { type: "number" },
+                    longestRun: { type: "number" },
+                    consistency: { type: "number" }
+                  }
+                },
+                strengths: { type: "array", items: { type: "object", properties: { area: { type: "string" }, evidence: { type: "string" } } } },
+                limiters: { type: "array", items: { type: "object", properties: { area: { type: "string" }, evidence: { type: "string" } } } },
+                constraints: { type: "array", items: { type: "string" } }
+              }
+            },
+            zones: {
+              type: "object",
+              properties: {
+                run: {
+                  type: "object",
+                  properties: {
+                    hr: {
+                      type: "object",
+                      properties: {
+                        lthr: { type: "number" },
+                        zones: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              zone: { type: "integer" },
+                              name: { type: "string" },
+                              percentLow: { type: "number" },
+                              percentHigh: { type: "number" },
+                              hrLow: { type: "number" },
+                              hrHigh: { type: "number" }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    pace: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          zone: { type: "string" },
+                          name: { type: "string" },
+                          paceRange: { type: "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            phases: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  startWeek: { type: "integer" },
+                  endWeek: { type: "integer" },
+                  focus: { type: "string" },
+                  weeklyHoursRange: { type: "object", properties: { low: { type: "number" }, high: { type: "number" } } },
+                  keyWorkouts: { type: "array", items: { type: "string" } },
+                  physiologicalGoals: { type: "array", items: { type: "string" } }
+                }
+              }
+            },
+            weeks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  weekNumber: { type: "integer" },
+                  startDate: { type: "string", format: "date" },
+                  endDate: { type: "string", format: "date" },
+                  phase: { type: "string" },
+                  focus: { type: "string" },
+                  targetHours: { type: "number" },
+                  isRecoveryWeek: { type: "boolean" },
+                  days: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        date: { type: "string", format: "date" },
+                        dayOfWeek: { type: "string" },
+                        workouts: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string" },
+                              sport: { type: "string" },
+                              type: { type: "string" },
+                              name: { type: "string" },
+                              description: { type: "string" },
+                              durationMinutes: { type: "number" },
+                              distanceKm: { type: "number" },
+                              primaryZone: { type: "string" },
+                              humanReadable: { type: "string" },
+                              completed: { type: "boolean" }
+                            },
+                            required: ["id", "sport", "type", "name", "durationMinutes", "primaryZone", "humanReadable", "completed"]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  summary: { type: "object", properties: { totalHours: { type: "number" }, totalKm: { type: "number" }, sessions: { type: "integer" } } }
+                }
+              }
+            },
+            raceStrategy: {
+              type: "object",
+              properties: {
+                event: { type: "object", properties: { name: { type: "string" }, date: { type: "string", format: "date" }, type: { type: "string" }, distance: { type: "number" } } },
+                pacing: { type: "object", properties: { run: { type: "object", properties: { target: { type: "string" }, notes: { type: "string" } } } } },
+                nutrition: { type: "object", properties: { preRace: { type: "string" }, during: { type: "object", properties: { carbsPerHour: { type: "number" }, fluidPerHour: { type: "string" }, products: { type: "array", items: { type: "string" } } } }, notes: { type: "string" } } },
+                taper: { type: "object", properties: { startDate: { type: "string", format: "date" }, volumeReduction: { type: "number" }, notes: { type: "string" } } }
+              }
+            }
+          },
+          required: ["meta", "assessment", "zones", "phases", "weeks", "raceStrategy"]
+        }
+      }
+    ],
+    tool_choice: { type: "tool", name: "generate_training_plan" }
+  };
+}
+
+function buildChatPayload(chatMessages: Array<{role: string; content: string}>) {
+  return {
+    model: ANTHROPIC_MODEL,
+    max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+    system: CHAT_SYSTEM_PROMPT,
+    messages: chatMessages,
+    tools: [
+      {
+        name: "respond_to_athlete",
+        description: "Provides a conversational response to the athlete with optional training plan modifications.",
+        input_schema: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "The conversational coaching advice." },
+            patch: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  week: { type: "integer" },
+                  dayDate: { type: "string", format: "date" },
+                  workoutId: { type: "string" },
+                  fields: {
+                    type: "object",
+                    properties: {
+                      sport: { type: "string" },
+                      type: { type: "string" },
+                      name: { type: "string" },
+                      description: { type: "string" },
+                      durationMinutes: { type: "number" },
+                      distanceKm: { type: "number" },
+                      primaryZone: { type: "string" },
+                      humanReadable: { type: "string" }
+                    }
+                  }
+                },
+                required: ["week", "dayDate", "workoutId", "fields"]
+              },
+              nullable: true
+            },
+            patchSummary: { type: "string", nullable: true }
+          },
+          required: ["text", "patch", "patchSummary"]
+        }
+      }
+    ],
+    tool_choice: { type: "tool", name: "respond_to_athlete" }
+  };
+}
+
+function buildInsightsSynthesisPayload(userPrompt: string) {
+  return {
+    model: ANTHROPIC_MODEL,
+    max_tokens: 800,
+    system: INSIGHTS_SYNTHESIS_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+  };
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -952,6 +1245,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
 
   try {
     // 1. Auth check
@@ -966,21 +1265,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Extract user ID from JWT payload (decode without full verification)
-    // Format: "header.payload.signature"
+    // Extract user ID from JWT payload
     let userId: string | null = null;
     try {
       const parts = accessToken.split(".");
       if (parts.length === 3) {
-        // Decode the payload (second part) from base64url
         const base64Url = parts[1];
         const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonStr = atob(base64); // Standard base64 decode
+        const jsonStr = atob(base64);
         const payload = JSON.parse(jsonStr);
-        userId = payload.sub; // Supabase uses 'sub' claim for user ID
+        userId = payload.sub;
       }
     } catch (e) {
-      // If JWT parsing fails, reject request
       console.error("JWT decode error:", e);
     }
 
@@ -998,16 +1294,13 @@ Deno.serve(async (req) => {
     const payload = await req.json();
 
     // ── MODE DISPATCH ──
-    if (payload.mode === "chat") {
-      // Chat mode: conversational coaching with optional patch suggestions
-      const chatMessages = buildChatMessages(payload);
-
-      const totalInputChars = CHAT_SYSTEM_PROMPT.length +
-        chatMessages.reduce((sum, m) => sum + m.content.length, 0);
+    if (payload.mode === "insights_synthesis") {
+      const userPrompt = buildInsightsSynthesisPrompt(payload);
+      const totalInputChars = INSIGHTS_SYNTHESIS_SYSTEM_PROMPT.length + userPrompt.length;
       if (totalInputChars > MAX_INPUT_CHARS) {
         return new Response(
           JSON.stringify({
-            error: "Chat payload too large. Try a shorter conversation or reduce plan context.",
+            error: "Insights payload too large.",
             estimatedTokens: estimateTokens(String(totalInputChars)),
           }),
           { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -1029,12 +1322,71 @@ Deno.serve(async (req) => {
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
-        body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
-          max_tokens: CHAT_MAX_OUTPUT_TOKENS,
-          system: CHAT_SYSTEM_PROMPT,
-          messages: chatMessages,
+        body: JSON.stringify(buildInsightsSynthesisPayload(userPrompt)),
+      });
+
+      if (!aiResponse.ok) {
+        const errBody = await aiResponse.text();
+        return new Response(
+          JSON.stringify({ error: "Claude API error", status: aiResponse.status, detail: errBody }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiResult = await aiResponse.json();
+      const synthesis = aiResult.content
+        ?.filter((block: any) => block?.type === "text")
+        .map((block: any) => block.text)
+        .join("\n")
+        .trim();
+
+      if (!synthesis) {
+        return new Response(
+          JSON.stringify({ error: "Empty response from Claude" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          synthesis,
+          usage: aiResult.usage,
         }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (payload.mode === "chat") {
+      const chatMessages = buildChatMessages(payload);
+
+      const totalInputChars = CHAT_SYSTEM_PROMPT.length +
+        chatMessages.reduce((sum, m) => sum + m.content.length, 0);
+      if (totalInputChars > MAX_INPUT_CHARS) {
+        return new Response(
+          JSON.stringify({
+            error: "Chat payload too large.",
+            estimatedTokens: estimateTokens(String(totalInputChars)),
+          }),
+          { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthropicKey) {
+        return new Response(
+          JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiResponse = await fetchWithRetry(ANTHROPIC_URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(buildChatPayload(chatMessages)),
       });
 
       if (!aiResponse.ok) {
@@ -1047,48 +1399,16 @@ Deno.serve(async (req) => {
 
       const aiResult = await aiResponse.json();
 
-      if (aiResult.stop_reason !== "end_turn") {
+      // Extract JSON from tool use
+      const toolCall = aiResult.content.find((c: any) => c.type === "tool_use");
+      if (!toolCall) {
         return new Response(
-          JSON.stringify({ error: "Chat response was truncated.", stop_reason: aiResult.stop_reason }),
-          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const rawText = aiResult.content?.[0]?.text;
-      if (!rawText) {
-        return new Response(
-          JSON.stringify({ error: "Empty response from Claude" }),
+          JSON.stringify({ error: "No tool use in Claude response" }),
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      let chatData;
-      try {
-        chatData = JSON.parse(rawText);
-      } catch {
-        return new Response(
-          JSON.stringify({ error: "Failed to parse chat JSON from Claude", rawPreview: rawText.slice(0, 500) }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Validate response structure
-      if (typeof chatData.text !== "string") {
-        return new Response(
-          JSON.stringify({ error: "Chat response missing 'text' field" }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Validate patch array if present
-      if (chatData.patch !== null && chatData.patch !== undefined) {
-        if (!validatePatchArray(chatData.patch)) {
-          return new Response(
-            JSON.stringify({ error: "Invalid patch array structure in chat response", patch: chatData.patch }),
-            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      }
+      const chatData = toolCall.input;
 
       return new Response(
         JSON.stringify({
@@ -1101,29 +1421,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── GENERATE MODE (existing behavior, mode === "generate" or no mode field) ──
+    // ── GENERATE MODE ──
     const athletePayload = payload as AthletePayload;
-
-    // 3. Build user prompt
     const userPrompt = buildUserPrompt(athletePayload);
 
-    // 4. Token limit pre-check
-    const totalInputChars = SYSTEM_PROMPT.length + userPrompt.length;
-    if (totalInputChars > MAX_INPUT_CHARS) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Request payload too large. Reduce background text or simplify constraints.",
-          estimatedTokens: estimateTokens(SYSTEM_PROMPT + userPrompt),
-        }),
-        {
-          status: 413,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // 5. Call Anthropic Messages API
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) {
       return new Response(
@@ -1142,12 +1443,7 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
+      body: JSON.stringify(buildGeneratePayload(userPrompt)),
     });
 
     if (!aiResponse.ok) {
@@ -1167,66 +1463,16 @@ Deno.serve(async (req) => {
 
     const aiResult = await aiResponse.json();
 
-    // 6. Truncation guard
-    if (aiResult.stop_reason !== "end_turn") {
+    // Extract JSON from tool use
+    const toolCall = aiResult.content.find((c: any) => c.type === "tool_use");
+    if (!toolCall) {
       return new Response(
-        JSON.stringify({
-          error: "Plan generation was truncated. The plan may be too long.",
-          stop_reason: aiResult.stop_reason,
-        }),
-        {
-          status: 422,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "No tool use in Claude response" }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 7. Parse JSON from response text
-    const rawText = aiResult.content?.[0]?.text;
-    if (!rawText) {
-      return new Response(
-        JSON.stringify({ error: "Empty response from Claude" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    let planData;
-    try {
-      planData = JSON.parse(rawText);
-    } catch {
-      return new Response(
-        JSON.stringify({
-          error: "Failed to parse plan JSON from Claude response",
-          rawPreview: rawText.slice(0, 500),
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // 8. Minimal top-level structure validation
-    if (
-      !planData.meta ||
-      !planData.phases ||
-      !planData.weeks ||
-      !Array.isArray(planData.weeks)
-    ) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Plan JSON missing required top-level fields (meta, phases, weeks)",
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const planData = toolCall.input;
 
     // 9. Save to hierarchical_plans
     const { data: savedPlan, error: saveErr } = await supabase
@@ -1234,8 +1480,8 @@ Deno.serve(async (req) => {
       .insert({
         user_id: userId,
         plan_data: planData,
-        event_name: planData.meta?.event || payload.raceGoal.eventName,
-        event_date: planData.meta?.eventDate || payload.raceGoal.eventDate,
+        event_name: planData.meta?.event || athletePayload.raceGoal.eventName,
+        event_date: planData.meta?.eventDate || athletePayload.raceGoal.eventDate,
         status: "active",
       })
       .select()
@@ -1254,7 +1500,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 10. Return success
     return new Response(
       JSON.stringify({
         id: savedPlan.id,
@@ -1276,3 +1521,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+

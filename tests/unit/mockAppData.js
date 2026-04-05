@@ -294,16 +294,47 @@ export const SAMPLE_DAILY_LOGS = [
   },
 ];
 
+export const SAMPLE_SESSIONS = [
+  {
+    session_id: "session-1",
+    firstMessage: "How should I adjust my training this week?",
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    session_id: "session-2",
+    firstMessage: "Pre-race tapering advice",
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+export const SAMPLE_CHAT_MESSAGES = [
+  {
+    id: "msg-1",
+    session_id: "session-1",
+    role: "user",
+    content: [{ type: "text", text: "How should I adjust my training this week?" }],
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "msg-2",
+    session_id: "session-1",
+    role: "assistant",
+    content: [{ type: "text", text: JSON.stringify({ type: "conversation", content: "Based on your recent fatigue levels, I'd recommend reducing intensity." }) }],
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+// Legacy aliases for backward compatibility with existing tests
 export const SAMPLE_CONVERSATIONS = [
   {
-    id: "conv-1",
+    id: "session-1",
     user_id: "user-1",
-    title: "Good training consistency",
+    title: "How should I adjust my training this week?",
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
-    id: "conv-2",
+    id: "session-2",
     user_id: "user-1",
     title: "Pre-race tapering advice",
     created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
@@ -314,14 +345,14 @@ export const SAMPLE_CONVERSATIONS = [
 export const SAMPLE_MESSAGES = [
   {
     id: "msg-1",
-    conversation_id: "conv-1",
+    conversation_id: "session-1",
     role: "user",
     content: { type: "initial_request" },
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "msg-2",
-    conversation_id: "conv-1",
+    conversation_id: "session-1",
     role: "assistant",
     content: [
       {
@@ -872,26 +903,15 @@ export function makeAppData(overrides = {}) {
       toggleCompleted: vi.fn().mockResolvedValue(undefined),
     },
     coachConversations: {
-      conversations: [],
-      activeConversation: null,
+      sessions: [],
       messages: [],
+      activeSessionId: null,
       loading: false,
       error: null,
-      loadConversations: vi.fn().mockResolvedValue([]),
-      loadMessages: vi.fn().mockResolvedValue([]),
-      createConversation: vi.fn().mockResolvedValue(SAMPLE_CONVERSATIONS[0]),
-      addMessage: vi.fn().mockImplementation((convId, role, content) =>
-        Promise.resolve({
-          id: `msg-${Date.now()}`,
-          conversation_id: convId,
-          role,
-          content,
-          created_at: new Date().toISOString(),
-        })
-      ),
-      updateConversationTitle: vi.fn().mockResolvedValue(undefined),
-      deleteConversation: vi.fn().mockResolvedValue(undefined),
-      setActiveConversation: vi.fn().mockResolvedValue(undefined),
+      setActiveSessionId: vi.fn().mockResolvedValue(undefined),
+      startNewSession: vi.fn().mockReturnValue("new-session-id"),
+      reload: vi.fn().mockResolvedValue(undefined),
+      loadSessions: vi.fn().mockResolvedValue([]),
     },
     hierarchicalPlan: {
       plan: SAMPLE_HIERARCHICAL_PLAN,

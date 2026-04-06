@@ -1,8 +1,7 @@
-// Supabase Edge Function — Claude Coach (Agent Skills relay)
+// Supabase Edge Function — Claude Coach
 //
 // Receives user messages + athlete context, loads conversation history from
-// coach_conversations, calls the Anthropic API with the running-coach custom
-// skill attached, handles pause_turn loops, routes response by type
+// coach_conversations, calls the Anthropic Messages API, routes response by type
 // (conversation, full-plan, plan-patch, plan-phase-update), and persists
 // both user and assistant messages.
 
@@ -11,6 +10,7 @@ import { getAnthropicModelCandidatesForMode, getAnthropicModelForMode } from "./
 import { loadConversationHistory, persistConversationTurn } from "./conversationStore.ts";
 import { getCoachRequestMode } from "./requestMode.ts";
 import { parseRaceInfoResponse } from "./raceInfo.ts";
+import { buildCoachSystemPrompt } from "./coachPrompt.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -83,10 +83,26 @@ function getBearerToken(req: Request): string | null {
   return token;
 }
 
-async function verifyAndGetUserId(token: string, supabase: any): Promise<string | null> {
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data?.user?.id) return null;
-  return data.user.id;
+function getApiKey(req: Request): string | null {
+  return req.headers.get("apikey") || req.headers.get("Apikey");
+}
+
+async function verifyAndGetUserId(token: string, apiKey: string | null): Promise<string | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  if (!supabaseUrl || !apiKey) return null;
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    method: "GET",
+    headers: {
+      apikey: apiKey,
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) return null;
+
+  const user = await response.json();
+  return user?.id ?? null;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -127,29 +143,21 @@ function jsonResponse(body: any, status = 200) {
   });
 }
 
-// ── Agent Skills API call ────────────────────────────────────────────────────
+// ── Anthropic Messages API call ──────────────────────────────────────────────
 
-interface SkillsChatParams {
+interface CoachChatParams {
   messages: Array<{ role: string; content: any }>;
   system: string;
   anthropicKey: string;
-  skillId: string;
   model: string;
 }
 
-async function callAgentSkills({ messages, system, anthropicKey, skillId, model }: SkillsChatParams) {
+async function callCoachModel({ messages, system, anthropicKey, model }: CoachChatParams) {
   const body: any = {
     model,
     max_tokens: MAX_OUTPUT_TOKENS,
     system,
     messages,
-    skills: [
-      {
-        type: "custom",
-        skill_id: skillId,
-        version: "latest",
-      },
-    ],
   };
 
   let response = await fetchWithRetry(ANTHROPIC_URL, {
@@ -157,7 +165,6 @@ async function callAgentSkills({ messages, system, anthropicKey, skillId, model 
     headers: {
       "x-api-key": anthropicKey,
       "anthropic-version": "2023-06-01",
-      "anthropic-beta": "skills-2025-10-02",
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -181,7 +188,6 @@ async function callAgentSkills({ messages, system, anthropicKey, skillId, model 
       headers: {
         "x-api-key": anthropicKey,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "skills-2025-10-02",
         "content-type": "application/json",
       },
       body: JSON.stringify({ ...body, messages }),
@@ -371,7 +377,7 @@ Deno.serve(async (req) => {
     const accessToken = getBearerToken(req);
     if (!accessToken) return jsonResponse({ code: 401, message: "Missing bearer token" }, 401);
 
-    const userId = await verifyAndGetUserId(accessToken, supabase);
+    const userId = await verifyAndGetUserId(accessToken, getApiKey(req));
     if (!userId) return jsonResponse({ code: 401, message: "Invalid JWT" }, 401);
 
     // 2. Parse
@@ -468,12 +474,10 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
       }
     }
 
-    // ── Chat mode (Agent Skills) ──
+    // ── Chat mode ──
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    const skillId = Deno.env.get("CLAUDE_COACH_SKILL_ID");
     const model = getAnthropicModelForMode(requestMode);
     if (!anthropicKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
-    if (!skillId) return jsonResponse({ error: "CLAUDE_COACH_SKILL_ID not configured" }, 500);
 
     const sessionId = payload.sessionId;
     const newMessage = payload.newMessage;
@@ -497,14 +501,10 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     messages.push({ role: "user", content: [userContent] });
 
     // 5. Build system prompt with athlete context
-    let system = "You are an expert endurance running coach. Use the running-coach skill for all coaching guidance.\n\n";
-    if (payload.athleteContext) {
-      system += "## Current Athlete Context\n\n";
-      system += JSON.stringify(payload.athleteContext, null, 2);
-    }
+    const system = buildCoachSystemPrompt(payload);
 
-    // 6. Call Agent Skills API
-    const apiResult = await callAgentSkills({ messages, system, anthropicKey, skillId, model });
+    // 6. Call Anthropic Messages API
+    const apiResult = await callCoachModel({ messages, system, anthropicKey, model });
 
     // 7. Parse response envelope
     const envelope = extractResponseEnvelope(apiResult);

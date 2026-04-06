@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
 const initialState = {
-  plan: null,       // single hierarchical_plans row (or null)
-  loading: false,   // initial fetch in progress
-  generating: false,// claude-coach call in progress
+  plan: null,           // single hierarchical_plans row (or null)
+  loading: false,       // initial fetch in progress
+  generating: false,    // claude-coach call in progress
   error: null,
+  planSessionId: null,  // session ID for the active plan intake Q&A session
 };
 
 function reducer(state, action) {
@@ -20,10 +21,24 @@ function reducer(state, action) {
       return { ...state, plan: action.payload, generating: false };
     case "patched":
       return { ...state, plan: action.payload };
+    case "plan_session_started":
+      return { ...state, generating: false, planSessionId: action.payload };
     case "error":
       return { ...state, loading: false, generating: false, error: action.payload };
     default:
       return state;
+  }
+}
+
+// ── mapDistanceToEventType helper ────────────────────────────────────────────
+function mapDistanceToEventType(distance) {
+  switch (distance) {
+    case "Marathon": return "marathon";
+    case "Half Marathon": return "half_marathon";
+    case "10K": return "10k";
+    case "5K": return "5k";
+    case "Ultra": return "ultra";
+    default: return distance ? distance.toLowerCase().replace(/\s+/g, "_") : "other";
   }
 }
 
@@ -52,7 +67,7 @@ export function useHierarchicalPlan(userId) {
     return data ?? null;
   }, [client, userId]);
 
-  // ── generatePlan ────────────────────────────────────────────────────────────
+  // ── generatePlan (legacy — kept for backwards compatibility) ─────────────
   const generatePlan = useCallback(async (payload) => {
     if (!client) throw new Error("Supabase is not configured");
 
@@ -95,6 +110,130 @@ export function useHierarchicalPlan(userId) {
       return savedRow;
     } catch (err) {
       // h. Reset on error
+      dispatch({ type: "error", payload: err });
+      throw err;
+    }
+  }, [client, userId]);
+
+  // ── startPlanSession ─────────────────────────────────────────────────────
+  const startPlanSession = useCallback(async (payload) => {
+    if (!client) throw new Error("Supabase is not configured");
+    dispatch({ type: "generating" });
+    try {
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      const session = sessionData?.session;
+      if (!session) throw new Error("No active session. Please sign in first.");
+
+      // Deactivate old active plans
+      await client
+        .from("hierarchical_plans")
+        .update({ status: "replaced" })
+        .eq("user_id", userId)
+        .eq("status", "active");
+
+      const sessionId = crypto.randomUUID();
+
+      // Build intake message
+      const intake = payload.planIntake || payload; // support both new and old payload shape
+      const raceGoal = intake.raceGoal || {};
+      const fitness = intake.fitness || {};
+      const raceInfo = intake.raceInfo;
+
+      const parts = [
+        `The athlete wants to generate a training plan. Here is their intake:`,
+        `Race: ${raceGoal.eventName || "Unknown"}, ${raceGoal.eventType || ""}${raceGoal.ultraDistanceKm ? ` (${raceGoal.ultraDistanceKm}km)` : ""}, on ${raceGoal.eventDate || "TBD"}. Goal: ${raceGoal.goalType || "finish"}.`,
+        `Current weekly volume: ${fitness.weeklyKm || 0}km. Longest recent run: ${fitness.longestRecentRun ? fitness.longestRecentRun + "km" : "unknown"}.`,
+      ];
+      if (raceInfo?.keyFacts) parts.push(`Race characteristics: ${raceInfo.keyFacts}.`);
+      parts.push(`Please ask your assessment questions now, then generate the full plan once satisfied.`);
+
+      const systemPrompt = `You are an expert running coach. The athlete has submitted an intake form to generate a training plan.
+Your job is to ask 1–2 targeted assessment questions to validate your key assumptions before generating
+the plan — following the assessment validation approach (see athlete context). Keep questions concise
+and specific. After receiving answers (or after 2 exchanges), generate the full plan immediately using
+the full-plan response format.`;
+
+      const { data: invokeData, error: invokeError } = await client.functions.invoke("claude-coach", {
+        body: {
+          sessionId,
+          newMessage: parts.join("\n"),
+          athleteContext: {
+            planIntake: intake,
+            activePlan: null,
+            systemPromptOverride: systemPrompt,
+          },
+        },
+        headers: { Authorization: "Bearer " + session.access_token },
+      });
+
+      if (invokeError) throw invokeError;
+
+      // If Claude immediately generated a full plan, handle it
+      if (invokeData?.planUpdated) {
+        const { data: savedRow } = await client
+          .from("hierarchical_plans")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (savedRow) {
+          dispatch({ type: "generated", payload: savedRow });
+          return { sessionId, question: null, planGenerated: true };
+        }
+      }
+
+      dispatch({ type: "plan_session_started", payload: sessionId });
+      return {
+        sessionId,
+        question: invokeData?.content || null,
+        planGenerated: false,
+      };
+    } catch (err) {
+      dispatch({ type: "error", payload: err });
+      throw err;
+    }
+  }, [client, userId]);
+
+  // ── sendPlanMessage ──────────────────────────────────────────────────────
+  const sendPlanMessage = useCallback(async (sessionId, message) => {
+    if (!client) throw new Error("Supabase is not configured");
+    try {
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      const session = sessionData?.session;
+      if (!session) throw new Error("No active session. Please sign in first.");
+
+      const { data: invokeData, error: invokeError } = await client.functions.invoke("claude-coach", {
+        body: {
+          sessionId,
+          newMessage: message,
+        },
+        headers: { Authorization: "Bearer " + session.access_token },
+      });
+
+      if (invokeError) throw invokeError;
+
+      // If plan was generated, fetch and save it
+      if (invokeData?.planUpdated) {
+        const { data: savedRow } = await client
+          .from("hierarchical_plans")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (savedRow) {
+          dispatch({ type: "generated", payload: savedRow });
+          return { question: null, planGenerated: true };
+        }
+      }
+
+      return { question: invokeData?.content || null, planGenerated: false };
+    } catch (err) {
       dispatch({ type: "error", payload: err });
       throw err;
     }
@@ -180,8 +319,11 @@ export function useHierarchicalPlan(userId) {
     loading: state.loading,
     generating: state.generating,
     error: state.error,
+    planSessionId: state.planSessionId,
     loadPlan,
     generatePlan,
+    startPlanSession,
+    sendPlanMessage,
     applyPatch,
     toggleWorkoutCompleted,
     moveWorkout,

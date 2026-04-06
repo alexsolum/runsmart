@@ -11,6 +11,7 @@ import { loadConversationHistory, persistConversationTurn } from "./conversation
 import { getCoachRequestMode } from "./requestMode.ts";
 import { parseRaceInfoResponse } from "./raceInfo.ts";
 import { buildCoachSystemPrompt } from "./coachPrompt.ts";
+import { saveFullPlan } from "./planUtils.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -241,36 +242,7 @@ async function routeResponse(
   switch (envelope.type) {
     case "full-plan": {
       if (!envelope.plan) return { planUpdated: false, error: null };
-
-      // Upsert hierarchical plan
-      const { error: planErr } = await supabase
-        .from("hierarchical_plans")
-        .upsert(
-          { user_id: userId, status: "active", plan_data: envelope.plan },
-          { onConflict: "user_id" }
-        );
-      if (planErr) return { planUpdated: false, error: planErr.message };
-
-      // Derive and sync training_blocks from plan.phases
-      if (envelope.plan.phases && envelope.plan.weeks?.length) {
-        const planStartDate = new Date(envelope.plan.weeks[0].startDate);
-        const blocks = envelope.plan.phases.map((phase: any) => ({
-          user_id: userId,
-          phase: phase.name,
-          label: phase.name,
-          start_date: addDays(planStartDate, (phase.startWeek - 1) * 7),
-          end_date: addDays(planStartDate, phase.endWeek * 7 - 1),
-          target_km: null,
-          notes: phase.focus,
-        }));
-
-        // Delete existing blocks and re-insert
-        await supabase.from("training_blocks").delete().eq("user_id", userId);
-        const { error: blockErr } = await supabase.from("training_blocks").insert(blocks);
-        if (blockErr) return { planUpdated: true, error: `Plan saved but blocks failed: ${blockErr.message}` };
-      }
-
-      return { planUpdated: true, error: null };
+      return await saveFullPlan(supabase, userId, envelope.plan);
     }
 
     case "plan-patch": {

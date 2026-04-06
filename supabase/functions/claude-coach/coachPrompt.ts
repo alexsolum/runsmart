@@ -1,4 +1,5 @@
 import { RUNNING_COACH_METHODOLOGY } from "./coachMethodology.ts";
+import { buildFullPlanSchemaGuidance } from "./planUtils.ts";
 
 export function buildCoachSystemPrompt(payload: any): string {
   const parts: string[] = [];
@@ -26,6 +27,8 @@ Rules:
 - Use "plan-phase-update" only when changing phase metadata.
 - Do not wrap JSON in markdown fences.
 - Do not include any prose before or after the JSON object.`);
+
+  parts.push(buildFullPlanSchemaGuidance());
 
   if (payload?.athleteContext) {
     const athleteContext = { ...payload.athleteContext };

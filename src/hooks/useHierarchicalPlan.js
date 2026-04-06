@@ -145,6 +145,7 @@ the full-plan response format.`;
       });
 
       if (invokeError) throw invokeError;
+      if (invokeData?.routeError) throw new Error(invokeData.routeError);
 
       // If Claude immediately generated a full plan, handle it
       if (invokeData?.planUpdated) {
@@ -186,6 +187,7 @@ the full-plan response format.`;
       });
 
       if (invokeError) throw invokeError;
+      if (invokeData?.routeError) throw new Error(invokeData.routeError);
 
       // If plan was generated, fetch and save it
       if (invokeData?.planUpdated) {

@@ -387,6 +387,64 @@ describe("useHierarchicalPlan", () => {
     expect(callOrder.indexOf("update-replaced")).toBeLessThan(callOrder.indexOf("invoke"));
   });
 
+  it("startPlanSession throws when the edge function returns routeError", async () => {
+    const invokeSpy = vi.fn().mockResolvedValue({
+      data: { routeError: "Generated plan failed validation: missing top-level field: weeks" },
+      error: null,
+    });
+
+    const { client } = createMockClient({
+      invoke: invokeSpy,
+      selectHandlers: {
+        select: () => ({ data: null, error: null }),
+        update: () => ({ data: null, error: null }),
+      },
+    });
+    getSupabaseClient.mockReturnValue(client);
+
+    const { result } = renderHook(() => useHierarchicalPlan("user-1"));
+
+    await act(async () => {
+      await expect(
+        result.current.startPlanSession({
+          planIntake: {
+            raceGoal: { eventName: "Soria Moria", eventDate: "2026-05-30", eventType: "ultra" },
+            fitness: { weeklyKm: 105 },
+            constraints: {},
+          },
+        }),
+      ).rejects.toThrow("Generated plan failed validation");
+    });
+
+    expect(result.current.error).not.toBeNull();
+  });
+
+  it("sendPlanMessage throws when the edge function returns routeError", async () => {
+    const invokeSpy = vi.fn().mockResolvedValue({
+      data: { routeError: "there is no unique or exclusion constraint matching the ON CONFLICT specification" },
+      error: null,
+    });
+
+    const { client } = createMockClient({
+      invoke: invokeSpy,
+      selectHandlers: {
+        select: () => ({ data: null, error: null }),
+        update: () => ({ data: null, error: null }),
+      },
+    });
+    getSupabaseClient.mockReturnValue(client);
+
+    const { result } = renderHook(() => useHierarchicalPlan("user-1"));
+
+    await act(async () => {
+      await expect(
+        result.current.sendPlanMessage("session-1", "Please generate the plan now."),
+      ).rejects.toThrow("there is no unique or exclusion constraint matching the ON CONFLICT specification");
+    });
+
+    expect(result.current.error).not.toBeNull();
+  });
+
   // ── applyPatch ──────────────────────────────────────────────────────────────
 
   it("applyPatch calls client.rpc('apply_plan_patch', ...) and updates state", async () => {

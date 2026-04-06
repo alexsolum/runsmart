@@ -20,6 +20,9 @@ describe("buildCoachSystemPrompt", () => {
     expect(prompt).toContain("Use back-to-back long runs strategically for ultra preparation");
     expect(prompt).toContain('"type":"conversation"');
     expect(prompt).toContain('"type":"full-plan"');
+    expect(prompt).toContain('complete hierarchical running plan object for this app');
+    expect(prompt).toContain('plan.weeks must be a non-empty array');
+    expect(prompt).toContain('plan.meta.planStartDate must exactly equal plan.weeks[0].startDate');
     expect(prompt).toContain('"eventName": "Soria Moria"');
     expect(prompt).not.toContain("running-coach skill");
     expect(prompt).not.toContain("systemPromptOverride");

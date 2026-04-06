@@ -30,18 +30,6 @@ function reducer(state, action) {
   }
 }
 
-// ── mapDistanceToEventType helper ────────────────────────────────────────────
-function mapDistanceToEventType(distance) {
-  switch (distance) {
-    case "Marathon": return "marathon";
-    case "Half Marathon": return "half_marathon";
-    case "10K": return "10k";
-    case "5K": return "5k";
-    case "Ultra": return "ultra";
-    default: return distance ? distance.toLowerCase().replace(/\s+/g, "_") : "other";
-  }
-}
-
 export function useHierarchicalPlan(userId) {
   const client = useMemo(() => getSupabaseClient(), []);
   const [state, dispatch] = useReducer(reducer, initialState);

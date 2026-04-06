@@ -222,7 +222,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
       });
     }
     setSchedule(defaultSchedule);
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, activities, runnerProfile, workoutEntries]);
 
   // ── Rotating message effect ────────────────────────────────────────────────
 
@@ -318,26 +318,6 @@ export function PlanIntakeModal({ open, onOpenChange }) {
 
   // ── Step 2 validation + startPlanSession ──────────────────────────────────
 
-  const handleStep2Next = useCallback(async () => {
-    const newErrors = {};
-    if (!weeklyKm) newErrors.weeklyKm = "Enter your approximate weekly km.";
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setErrors({});
-
-    // If plan exists and haven't confirmed replacement, show confirm screen
-    if (hierarchicalPlan?.plan && !showConfirmReplace) {
-      setShowConfirmReplace(true);
-      return;
-    }
-
-    await doStartPlanSession();
-  }, [weeklyKm, hierarchicalPlan, showConfirmReplace, doStartPlanSession]);
-
   const doStartPlanSession = useCallback(async () => {
     setStep3Loading(true);
     setMessages([]);
@@ -398,6 +378,26 @@ export function PlanIntakeModal({ open, onOpenChange }) {
     weeklyKm, longestRun, background, injuries, raceInfo,
     hierarchicalPlan, onOpenChange,
   ]);
+
+  const handleStep2Next = useCallback(async () => {
+    const newErrors = {};
+    if (!weeklyKm) newErrors.weeklyKm = "Enter your approximate weekly km.";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+
+    // If plan exists and haven't confirmed replacement, show confirm screen
+    if (hierarchicalPlan?.plan && !showConfirmReplace) {
+      setShowConfirmReplace(true);
+      return;
+    }
+
+    await doStartPlanSession();
+  }, [weeklyKm, hierarchicalPlan, showConfirmReplace, doStartPlanSession]);
 
   // ── Step 3: send message ───────────────────────────────────────────────────
 

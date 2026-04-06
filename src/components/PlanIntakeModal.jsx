@@ -170,42 +170,58 @@ export function PlanIntakeModal({ open, onOpenChange }) {
   useEffect(() => {
     if (!open) return;
 
-    // Reset step and general state
+    // Reset all step fields on modal open
     setStep(1);
-    setShowConfirmReplace(false);
+    setRaceName("");
+    setRaceDate("");
+    setGoalDistance("");
+    setUltraKm("");
+    setGoalType("finish");
+    setRaceInfo(null);
     setErrors({});
+    setMessages([]);
+    setSessionId(null);
+    setStep3Loading(false);
+    setShowConfirmReplace(false);
     setCurrentMessageIndex(0);
 
-    // Pre-fill background
-    if (runnerProfile?.background && !background) {
+    // Pre-fill background from runner profile
+    if (runnerProfile?.background) {
       setBackground(runnerProfile.background);
       setBackgroundPrefilled(true);
+    } else {
+      setBackground("");
+      setBackgroundPrefilled(false);
     }
 
     // Pre-fill weekly km from Strava
-    if (!weeklyKm && activities?.activities) {
+    if (activities?.activities) {
       const computedKm = computeWeeklyKmFromActivities(activities.activities);
       if (computedKm !== null) {
         setWeeklyKm(computedKm.toString());
         setWeeklyKmPrefilled(true);
+      } else {
+        setWeeklyKm("");
+        setWeeklyKmPrefilled(false);
       }
+    } else {
+      setWeeklyKm("");
+      setWeeklyKmPrefilled(false);
     }
 
-    // Pre-fill schedule from workout entries
+    // Reset schedule then pre-fill from workout entries
+    const defaultSchedule = {
+      Mon: "Off", Tue: "Off", Wed: "Off", Thu: "Off", Fri: "Off", Sat: "Off", Sun: "Off",
+    };
     if (workoutEntries?.entries) {
-      const { hardDays: extractedHardDays, restDays: extractedRestDays } =
+      const { hardDays: extractedHardDays } =
         extractConstraintDaysFromWorkoutEntries(workoutEntries.entries);
 
-      setSchedule((prev) => {
-        const next = { ...prev };
-        // Mark extracted hard days
-        extractedHardDays.forEach((d) => {
-          if (next[d] !== undefined) next[d] = "Hard";
-        });
-        // Rest days remain "Off" (already default)
-        return next;
+      extractedHardDays.forEach((d) => {
+        if (defaultSchedule[d] !== undefined) defaultSchedule[d] = "Hard";
       });
     }
+    setSchedule(defaultSchedule);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Rotating message effect ────────────────────────────────────────────────
@@ -320,7 +336,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
     }
 
     await doStartPlanSession();
-  }, [weeklyKm, hierarchicalPlan, showConfirmReplace]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [weeklyKm, hierarchicalPlan, showConfirmReplace, doStartPlanSession]);
 
   const doStartPlanSession = useCallback(async () => {
     setStep3Loading(true);
@@ -332,6 +348,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
     const trainingDayCount = Object.values(schedule).filter((v) => v !== "Off").length;
 
     try {
+      if (!hierarchicalPlan?.startPlanSession) throw new Error("Plan session not available");
       const result = await hierarchicalPlan.startPlanSession({
         planIntake: {
           raceGoal: {
@@ -393,6 +410,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
     setStep3Loading(true);
 
     try {
+      if (!hierarchicalPlan?.sendPlanMessage) throw new Error("Plan session not available");
       const result = await hierarchicalPlan.sendPlanMessage(sessionId, text);
 
       if (result?.planGenerated) {

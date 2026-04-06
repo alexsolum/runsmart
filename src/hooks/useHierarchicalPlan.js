@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { invokeEdgeFunctionWithSessionRetry } from "../lib/edgeFunctionAuth";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
 const initialState = {
@@ -64,11 +65,6 @@ export function useHierarchicalPlan(userId) {
 
     try {
       // b. Get session
-      const { data: sessionData, error: sessionError } = await client.auth.getSession();
-      if (sessionError) throw sessionError;
-      const session = sessionData?.session;
-      if (!session) throw new Error("No active session. Please sign in first.");
-
       // c. Deactivate old active plans
       await client
         .from("hierarchical_plans")
@@ -77,9 +73,8 @@ export function useHierarchicalPlan(userId) {
         .eq("status", "active");
 
       // d. Call claude-coach Edge Function
-      const { data: invokeData, error: invokeError } = await client.functions.invoke("claude-coach", {
+      const { data: invokeData, error: invokeError } = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
         body: payload,
-        headers: { Authorization: "Bearer " + session.access_token },
       });
 
       if (invokeError) throw invokeError;
@@ -108,11 +103,6 @@ export function useHierarchicalPlan(userId) {
     if (!client) throw new Error("Supabase is not configured");
     dispatch({ type: "generating" });
     try {
-      const { data: sessionData, error: sessionError } = await client.auth.getSession();
-      if (sessionError) throw sessionError;
-      const session = sessionData?.session;
-      if (!session) throw new Error("No active session. Please sign in first.");
-
       // Deactivate old active plans
       await client
         .from("hierarchical_plans")
@@ -142,7 +132,7 @@ the plan — following the assessment validation approach (see athlete context).
 and specific. After receiving answers (or after 2 exchanges), generate the full plan immediately using
 the full-plan response format.`;
 
-      const { data: invokeData, error: invokeError } = await client.functions.invoke("claude-coach", {
+      const { data: invokeData, error: invokeError } = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
         body: {
           sessionId,
           newMessage: parts.join("\n"),
@@ -152,7 +142,6 @@ the full-plan response format.`;
             systemPromptOverride: systemPrompt,
           },
         },
-        headers: { Authorization: "Bearer " + session.access_token },
       });
 
       if (invokeError) throw invokeError;
@@ -189,17 +178,11 @@ the full-plan response format.`;
   const sendPlanMessage = useCallback(async (sessionId, message) => {
     if (!client) throw new Error("Supabase is not configured");
     try {
-      const { data: sessionData, error: sessionError } = await client.auth.getSession();
-      if (sessionError) throw sessionError;
-      const session = sessionData?.session;
-      if (!session) throw new Error("No active session. Please sign in first.");
-
-      const { data: invokeData, error: invokeError } = await client.functions.invoke("claude-coach", {
+      const { data: invokeData, error: invokeError } = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
         body: {
           sessionId,
           newMessage: message,
         },
-        headers: { Authorization: "Bearer " + session.access_token },
       });
 
       if (invokeError) throw invokeError;

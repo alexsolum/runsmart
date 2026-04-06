@@ -10,6 +10,7 @@ import { useWorkoutEntries } from "../hooks/useWorkoutEntries";
 import { useRunnerProfile } from "../hooks/useRunnerProfile";
 import { useCoachConversations } from "../hooks/useCoachConversations";
 import { useHierarchicalPlan } from "../hooks/useHierarchicalPlan";
+import { invokeEdgeFunctionWithSessionRetry } from "../lib/edgeFunctionAuth";
 import { useToast } from "./ToastContext";
 import { normalizeCheckin } from "../lib/coachPayload";
 
@@ -57,16 +58,8 @@ export function AppDataProvider({ children }) {
         throw new Error("Supabase is not configured.");
       }
 
-      const session = auth.session ?? (await client.auth.getSession()).data.session;
-      if (!session?.access_token) {
-        throw new Error("No active session. Please sign in first.");
-      }
-
-      const { data, error } = await client.functions.invoke("claude-coach", {
+      const { data, error } = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
         body: { mode: "insights_synthesis", ...payload },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
       });
 
       if (error) {

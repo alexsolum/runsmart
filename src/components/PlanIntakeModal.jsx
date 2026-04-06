@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { useAppData } from "../context/AppDataContext";
+import { invokeEdgeFunctionWithSessionRetry } from "../lib/edgeFunctionAuth";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import {
   Dialog,
@@ -256,17 +257,10 @@ export function PlanIntakeModal({ open, onOpenChange }) {
         return;
       }
 
-      const { data: sessionData } = await client.auth.getSession();
-      const session = sessionData?.session;
-      if (!session) {
-        setRaceInfoLoading(false);
-        return;
-      }
-
-      const { data } = await client.functions.invoke("claude-coach", {
+      const { data, error } = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
         body: { mode: "race_info", raceName: raceName.trim() },
-        headers: { Authorization: "Bearer " + session.access_token },
       });
+      if (error) throw error;
 
       setRaceInfo(data?.raceInfo || null);
     } catch (err) {

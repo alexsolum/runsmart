@@ -83,22 +83,25 @@ function getBearerToken(req: Request): string | null {
   return token;
 }
 
-// Decode a JWT payload without verifying the signature.
-// Safe to use here because Supabase's verify_jwt=true gateway already validated
-// the signature before this function runs. We only need the sub (user ID).
-function getUserIdFromJwt(token: string): string | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    // Base64url → Base64: replace URL-safe chars, then add required = padding
-    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
-    const payload = JSON.parse(atob(padded));
-    const sub = payload?.sub;
-    return typeof sub === "string" && sub ? sub : null;
-  } catch {
-    return null;
-  }
+function getApiKey(req: Request): string | null {
+  return req.headers.get("apikey") || req.headers.get("Apikey");
+}
+
+async function verifyAndGetUserId(token: string, apiKey: string | null): Promise<string | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  if (!supabaseUrl || !apiKey) return null;
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    method: "GET",
+    headers: {
+      apikey: apiKey,
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) return null;
+  const user = await response.json();
+  return user?.id ?? null;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -374,7 +377,7 @@ Deno.serve(async (req) => {
     const accessToken = getBearerToken(req);
     if (!accessToken) return jsonResponse({ code: 401, message: "Missing bearer token" }, 401);
 
-    const userId = getUserIdFromJwt(accessToken);
+    const userId = await verifyAndGetUserId(accessToken, getApiKey(req));
     if (!userId) return jsonResponse({ code: 401, message: "Invalid JWT" }, 401);
 
     // 2. Parse

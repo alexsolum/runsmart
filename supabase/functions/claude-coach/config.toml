@@ -1,0 +1,2 @@
+[functions.claude-coach]
+verify_jwt = false

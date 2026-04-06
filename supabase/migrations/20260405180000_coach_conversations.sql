@@ -3,6 +3,11 @@
 -- Messages are grouped by session_id UUID.
 -- Content is JSONB to preserve tool-use blocks from Agent Skills execution.
 
+-- Drop old schema (messages table first due to FK, then conversations)
+DROP TABLE IF EXISTS coach_messages;
+DROP TABLE IF EXISTS coach_conversations;
+
+-- Create new flat schema (one row per message turn)
 create table coach_conversations (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,

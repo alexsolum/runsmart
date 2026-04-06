@@ -16,32 +16,40 @@ export function CoachFAB({
   canPatchPlan = true,
 }) {
   const [open, setOpen] = useState(false);
-  const [fabConversation, setFabConversation] = useState(null);
-  const [fabMessages, setFabMessages] = useState([]);
 
-  // Load conversations on mount so FAB chat appears in CoachPage list
+  const {
+    messages,
+    activeSessionId,
+    startNewSession,
+    reload,
+    loadSessions,
+  } = coachConversations;
+
+  // Load sessions on mount so FAB chat appears in CoachPage list
   useEffect(() => {
-    coachConversations.loadConversations();
+    loadSessions();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleConversationCreated = useCallback((conv) => {
-    setFabConversation(conv);
-  }, []);
-
-  // Sync messages when fabConversation changes
+  // Start a new session when FAB opens with no active session
   useEffect(() => {
-    if (fabConversation) {
-      coachConversations.loadMessages(fabConversation.id).then(() => {
-        // Messages will be synced via the effect below
-      });
+    if (open && !activeSessionId) {
+      startNewSession();
     }
-  }, [fabConversation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, activeSessionId, startNewSession]);
 
-  useEffect(() => {
-    if (fabConversation) {
-      setFabMessages(coachConversations.messages);
-    }
-  }, [coachConversations.messages, fabConversation]);
+  const buildAthleteContext = useCallback(() => {
+    return {
+      plan: hierarchicalPlan.plan?.plan_data ?? null,
+      recentActivities: (activities.activities ?? []).slice(0, 30).map((a) => ({
+        name: a.name || a.type || "Run",
+        distance: (Number(a.distance) || 0) / 1000,
+        duration: a.moving_time || 0,
+        effort: a.perceived_effort ?? null,
+      })),
+      trainingBlocks: (trainingBlocks.blocks ?? []),
+      checkins: (checkins.checkins ?? []).slice(0, 3),
+    };
+  }, [hierarchicalPlan.plan, activities.activities, trainingBlocks.blocks, checkins.checkins]);
 
   const handleToggle = useCallback(() => {
     setOpen((prev) => !prev);
@@ -85,10 +93,7 @@ export function CoachFAB({
               variant="ghost"
               size="sm"
               className="shrink-0 h-auto py-1 px-2 text-xs text-slate-400 hover:text-slate-600"
-              onClick={() => {
-                setFabConversation(null);
-                setFabMessages([]);
-              }}
+              onClick={startNewSession}
             >
               New
             </Button>
@@ -96,21 +101,19 @@ export function CoachFAB({
 
           {/* Chat panel — reusing the same component as CoachPage */}
           <ChatPanel
-            coachConversations={coachConversations}
-            activeConversation={fabConversation}
-            messages={fabMessages}
-            hierarchicalPlan={hierarchicalPlan}
-            activities={activities}
-            dailyLogs={dailyLogs}
-            checkins={checkins}
-            runnerProfile={runnerProfile}
-            trainingBlocks={trainingBlocks}
-            activePlan={activePlan}
-            lang={lang}
-            onConversationCreated={handleConversationCreated}
-            className="flex-1 min-h-0"
+            sessionId={activeSessionId}
+            messages={messages}
+            buildAthleteContext={buildAthleteContext}
+            onMessageSent={reload}
             canApplyPatch={canPatchPlan}
             patchUnavailableReason="Generate a plan first, then you can apply coach-proposed schedule changes from here."
+            onApplyPatch={async (patch) => {
+              await hierarchicalPlan.applyPatch(patch);
+              await hierarchicalPlan.loadPlan();
+            }}
+            onPlanRefresh={async () => {
+              await hierarchicalPlan.loadPlan();
+            }}
           />
         </div>
       )}

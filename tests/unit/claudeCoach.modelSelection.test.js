@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAnthropicModelForMode } from "../../supabase/functions/claude-coach/modelSelection.ts";
+import {
+  getAnthropicModelCandidatesForMode,
+  getAnthropicModelForMode,
+} from "../../supabase/functions/claude-coach/modelSelection.ts";
 
 describe("getAnthropicModelForMode", () => {
   beforeEach(() => {
@@ -22,5 +25,18 @@ describe("getAnthropicModelForMode", () => {
   it("lets insights_synthesis inherit the configured coach model", () => {
     vi.stubEnv("ANTHROPIC_COACH_CHAT_MODEL", "custom-chat-model");
     expect(getAnthropicModelForMode("insights_synthesis")).toBe("custom-chat-model");
+  });
+
+  it("uses a stronger fallback after the cheap race_info model", () => {
+    expect(getAnthropicModelCandidatesForMode("race_info")).toEqual([
+      "claude-3-5-haiku-latest",
+      "claude-sonnet-4-20250514",
+    ]);
+  });
+
+  it("does not add a fallback list for normal chat mode", () => {
+    expect(getAnthropicModelCandidatesForMode("chat")).toEqual([
+      "claude-sonnet-4-20250514",
+    ]);
   });
 });

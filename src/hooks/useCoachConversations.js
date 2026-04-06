@@ -1,87 +1,81 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
 /**
  * Manages coach chat sessions and messages.
  *
- * Sessions are grouped by session_id UUID in the coach_conversations table.
- * Each row is one message turn. Session title is derived from the first
- * user message on the frontend.
+ * Sessions live in coach_conversations and message turns live in coach_messages.
+ * The hook normalizes that split schema back into the UI shape expected by the
+ * conversation sidebar and chat panel.
  */
 export function useCoachConversations(userId) {
+  const client = useMemo(() => getSupabaseClient(), []);
   const [sessions, setSessions] = useState([]);
   const [messages, setMessages] = useState([]);
   const [activeSessionId, setActiveSessionIdState] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load session list: distinct session_ids with their first user message + created_at
   const loadSessions = useCallback(async () => {
-    if (!userId) return;
-    const client = getSupabaseClient();
-    if (!client) return;
+    if (!userId || !client) return;
+
     setLoading(true);
     setError(null);
+
     try {
-      // Get all messages grouped by session — we derive sessions client-side
       const { data, error: err } = await client
         .from("coach_conversations")
-        .select("session_id, role, content, created_at")
+        .select("id, title, created_at, updated_at")
         .eq("user_id", userId)
-        .order("created_at", { ascending: true });
+        .order("updated_at", { ascending: false });
+
       if (err) throw err;
 
-      // Derive session list from messages
-      const sessionMap = new Map();
-      for (const row of (data ?? [])) {
-        if (!sessionMap.has(row.session_id)) {
-          // Extract title from first user message
-          let title = "New conversation";
-          if (row.role === "user") {
-            const text = extractTextFromContent(row.content);
-            if (text) title = text.slice(0, 60) + (text.length > 60 ? "..." : "");
-          }
-          sessionMap.set(row.session_id, {
-            session_id: row.session_id,
-            firstMessage: title,
-            createdAt: row.created_at,
-          });
-        }
-      }
+      const sessionList = (data ?? []).map((row) => ({
+        session_id: row.id,
+        firstMessage: row.title || "New conversation",
+        createdAt: row.created_at,
+        updatedAt: row.updated_at ?? row.created_at,
+      }));
 
-      // Sort by createdAt descending
-      const sessionList = Array.from(sessionMap.values())
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setSessions(sessionList);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [client, userId]);
 
-  // Load messages for a specific session
   const loadMessages = useCallback(async (sessionId) => {
     if (!sessionId) {
       setMessages([]);
       return;
     }
-    const client = getSupabaseClient();
+
     if (!client) return;
+
     try {
+      setError(null);
+
       const { data, error: err } = await client
-        .from("coach_conversations")
-        .select("id, session_id, role, content, created_at")
-        .eq("session_id", sessionId)
+        .from("coach_messages")
+        .select("id, role, content, created_at")
+        .eq("conversation_id", sessionId)
         .order("created_at", { ascending: true });
+
       if (err) throw err;
-      setMessages(data ?? []);
+
+      setMessages(
+        (data ?? []).map((row) => ({
+          ...row,
+          session_id: sessionId,
+        })),
+      );
     } catch (err) {
       setError(err.message);
     }
-  }, []);
+  }, [client]);
 
-  // Set active session and load its messages
   const setActiveSessionId = useCallback(async (sessionId) => {
     setActiveSessionIdState(sessionId);
     if (sessionId) {
@@ -91,7 +85,6 @@ export function useCoachConversations(userId) {
     }
   }, [loadMessages]);
 
-  // Start a new session — just generates a UUID, no DB write
   const startNewSession = useCallback(() => {
     const newId = crypto.randomUUID();
     setActiveSessionIdState(newId);
@@ -99,14 +92,12 @@ export function useCoachConversations(userId) {
     return newId;
   }, []);
 
-  // Reload messages for the active session (called after edge fn responds)
   const reload = useCallback(async () => {
     if (activeSessionId) {
       await loadMessages(activeSessionId);
     }
   }, [activeSessionId, loadMessages]);
 
-  // Auto-load sessions on mount
   useEffect(() => {
     if (userId) loadSessions();
   }, [userId, loadSessions]);
@@ -122,15 +113,4 @@ export function useCoachConversations(userId) {
     reload,
     loadSessions,
   };
-}
-
-function extractTextFromContent(content) {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    for (const block of content) {
-      if (block.type === "text" && block.text) return block.text;
-    }
-  }
-  if (content?.text) return content.text;
-  return null;
 }

@@ -26,3 +26,14 @@ export function getAnthropicModelForMode(mode: string): string {
 
   return readEnv("ANTHROPIC_COACH_CHAT_MODEL") ?? DEFAULT_COACH_CHAT_MODEL;
 }
+
+export function getAnthropicModelCandidatesForMode(mode: string): string[] {
+  const primary = getAnthropicModelForMode(mode);
+
+  if (mode !== "race_info") {
+    return [primary];
+  }
+
+  const fallback = readEnv("ANTHROPIC_COACH_CHAT_MODEL") ?? DEFAULT_COACH_CHAT_MODEL;
+  return primary === fallback ? [primary] : [primary, fallback];
+}

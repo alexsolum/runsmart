@@ -7,8 +7,10 @@
 // both user and assistant messages.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getAnthropicModelForMode } from "./modelSelection.ts";
+import { getAnthropicModelCandidatesForMode, getAnthropicModelForMode } from "./modelSelection.ts";
+import { loadConversationHistory, persistConversationTurn } from "./conversationStore.ts";
 import { getCoachRequestMode } from "./requestMode.ts";
+import { parseRaceInfoResponse } from "./raceInfo.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -412,7 +414,7 @@ Deno.serve(async (req) => {
     // ── Race info mode ──
     if (requestMode === "race_info") {
       const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-      const model = getAnthropicModelForMode(requestMode);
+      const models = getAnthropicModelCandidatesForMode(requestMode);
       if (!anthropicKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
 
       const raceName = payload.raceName;
@@ -430,36 +432,37 @@ Deno.serve(async (req) => {
 If the race is unknown or you are not confident, return: {"unknown": true}`;
 
       try {
-        const aiResponse = await fetchWithRetry(ANTHROPIC_URL, {
-          method: "POST",
-          headers: {
-            "x-api-key": anthropicKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: 300,
-            system: RACE_INFO_SYSTEM,
-            messages: [{ role: "user", content: `Race: ${raceName}` }],
-          }),
-        });
+        for (const model of models) {
+          const aiResponse = await fetchWithRetry(ANTHROPIC_URL, {
+            method: "POST",
+            headers: {
+              "x-api-key": anthropicKey,
+              "anthropic-version": "2023-06-01",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              model,
+              max_tokens: 300,
+              system: RACE_INFO_SYSTEM,
+              messages: [{ role: "user", content: `Race: ${raceName}` }],
+            }),
+          });
 
-        if (!aiResponse.ok) {
-          return jsonResponse({ raceInfo: null });
-        }
+          if (!aiResponse.ok) {
+            console.warn("race_info model request failed", { model, raceName, status: aiResponse.status });
+            continue;
+          }
 
-        const aiData = await aiResponse.json();
-        const text = aiData.content?.[0]?.text ?? "";
-        try {
-          const parsed = JSON.parse(text);
-          if (parsed.unknown) return jsonResponse({ raceInfo: null });
-          // Shape guard: must have at minimum displayName and distanceKm
-          if (!parsed.displayName || parsed.distanceKm == null) return jsonResponse({ raceInfo: null });
+          const aiData = await aiResponse.json();
+          const text = aiData.content?.[0]?.text ?? "";
+          const parsed = parseRaceInfoResponse(text);
+          if (!parsed) {
+            console.warn("race_info parse failed", { model, raceName, text });
+            continue;
+          }
           return jsonResponse({ raceInfo: parsed });
-        } catch {
-          return jsonResponse({ raceInfo: null });
         }
+        return jsonResponse({ raceInfo: null });
       } catch {
         return jsonResponse({ raceInfo: null });
       }
@@ -479,14 +482,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     }
 
     // 3. Load conversation history from DB
-    const { data: history, error: histErr } = await supabase
-      .from("coach_conversations")
-      .select("role, content")
-      .eq("user_id", userId)
-      .eq("session_id", sessionId)
-      .order("created_at", { ascending: true });
-
-    if (histErr) return jsonResponse({ error: `History load failed: ${histErr.message}` }, 500);
+    const history = await loadConversationHistory(supabase, userId, sessionId);
 
     // 4. Build messages array
     const messages: Array<{ role: string; content: any }> = [];
@@ -517,21 +513,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     const routeResult = await routeResponse(envelope, userId, supabase);
 
     // 9. Persist messages
-    // Save user message
-    await supabase.from("coach_conversations").insert({
-      user_id: userId,
-      session_id: sessionId,
-      role: "user",
-      content: [userContent],
-    });
-
-    // Save assistant message (full API content blocks for faithful replay)
-    await supabase.from("coach_conversations").insert({
-      user_id: userId,
-      session_id: sessionId,
-      role: "assistant",
-      content: apiResult.content,
-    });
+    await persistConversationTurn(supabase, sessionId, userContent, apiResult.content);
 
     // 10. Return response
     return jsonResponse({

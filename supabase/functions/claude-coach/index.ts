@@ -448,6 +448,8 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
         try {
           const parsed = JSON.parse(text);
           if (parsed.unknown) return jsonResponse({ raceInfo: null });
+          // Shape guard: must have at minimum displayName and distanceKm
+          if (!parsed.displayName || parsed.distanceKm == null) return jsonResponse({ raceInfo: null });
           return jsonResponse({ raceInfo: parsed });
         } catch {
           return jsonResponse({ raceInfo: null });

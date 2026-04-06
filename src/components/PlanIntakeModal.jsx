@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { useAppData } from "../context/AppDataContext";
+import { getSupabaseClient } from "../lib/supabaseClient";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -21,39 +20,49 @@ import {
   SelectValue,
 } from "./ui/select";
 
-const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const ROTATING_MESSAGES = [
   "Analyzing your fitness...",
   "Structuring your phases...",
   "Building your weekly plan...",
+  "Calibrating weekly volumes...",
+  "Finalizing your schedule...",
 ];
 
-// Helper function to map distance to event type
+const DAY_TYPES = ["Off", "Easy", "Hard", "Long"];
+
+const DAY_TYPE_CLASSES = {
+  Off: "bg-background border-input text-foreground hover:bg-accent",
+  Easy: "bg-green-100 text-green-800 border-green-300 hover:bg-green-200",
+  Hard: "bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200",
+  Long: "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+};
+
+// ── Helper functions ─────────────────────────────────────────────────────────
+
 function mapDistanceToEventType(distance) {
   switch (distance) {
-    case "5K":
-    case "10K":
-      return "road";
-    case "Half Marathon":
-      return "half_marathon";
-    case "Marathon":
-      return "marathon";
-    default:
-      return "road";
+    case "5K": return "5k";
+    case "10K": return "10k";
+    case "Half Marathon": return "half_marathon";
+    case "Marathon": return "marathon";
+    case "Ultra": return "ultra";
+    default: return distance ? distance.toLowerCase().replace(/\s+/g, "_") : "other";
   }
 }
 
-// Helper to get day of week from date string
 function getDayOfWeekFromDate(dateStr) {
   const date = new Date(`${dateStr}T00:00:00Z`);
   const dayIndex = date.getUTCDay();
-  // Convert Sunday (0) to index 6, others shift by 1
-  const dayOfWeekIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-  return DAYS_OF_WEEK[dayOfWeekIndex];
+  // UTC Sunday=0 → Mon=0..Sun=6 index
+  const mondayFirstIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+  const fullDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  return fullDays[mondayFirstIndex];
 }
 
-// Helper to compute weekly km from activities
 function computeWeeklyKmFromActivities(activities) {
   if (!activities || activities.length === 0) return null;
 
@@ -69,14 +78,12 @@ function computeWeeklyKmFromActivities(activities) {
   if (recentRuns.length === 0) return null;
 
   const totalKm = recentRuns.reduce((sum, activity) => {
-    // Distance is in metres
     return sum + (activity.distance || 0) / 1000;
   }, 0);
 
   return Math.round(totalKm / 4);
 }
 
-// Helper to extract constraint days from workout entries
 function extractConstraintDaysFromWorkoutEntries(entries) {
   const hardDays = new Set();
   const restDays = new Set();
@@ -87,11 +94,13 @@ function extractConstraintDaysFromWorkoutEntries(entries) {
 
   entries.forEach((entry) => {
     const dayOfWeek = getDayOfWeekFromDate(entry.workout_date);
+    // Convert full day name to 3-letter abbreviation
+    const dayAbbrev = dayOfWeek.slice(0, 3);
 
     if (entry.workout_type === "Rest") {
-      restDays.add(dayOfWeek);
+      restDays.add(dayAbbrev);
     } else if (!["Easy", "Recovery"].includes(entry.workout_type)) {
-      hardDays.add(dayOfWeek);
+      hardDays.add(dayAbbrev);
     }
   });
 
@@ -101,42 +110,79 @@ function extractConstraintDaysFromWorkoutEntries(entries) {
   };
 }
 
-export function PlanIntakeModal({ open, onOpenChange }) {
-  const { hierarchicalPlan, runnerProfile, activities, workoutEntries } = useAppData();
+function buildScheduleSummary(schedule) {
+  const trainingDays = DAYS_OF_WEEK.filter((d) => schedule[d] !== "Off");
+  const hardDays = DAYS_OF_WEEK.filter((d) => schedule[d] === "Hard");
+  const longDay = DAYS_OF_WEEK.find((d) => schedule[d] === "Long");
+  const restDays = DAYS_OF_WEEK.filter((d) => schedule[d] === "Off");
 
-  // Form state
+  const parts = [`${trainingDays.length} training days`];
+  if (hardDays.length > 0) parts.push(`Hard: ${hardDays.join(", ")}`);
+  if (longDay) parts.push(`Long run: ${longDay}`);
+  if (restDays.length > 0) parts.push(`Rest: ${restDays.join(", ")}`);
+
+  return parts.join(" · ");
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function PlanIntakeModal({ open, onOpenChange }) {
+  const { hierarchicalPlan, runnerProfile, activities, workoutEntries, auth } = useAppData();
+
+  // Step
+  const [step, setStep] = useState(1);
+
+  // Step 1 state
   const [raceName, setRaceName] = useState("");
   const [raceDate, setRaceDate] = useState("");
   const [goalDistance, setGoalDistance] = useState("");
+  const [ultraKm, setUltraKm] = useState("");
+  const [goalType, setGoalType] = useState("finish");
+  const [raceInfo, setRaceInfo] = useState(null);
+  const [raceInfoLoading, setRaceInfoLoading] = useState(false);
+
+  // Step 2 state
   const [weeklyKm, setWeeklyKm] = useState("");
-  const [daysPerWeek, setDaysPerWeek] = useState("");
-  const [hardDays, setHardDays] = useState([]);
-  const [restDay, setRestDay] = useState("");
-  const [background, setBackground] = useState("");
-
-  // Modal state
-  const [showConfirmReplace, setShowConfirmReplace] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [weeklyKmPrefilled, setWeeklyKmPrefilled] = useState(false);
+  const [longestRun, setLongestRun] = useState("");
+  const [schedule, setSchedule] = useState({
+    Mon: "Off", Tue: "Off", Wed: "Off", Thu: "Off", Fri: "Off", Sat: "Off", Sun: "Off",
+  });
+  const [background, setBackground] = useState("");
   const [backgroundPrefilled, setBackgroundPrefilled] = useState(false);
+  const [injuries, setInjuries] = useState("");
 
-  // Pre-fill form on mount or when modal opens
+  // Step 3 state
+  const [messages, setMessages] = useState([]);
+  const [userInput, setUserInput] = useState("");
+  const [sessionId, setSessionId] = useState(null);
+  const [step3Loading, setStep3Loading] = useState(false);
+
+  // General state
+  const [errors, setErrors] = useState({});
+  const [showConfirmReplace, setShowConfirmReplace] = useState(false);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+
+  const messagesEndRef = useRef(null);
+
+  // ── Pre-fill on open ───────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!open) return;
 
-    // Reset state when modal opens
+    // Reset step and general state
+    setStep(1);
     setShowConfirmReplace(false);
     setErrors({});
     setCurrentMessageIndex(0);
 
-    // Pre-fill background from runner profile
+    // Pre-fill background
     if (runnerProfile?.background && !background) {
       setBackground(runnerProfile.background);
       setBackgroundPrefilled(true);
     }
 
-    // Pre-fill weeklyKm from Strava activities
+    // Pre-fill weekly km from Strava
     if (!weeklyKm && activities?.activities) {
       const computedKm = computeWeeklyKmFromActivities(activities.activities);
       if (computedKm !== null) {
@@ -145,20 +191,25 @@ export function PlanIntakeModal({ open, onOpenChange }) {
       }
     }
 
-    // Pre-fill constraint days from workout entries
-    if (workoutEntries?.entries && hardDays.length === 0 && restDay === "") {
+    // Pre-fill schedule from workout entries
+    if (workoutEntries?.entries) {
       const { hardDays: extractedHardDays, restDays: extractedRestDays } =
         extractConstraintDaysFromWorkoutEntries(workoutEntries.entries);
-      if (extractedHardDays.length > 0) {
-        setHardDays(extractedHardDays);
-      }
-      if (extractedRestDays.length > 0) {
-        setRestDay(extractedRestDays[0]);
-      }
-    }
-  }, [open]);
 
-  // Rotating message effect during generation
+      setSchedule((prev) => {
+        const next = { ...prev };
+        // Mark extracted hard days
+        extractedHardDays.forEach((d) => {
+          if (next[d] !== undefined) next[d] = "Hard";
+        });
+        // Rest days remain "Off" (already default)
+        return next;
+      });
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Rotating message effect ────────────────────────────────────────────────
+
   useEffect(() => {
     if (!hierarchicalPlan?.generating) return;
 
@@ -169,171 +220,225 @@ export function PlanIntakeModal({ open, onOpenChange }) {
     return () => clearInterval(interval);
   }, [hierarchicalPlan?.generating]);
 
-  // Validation helper
-  const validateForm = useCallback(() => {
-    const newErrors = {};
+  // ── Auto-scroll messages ───────────────────────────────────────────────────
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ── Race info lookup ───────────────────────────────────────────────────────
+
+  const handleRaceLookup = useCallback(async () => {
+    if (!raceName.trim()) return;
+
+    setRaceInfoLoading(true);
+    try {
+      // Get supabase client — prefer auth.client from context, fallback to singleton
+      const client = auth?.client || getSupabaseClient();
+      if (!client) {
+        setRaceInfoLoading(false);
+        return;
+      }
+
+      const { data: sessionData } = await client.auth.getSession();
+      const session = sessionData?.session;
+      if (!session) {
+        setRaceInfoLoading(false);
+        return;
+      }
+
+      const { data } = await client.functions.invoke("claude-coach", {
+        body: { mode: "race_info", raceName: raceName.trim() },
+        headers: { Authorization: "Bearer " + session.access_token },
+      });
+
+      setRaceInfo(data?.raceInfo || null);
+    } catch (err) {
+      console.error("Race info lookup failed:", err);
+      setRaceInfo(null);
+    } finally {
+      setRaceInfoLoading(false);
+    }
+  }, [raceName, auth]);
+
+  // ── Schedule day cycling ───────────────────────────────────────────────────
+
+  const handleDayClick = useCallback((day) => {
+    setSchedule((prev) => {
+      const current = prev[day];
+      const currentIndex = DAY_TYPES.indexOf(current);
+      const nextType = DAY_TYPES[(currentIndex + 1) % DAY_TYPES.length];
+
+      const next = { ...prev };
+
+      // Only one "Long" allowed — clear previous Long day
+      if (nextType === "Long") {
+        Object.keys(next).forEach((d) => {
+          if (next[d] === "Long") next[d] = "Off";
+        });
+      }
+
+      next[day] = nextType;
+      return next;
+    });
+  }, []);
+
+  // ── Step 1 validation + navigation ────────────────────────────────────────
+
+  const handleStep1Next = useCallback(() => {
+    const newErrors = {};
     if (!raceDate) newErrors.raceDate = "Race date is required.";
     if (!goalDistance) newErrors.goalDistance = "Please select a goal distance.";
-    if (!weeklyKm) newErrors.weeklyKm = "Enter your approximate weekly km.";
-    if (!daysPerWeek) newErrors.daysPerWeek = "Select how many days you can train per week.";
-
-    return newErrors;
-  }, [raceDate, goalDistance, weeklyKm, daysPerWeek]);
-
-  // Validation helper
-  const hasErrors = Object.keys(errors).length > 0;
-
-  // Submit handler
-  const handleSubmit = useCallback(async () => {
-    const newErrors = validateForm();
+    if (goalDistance === "Ultra" && !ultraKm) newErrors.ultraKm = "Enter the ultra distance in km.";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // If plan exists and we haven't confirmed replacement, show confirmation
+    setErrors({});
+    setStep(2);
+  }, [raceDate, goalDistance, ultraKm]);
+
+  // ── Step 2 validation + startPlanSession ──────────────────────────────────
+
+  const handleStep2Next = useCallback(async () => {
+    const newErrors = {};
+    if (!weeklyKm) newErrors.weeklyKm = "Enter your approximate weekly km.";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+
+    // If plan exists and haven't confirmed replacement, show confirm screen
     if (hierarchicalPlan?.plan && !showConfirmReplace) {
       setShowConfirmReplace(true);
       return;
     }
 
-    // Construct the AthletePayload
-    const payload = {
-      raceGoal: {
-        eventName: raceName || goalDistance,
-        eventDate: raceDate,
-        eventType: mapDistanceToEventType(goalDistance),
-      },
-      fitness: {
-        weeklyKm: Number(weeklyKm),
-        longestRun: 0,
-        lthr: 0,
-        yearsRunning: 0,
-      },
-      constraints: {
-        longRunDay: "Sunday",
-        hardDays: hardDays,
-        restDays: restDay ? [restDay] : [],
-        maxSessions: Number(daysPerWeek),
-      },
-      background: background,
-    };
+    await doStartPlanSession();
+  }, [weeklyKm, hierarchicalPlan, showConfirmReplace]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const doStartPlanSession = useCallback(async () => {
+    setStep3Loading(true);
+    setMessages([]);
+
+    const hardDays = Object.entries(schedule).filter(([, v]) => v === "Hard").map(([k]) => k);
+    const restDays = Object.entries(schedule).filter(([, v]) => v === "Off").map(([k]) => k);
+    const longRunDay = Object.entries(schedule).find(([, v]) => v === "Long")?.[0] ?? null;
+    const trainingDayCount = Object.values(schedule).filter((v) => v !== "Off").length;
 
     try {
-      await hierarchicalPlan.generatePlan(payload);
-      onOpenChange(false);
-    } catch (err) {
-      // Error is already captured in hierarchicalPlan.error
-      console.error("Plan generation failed:", err);
-    }
-  }, [validateForm, hierarchicalPlan, showConfirmReplace, raceName, goalDistance, raceDate, weeklyKm, daysPerWeek, hardDays, restDay, background, onOpenChange]);
+      const result = await hierarchicalPlan.startPlanSession({
+        planIntake: {
+          raceGoal: {
+            eventName: raceName || goalDistance,
+            eventDate: raceDate,
+            eventType: mapDistanceToEventType(goalDistance),
+            ultraDistanceKm: goalDistance === "Ultra" ? Number(ultraKm) : null,
+            goalType,
+          },
+          fitness: {
+            weeklyKm: Number(weeklyKm),
+            longestRecentRun: longestRun ? Number(longestRun) : null,
+          },
+          constraints: {
+            hardDays,
+            restDays,
+            longRunDay,
+            maxSessions: trainingDayCount,
+          },
+          background,
+          injuries: injuries || null,
+          raceInfo,
+        },
+        activePlan: null,
+      });
 
-  // Confirmation handler
+      if (result?.planGenerated) {
+        // Plan was generated immediately — modal will show generating state then close
+        onOpenChange(false);
+        return;
+      }
+
+      // Move to step 3 with the first coach question
+      setSessionId(result?.sessionId || null);
+      if (result?.question) {
+        setMessages([{ role: "coach", text: result.question }]);
+      }
+      setStep(3);
+    } catch (err) {
+      console.error("startPlanSession failed:", err);
+      setErrors({ submit: "Failed to start plan session. Please try again." });
+    } finally {
+      setStep3Loading(false);
+    }
+  }, [
+    schedule, raceName, goalDistance, raceDate, ultraKm, goalType,
+    weeklyKm, longestRun, background, injuries, raceInfo,
+    hierarchicalPlan, onOpenChange,
+  ]);
+
+  // ── Step 3: send message ───────────────────────────────────────────────────
+
+  const handleSendMessage = useCallback(async (messageText) => {
+    const text = (messageText ?? userInput).trim();
+    if (!text || !sessionId) return;
+
+    setMessages((prev) => [...prev, { role: "user", text }]);
+    setUserInput("");
+    setStep3Loading(true);
+
+    try {
+      const result = await hierarchicalPlan.sendPlanMessage(sessionId, text);
+
+      if (result?.planGenerated) {
+        onOpenChange(false);
+        return;
+      }
+
+      if (result?.question) {
+        setMessages((prev) => [...prev, { role: "coach", text: result.question }]);
+      }
+    } catch (err) {
+      console.error("sendPlanMessage failed:", err);
+      setMessages((prev) => [
+        ...prev,
+        { role: "coach", text: "Something went wrong. Please try again." },
+      ]);
+    } finally {
+      setStep3Loading(false);
+    }
+  }, [userInput, sessionId, hierarchicalPlan, onOpenChange]);
+
+  const handleSkipQA = useCallback(() => {
+    handleSendMessage("No further context — please generate the plan now.");
+  }, [handleSendMessage]);
+
+  const handleStep3Back = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setStep(2);
+  }, []);
+
+  // ── Confirmation handler ───────────────────────────────────────────────────
+
   const handleConfirmReplace = useCallback(async () => {
-    const payload = {
-      raceGoal: {
-        eventName: raceName || goalDistance,
-        eventDate: raceDate,
-        eventType: mapDistanceToEventType(goalDistance),
-      },
-      fitness: {
-        weeklyKm: Number(weeklyKm),
-        longestRun: 0,
-        lthr: 0,
-        yearsRunning: 0,
-      },
-      constraints: {
-        longRunDay: "Sunday",
-        hardDays: hardDays,
-        restDays: restDay ? [restDay] : [],
-        maxSessions: Number(daysPerWeek),
-      },
-      background: background,
-    };
-
-    try {
-      await hierarchicalPlan.generatePlan(payload);
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Plan generation failed:", err);
-    }
-  }, [raceName, goalDistance, raceDate, weeklyKm, daysPerWeek, hardDays, restDay, background, hierarchicalPlan, onOpenChange]);
-
-  // Field change handlers that clear errors
-  const handleRaceNameChange = useCallback((e) => {
-    setRaceName(e.target.value);
-    if (errors.raceName) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.raceName;
-        return newErrors;
-      });
-    }
-  }, [errors]);
-
-  const handleRaceDateChange = useCallback((e) => {
-    setRaceDate(e.target.value);
-    if (errors.raceDate) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.raceDate;
-        return newErrors;
-      });
-    }
-  }, [errors]);
-
-  const handleGoalDistanceChange = useCallback((value) => {
-    setGoalDistance(value);
-    if (errors.goalDistance) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.goalDistance;
-        return newErrors;
-      });
-    }
-  }, [errors]);
-
-  const handleWeeklyKmChange = useCallback((e) => {
-    setWeeklyKm(e.target.value);
-    if (errors.weeklyKm) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.weeklyKm;
-        return newErrors;
-      });
-    }
-  }, [errors]);
-
-  const handleDaysPerWeekChange = useCallback((value) => {
-    setDaysPerWeek(value);
-    if (errors.daysPerWeek) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.daysPerWeek;
-        return newErrors;
-      });
-    }
-  }, [errors]);
-
-  const handleBackgroundChange = useCallback((e) => {
-    setBackground(e.target.value);
-    if (errors.background) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors.background;
-        return newErrors;
-      });
-    }
-  }, [errors]);
+    setShowConfirmReplace(false);
+    await doStartPlanSession();
+  }, [doStartPlanSession]);
 
   const isGenerating = hierarchicalPlan?.generating || false;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-lg"
+        className="sm:max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
         onInteractOutside={(e) => {
           if (isGenerating) e.preventDefault();
         }}
@@ -341,6 +446,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
           if (isGenerating) e.preventDefault();
         }}
       >
+        {/* ── Generating spinner ── */}
         {isGenerating ? (
           <>
             <DialogHeader>
@@ -350,10 +456,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
               <div className="flex h-20 w-20 items-center justify-center">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
               </div>
-              <div
-                className="mt-6 text-center text-sm text-muted-foreground"
-                aria-live="polite"
-              >
+              <div className="mt-6 text-center text-sm text-muted-foreground" aria-live="polite">
                 {ROTATING_MESSAGES[currentMessageIndex]}
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
@@ -362,6 +465,7 @@ export function PlanIntakeModal({ open, onOpenChange }) {
             </div>
           </>
         ) : showConfirmReplace ? (
+          /* ── Confirm replace ── */
           <>
             <DialogHeader>
               <DialogTitle>Replace Your Current Plan?</DialogTitle>
@@ -388,219 +492,382 @@ export function PlanIntakeModal({ open, onOpenChange }) {
               </div>
             </div>
           </>
-        ) : (
+        ) : step === 1 ? (
+          /* ── Step 1: Your Race Goal ── */
           <>
             <DialogHeader>
-              <DialogTitle>Build Your Training Plan</DialogTitle>
-              <DialogDescription>
-                Tell us about your goal and schedule. Claude will design a personalized plan.
-              </DialogDescription>
+              <DialogTitle>Step 1 of 3 — Your Race Goal</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-6 py-6">
-              {/* Field Group 1: Race Goal */}
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="race-name" className="text-sm font-semibold">
-                    Target Race
-                  </Label>
+            <div className="flex-1 overflow-y-auto space-y-5 py-4 pr-1">
+              {/* Race name + lookup */}
+              <div>
+                <Label htmlFor="race-name" className="text-sm font-semibold">
+                  Race Name
+                </Label>
+                <div className="flex gap-2 mt-1">
                   <Input
                     id="race-name"
                     placeholder="e.g. Boston Marathon"
                     value={raceName}
-                    onChange={handleRaceNameChange}
-                    disabled={isGenerating}
-                    className="mt-1"
+                    onChange={(e) => setRaceName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRaceLookup();
+                    }}
+                    className="flex-1"
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="race-date" className="text-sm font-semibold">
-                    Race Date
-                  </Label>
-                  <Input
-                    id="race-date"
-                    type="date"
-                    value={raceDate}
-                    onChange={handleRaceDateChange}
-                    disabled={isGenerating}
-                    className="mt-1"
-                  />
-                  {errors.raceDate && (
-                    <p className="mt-1 text-xs text-destructive">{errors.raceDate}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="goal-distance" className="text-sm font-semibold">
-                    Goal Distance
-                  </Label>
-                  <Select value={goalDistance} onValueChange={handleGoalDistanceChange} disabled={isGenerating}>
-                    <SelectTrigger id="goal-distance" className="mt-1">
-                      <SelectValue placeholder="Select a distance" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5K">5K</SelectItem>
-                      <SelectItem value="10K">10K</SelectItem>
-                      <SelectItem value="Half Marathon">Half Marathon</SelectItem>
-                      <SelectItem value="Marathon">Marathon</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.goalDistance && (
-                    <p className="mt-1 text-xs text-destructive">{errors.goalDistance}</p>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRaceLookup}
+                    disabled={!raceName.trim() || raceInfoLoading}
+                  >
+                    {raceInfoLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Look up →"
+                    )}
+                  </Button>
                 </div>
               </div>
 
-              {/* Field Group 2: Fitness Baseline */}
-              <div className="space-y-4">
+              {/* Race info card */}
+              {raceInfo && (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm relative">
+                  <button
+                    onClick={() => setRaceInfo(null)}
+                    className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+                    aria-label="Dismiss race info"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <p className="font-semibold">{raceInfo.displayName}</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    {raceInfo.distanceKm && `${raceInfo.distanceKm}km`}
+                    {raceInfo.terrain && ` · ${raceInfo.terrain}`}
+                    {raceInfo.location && ` · ${raceInfo.location}`}
+                  </p>
+                  {raceInfo.keyFacts && (
+                    <p className="mt-1 text-muted-foreground">{raceInfo.keyFacts}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Race date */}
+              <div>
+                <Label htmlFor="race-date" className="text-sm font-semibold">
+                  Race Date <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="race-date"
+                  type="date"
+                  value={raceDate}
+                  onChange={(e) => {
+                    setRaceDate(e.target.value);
+                    if (errors.raceDate) setErrors((p) => { const n = { ...p }; delete n.raceDate; return n; });
+                  }}
+                  className="mt-1"
+                />
+                {errors.raceDate && (
+                  <p className="mt-1 text-xs text-destructive">{errors.raceDate}</p>
+                )}
+              </div>
+
+              {/* Goal distance */}
+              <div>
+                <Label htmlFor="goal-distance" className="text-sm font-semibold">
+                  Goal Distance <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={goalDistance}
+                  onValueChange={(v) => {
+                    setGoalDistance(v);
+                    if (errors.goalDistance) setErrors((p) => { const n = { ...p }; delete n.goalDistance; return n; });
+                  }}
+                >
+                  <SelectTrigger id="goal-distance" className="mt-1">
+                    <SelectValue placeholder="Select a distance" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5K">5K</SelectItem>
+                    <SelectItem value="10K">10K</SelectItem>
+                    <SelectItem value="Half Marathon">Half Marathon</SelectItem>
+                    <SelectItem value="Marathon">Marathon</SelectItem>
+                    <SelectItem value="Ultra">Ultra</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.goalDistance && (
+                  <p className="mt-1 text-xs text-destructive">{errors.goalDistance}</p>
+                )}
+              </div>
+
+              {/* Ultra km (conditional) */}
+              {goalDistance === "Ultra" && (
                 <div>
-                  <Label htmlFor="weekly-km" className="text-sm font-semibold">
-                    Current Weekly Volume (km)
+                  <Label htmlFor="ultra-km" className="text-sm font-semibold">
+                    Ultra Distance (km) <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    id="weekly-km"
+                    id="ultra-km"
                     type="number"
-                    placeholder="40"
-                    value={weeklyKm}
-                    onChange={handleWeeklyKmChange}
-                    disabled={isGenerating}
-                    className={weeklyKmPrefilled ? "mt-1 italic bg-muted" : "mt-1"}
+                    placeholder="e.g. 100"
+                    value={ultraKm}
+                    onChange={(e) => {
+                      setUltraKm(e.target.value);
+                      if (errors.ultraKm) setErrors((p) => { const n = { ...p }; delete n.ultraKm; return n; });
+                    }}
+                    className="mt-1"
                   />
-                  {weeklyKmPrefilled && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Estimated from your recent Strava activities.
-                    </p>
+                  {errors.ultraKm && (
+                    <p className="mt-1 text-xs text-destructive">{errors.ultraKm}</p>
                   )}
-                  {errors.weeklyKm && (
-                    <p className="mt-1 text-xs text-destructive">{errors.weeklyKm}</p>
-                  )}
+                </div>
+              )}
+
+              {/* Goal type toggle */}
+              <div>
+                <Label className="text-sm font-semibold block mb-2">Goal Type</Label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setGoalType("finish")}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition-colors ${
+                      goalType === "finish"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-input hover:bg-accent"
+                    }`}
+                  >
+                    Finish it
+                  </button>
+                  <button
+                    onClick={() => setGoalType("time")}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition-colors ${
+                      goalType === "time"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-input hover:bg-accent"
+                    }`}
+                  >
+                    Target time
+                  </button>
                 </div>
               </div>
+            </div>
 
-              {/* Field Group 3: Weekly Constraints */}
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="days-per-week" className="text-sm font-semibold">
-                    Training Days Per Week
-                  </Label>
-                  <Select value={daysPerWeek} onValueChange={handleDaysPerWeekChange} disabled={isGenerating}>
-                    <SelectTrigger id="days-per-week" className="mt-1">
-                      <SelectValue placeholder="Select number of days" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3</SelectItem>
-                      <SelectItem value="4">4</SelectItem>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="6">6</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.daysPerWeek && (
-                    <p className="mt-1 text-xs text-destructive">{errors.daysPerWeek}</p>
-                  )}
-                </div>
+            {/* Footer */}
+            <div className="flex justify-end pt-4 border-t">
+              <Button onClick={handleStep1Next}>Next →</Button>
+            </div>
+          </>
+        ) : step === 2 ? (
+          /* ── Step 2: Fitness & Schedule ── */
+          <>
+            <DialogHeader>
+              <DialogTitle>Step 2 of 3 — Your Fitness &amp; Schedule</DialogTitle>
+            </DialogHeader>
 
-                <div>
-                  <Label className="text-sm font-semibold mb-2 block">
-                    Preferred Hard Days
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {DAYS_OF_WEEK.map((day) => (
-                      <button
-                        key={day}
-                        onClick={() => {
-                          setHardDays((prev) =>
-                            prev.includes(day)
-                              ? prev.filter((d) => d !== day)
-                              : [...prev, day]
-                          );
-                        }}
-                        disabled={isGenerating}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          hardDays.includes(day)
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-input hover:bg-accent"
-                        } ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="rest-day" className="text-sm font-semibold">
-                    Rest Day
-                  </Label>
-                  <Select value={restDay} onValueChange={setRestDay} disabled={isGenerating}>
-                    <SelectTrigger id="rest-day" className="mt-1">
-                      <SelectValue placeholder="Select a day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAYS_OF_WEEK.map((day) => (
-                        <SelectItem key={day} value={day}>
-                          {day}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="flex-1 overflow-y-auto space-y-5 py-4 pr-1">
+              {/* Weekly km */}
+              <div>
+                <Label htmlFor="weekly-km" className="text-sm font-semibold">
+                  Current Weekly km <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="weekly-km"
+                  type="number"
+                  placeholder="40"
+                  value={weeklyKm}
+                  onChange={(e) => {
+                    setWeeklyKm(e.target.value);
+                    if (errors.weeklyKm) setErrors((p) => { const n = { ...p }; delete n.weeklyKm; return n; });
+                  }}
+                  className={`mt-1 ${weeklyKmPrefilled ? "italic bg-muted" : ""}`}
+                />
+                {weeklyKmPrefilled && (
+                  <p className="mt-1 text-xs text-muted-foreground">From Strava</p>
+                )}
+                {errors.weeklyKm && (
+                  <p className="mt-1 text-xs text-destructive">{errors.weeklyKm}</p>
+                )}
               </div>
 
-              {/* Field Group 4: Background */}
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="background" className="text-sm font-semibold">
-                    About Your Running Background
-                  </Label>
-                  <Textarea
-                    id="background"
-                    placeholder="E.g. Running 3 years, completed one half marathon, struggle with long easy paces..."
-                    value={background}
-                    onChange={handleBackgroundChange}
-                    disabled={isGenerating}
-                    className={`mt-1 ${backgroundPrefilled ? "italic bg-muted" : ""}`}
-                    rows={4}
-                  />
-                  {backgroundPrefilled && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Loaded from your runner profile.
-                    </p>
-                  )}
-                </div>
+              {/* Longest run */}
+              <div>
+                <Label htmlFor="longest-run" className="text-sm font-semibold">
+                  Longest Recent Run (km)
+                  <span className="ml-1 text-xs text-muted-foreground font-normal">optional</span>
+                </Label>
+                <Input
+                  id="longest-run"
+                  type="number"
+                  placeholder="e.g. 25"
+                  value={longestRun}
+                  onChange={(e) => setLongestRun(e.target.value)}
+                  className="mt-1"
+                />
               </div>
 
-              {/* Replace warning (only when plan exists) */}
-              {hierarchicalPlan?.plan && !showConfirmReplace && (
+              {/* Weekly schedule grid */}
+              <div>
+                <Label className="text-sm font-semibold block mb-2">Weekly Schedule</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Click each day to cycle: Off → Easy → Hard → Long
+                </p>
+                <div className="grid grid-cols-7 gap-1">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <button
+                      key={day}
+                      onClick={() => handleDayClick(day)}
+                      className={`py-2 text-xs font-medium rounded-md border transition-colors ${DAY_TYPE_CLASSES[schedule[day]]}`}
+                    >
+                      <div>{day}</div>
+                      <div className="text-[10px] mt-0.5 opacity-75">{schedule[day]}</div>
+                    </button>
+                  ))}
+                </div>
+                {/* Live summary bar */}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {buildScheduleSummary(schedule)}
+                </p>
+              </div>
+
+              {/* Background */}
+              <div>
+                <Label htmlFor="background" className="text-sm font-semibold">
+                  Running Background
+                  <span className="ml-1 text-xs text-muted-foreground font-normal">optional</span>
+                </Label>
+                <Textarea
+                  id="background"
+                  placeholder="E.g. Running 3 years, completed one half marathon..."
+                  value={background}
+                  onChange={(e) => setBackground(e.target.value)}
+                  className={`mt-1 ${backgroundPrefilled ? "italic bg-muted" : ""}`}
+                  rows={3}
+                />
+                {backgroundPrefilled && (
+                  <p className="mt-1 text-xs text-muted-foreground">From your profile</p>
+                )}
+              </div>
+
+              {/* Injuries */}
+              <div>
+                <Label htmlFor="injuries" className="text-sm font-semibold">
+                  Current Injuries / Limitations
+                  <span className="ml-1 text-xs text-muted-foreground font-normal">optional</span>
+                </Label>
+                <Textarea
+                  id="injuries"
+                  placeholder="E.g. Left knee niggle, avoid hills..."
+                  value={injuries}
+                  onChange={(e) => setInjuries(e.target.value)}
+                  className="mt-1"
+                  rows={2}
+                />
+              </div>
+
+              {/* Error banner */}
+              {errors.submit && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                  {errors.submit}
+                </div>
+              )}
+
+              {/* Replace warning */}
+              {hierarchicalPlan?.plan && (
                 <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
                   This will replace your current plan.
                 </div>
               )}
-
-              {/* Error state */}
-              {hierarchicalPlan?.error && !isGenerating && (
-                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                  Plan generation failed. Check your connection and try again.
-                </div>
-              )}
             </div>
 
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isGenerating}
-              >
-                Back to Plan
+            {/* Footer */}
+            <div className="flex justify-between pt-4 border-t">
+              <Button variant="outline" onClick={() => setStep(1)}>
+                ← Back
               </Button>
-              <Button
-                variant="default"
-                onClick={handleSubmit}
-                disabled={isGenerating}
-              >
-                Generate Plan
+              <Button onClick={handleStep2Next} disabled={step3Loading}>
+                {step3Loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Starting...
+                  </>
+                ) : (
+                  "Next →"
+                )}
               </Button>
-            </DialogFooter>
+            </div>
+          </>
+        ) : (
+          /* ── Step 3: Q&A with coach ── */
+          <>
+            <DialogHeader>
+              <DialogTitle>A few questions first</DialogTitle>
+            </DialogHeader>
+
+            {/* Message list */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-3 min-h-0">
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              {step3Loading && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg px-3 py-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input row */}
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Your answer..."
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  disabled={step3Loading}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => handleSendMessage()}
+                  disabled={step3Loading || !userInput.trim()}
+                >
+                  Send
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Button variant="ghost" size="sm" onClick={handleStep3Back} disabled={step3Loading}>
+                  ← Back
+                </Button>
+                <button
+                  onClick={handleSkipQA}
+                  disabled={step3Loading}
+                  className="text-xs text-muted-foreground underline hover:text-foreground disabled:opacity-50"
+                >
+                  Skip Q&amp;A — generate anyway
+                </button>
+              </div>
+            </div>
           </>
         )}
       </DialogContent>

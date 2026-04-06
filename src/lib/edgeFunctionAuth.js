@@ -16,8 +16,20 @@ async function getAccessToken(client) {
   const { data, error } = await client.auth.getSession();
   if (error) throw error;
 
-  if (data?.session?.access_token) {
-    return data.session.access_token;
+  const currentSession = data?.session ?? null;
+  if (currentSession?.refresh_token) {
+    try {
+      const { data: refreshed, error: refreshError } = await client.auth.refreshSession();
+      if (!refreshError && refreshed?.session?.access_token) {
+        return refreshed.session.access_token;
+      }
+    } catch {
+      // Fall back to the currently cached session token when proactive refresh fails.
+    }
+  }
+
+  if (currentSession?.access_token) {
+    return currentSession.access_token;
   }
 
   const { data: refreshed, error: refreshError } = await client.auth.refreshSession();

@@ -165,11 +165,15 @@ export function PlanIntakeModal({ open, onOpenChange }) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
   const messagesEndRef = useRef(null);
+  const wasOpenRef = useRef(false);
 
   // ── Pre-fill on open ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!open) return;
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+
+    if (!justOpened) return;
 
     // Reset all step fields on modal open
     setStep(1);

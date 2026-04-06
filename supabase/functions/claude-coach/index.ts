@@ -7,6 +7,8 @@
 // both user and assistant messages.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAnthropicModelForMode } from "./modelSelection.ts";
+import { getCoachRequestMode } from "./requestMode.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -17,7 +19,6 @@ const corsHeaders = {
 };
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 const MAX_OUTPUT_TOKENS = 16384;
 
 // ── Insights synthesis (retained from previous version) ──────────────────────
@@ -131,11 +132,12 @@ interface SkillsChatParams {
   system: string;
   anthropicKey: string;
   skillId: string;
+  model: string;
 }
 
-async function callAgentSkills({ messages, system, anthropicKey, skillId }: SkillsChatParams) {
+async function callAgentSkills({ messages, system, anthropicKey, skillId, model }: SkillsChatParams) {
   const body: any = {
-    model: ANTHROPIC_MODEL,
+    model,
     max_tokens: MAX_OUTPUT_TOKENS,
     system,
     messages,
@@ -373,9 +375,12 @@ Deno.serve(async (req) => {
     // 2. Parse
     const payload = await req.json();
 
+    const requestMode = getCoachRequestMode(payload);
+
     // ── Insights synthesis mode (unchanged) ──
-    if (payload.mode === "insights_synthesis") {
+    if (requestMode === "insights_synthesis") {
       const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      const model = getAnthropicModelForMode(requestMode);
       if (!anthropicKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
 
       const userPrompt = buildInsightsSynthesisPrompt(payload);
@@ -387,7 +392,7 @@ Deno.serve(async (req) => {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
+          model,
           max_tokens: 800,
           system: INSIGHTS_SYNTHESIS_SYSTEM_PROMPT,
           messages: [{ role: "user", content: userPrompt }],
@@ -405,8 +410,9 @@ Deno.serve(async (req) => {
     }
 
     // ── Race info mode ──
-    if (payload.mode === "race_info") {
+    if (requestMode === "race_info") {
       const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      const model = getAnthropicModelForMode(requestMode);
       if (!anthropicKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
 
       const raceName = payload.raceName;
@@ -432,7 +438,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: ANTHROPIC_MODEL,
+            model,
             max_tokens: 300,
             system: RACE_INFO_SYSTEM,
             messages: [{ role: "user", content: `Race: ${raceName}` }],
@@ -462,6 +468,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     // ── Chat mode (Agent Skills) ──
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const skillId = Deno.env.get("CLAUDE_COACH_SKILL_ID");
+    const model = getAnthropicModelForMode(requestMode);
     if (!anthropicKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
     if (!skillId) return jsonResponse({ error: "CLAUDE_COACH_SKILL_ID not configured" }, 500);
 
@@ -501,7 +508,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     }
 
     // 6. Call Agent Skills API
-    const apiResult = await callAgentSkills({ messages, system, anthropicKey, skillId });
+    const apiResult = await callAgentSkills({ messages, system, anthropicKey, skillId, model });
 
     // 7. Parse response envelope
     const envelope = extractResponseEnvelope(apiResult);

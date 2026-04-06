@@ -80,16 +80,10 @@ function getBearerToken(req: Request): string | null {
   return token;
 }
 
-function getUserIdFromJwt(token: string): string | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(atob(base64));
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
+async function verifyAndGetUserId(token: string, supabase: any): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user?.id) return null;
+  return data.user.id;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -369,12 +363,12 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // 1. Auth
+    // 1. Auth — verify JWT with Supabase auth service (proper signature check)
     const accessToken = getBearerToken(req);
-    if (!accessToken) return jsonResponse({ error: "Missing bearer token" }, 401);
+    if (!accessToken) return jsonResponse({ code: 401, message: "Missing bearer token" }, 401);
 
-    const userId = getUserIdFromJwt(accessToken);
-    if (!userId) return jsonResponse({ error: "Invalid token" }, 401);
+    const userId = await verifyAndGetUserId(accessToken, supabase);
+    if (!userId) return jsonResponse({ code: 401, message: "Invalid JWT" }, 401);
 
     // 2. Parse
     const payload = await req.json();

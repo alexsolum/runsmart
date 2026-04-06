@@ -1,7 +1,8 @@
 // Supabase Edge Function — Strava activity sync
 // Reads the stored Strava tokens for the calling user, refreshes if
 // expired, fetches recent activities, and upserts them into the
-// activities table.
+// activities table. JWT verification is handled in-function via
+// supabase.auth.getUser so gateway validation can stay disabled.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

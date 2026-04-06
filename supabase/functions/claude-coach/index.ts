@@ -83,25 +83,10 @@ function getBearerToken(req: Request): string | null {
   return token;
 }
 
-function getApiKey(req: Request): string | null {
-  return req.headers.get("apikey") || req.headers.get("Apikey");
-}
-
-async function verifyAndGetUserId(token: string, apiKey: string | null): Promise<string | null> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  if (!supabaseUrl || !apiKey) return null;
-
-  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    method: "GET",
-    headers: {
-      apikey: apiKey,
-      authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) return null;
-  const user = await response.json();
-  return user?.id ?? null;
+async function verifyAndGetUserId(token: string, supabase: any): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user?.id) return null;
+  return data.user.id;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -372,12 +357,11 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // 1. Auth — Supabase gateway (verify_jwt=true) already validated the JWT
-    //    signature. Decode the payload to extract the user ID (sub claim).
+    // 1. Auth — verify the bearer token against Supabase Auth directly.
     const accessToken = getBearerToken(req);
     if (!accessToken) return jsonResponse({ code: 401, message: "Missing bearer token" }, 401);
 
-    const userId = await verifyAndGetUserId(accessToken, getApiKey(req));
+    const userId = await verifyAndGetUserId(accessToken, supabase);
     if (!userId) return jsonResponse({ code: 401, message: "Invalid JWT" }, 401);
 
     // 2. Parse

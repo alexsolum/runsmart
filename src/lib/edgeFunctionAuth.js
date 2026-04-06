@@ -1,6 +1,10 @@
+import { config } from "../config/runtime";
+
 function buildAuthHeaders(accessToken, headers = {}) {
   return {
     ...headers,
+    apikey: config.supabaseAnonKey,
+    "content-type": "application/json",
     Authorization: `Bearer ${accessToken}`,
   };
 }
@@ -38,15 +42,43 @@ async function getAccessToken(client) {
   return refreshed?.session?.access_token ?? null;
 }
 
+async function invokeEdgeFunction(functionName, accessToken, options = {}) {
+  const response = await fetch(`${config.supabaseUrl}/functions/v1/${functionName}`, {
+    method: "POST",
+    headers: buildAuthHeaders(accessToken, options.headers),
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+
+  const rawText = await response.text();
+  const data = rawText ? tryParseJson(rawText) ?? rawText : null;
+
+  if (response.ok) {
+    return { data, error: null };
+  }
+
+  const message = typeof data === "object" && data?.message
+    ? data.message
+    : `Edge Function error ${response.status}`;
+
+  return {
+    data,
+    error: new Error(message),
+  };
+}
+
+function tryParseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 export async function invokeEdgeFunctionWithSessionRetry(client, functionName, options = {}) {
   const token = await getAccessToken(client);
   if (!token) throw new Error("No active session. Please sign in first.");
 
-  const invoke = (accessToken) =>
-    client.functions.invoke(functionName, {
-      ...options,
-      headers: buildAuthHeaders(accessToken, options.headers),
-    });
+  const invoke = (accessToken) => invokeEdgeFunction(functionName, accessToken, options);
 
   let result = await invoke(token);
   if (!isInvalidJwtResponse(result?.data, result?.error)) {
@@ -66,5 +98,5 @@ export async function invokeEdgeFunctionWithSessionRetry(client, functionName, o
 }
 
 export function __testUtils__() {
-  return { isInvalidJwtResponse, buildAuthHeaders };
+  return { isInvalidJwtResponse, buildAuthHeaders, tryParseJson };
 }

@@ -1,13 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../src/config/runtime", () => ({
+  config: {
+    supabaseUrl: "https://rhbnzzxzltjtposwpfin.supabase.co",
+    supabaseAnonKey: "anon-key",
+  },
+}));
+
 import { __testUtils__, invokeEdgeFunctionWithSessionRetry } from "../../src/lib/edgeFunctionAuth";
 
 describe("edgeFunctionAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = vi.fn();
   });
 
   it("prefers a proactively refreshed session token when available", async () => {
-    const invoke = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
+    fetch.mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockResolvedValue('{"ok":true}'),
+    });
+
     const client = {
       auth: {
         getSession: vi.fn().mockResolvedValue({
@@ -19,7 +32,6 @@ describe("edgeFunctionAuth", () => {
           error: null,
         }),
       },
-      functions: { invoke },
     };
 
     const result = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
@@ -27,15 +39,24 @@ describe("edgeFunctionAuth", () => {
     });
 
     expect(result.data).toEqual({ ok: true });
-    expect(invoke).toHaveBeenCalledWith("claude-coach", {
-      body: { mode: "race_info", raceName: "CCC" },
-      headers: { Authorization: "Bearer token-2" },
+    expect(fetch).toHaveBeenCalledWith("https://rhbnzzxzltjtposwpfin.supabase.co/functions/v1/claude-coach", {
+      method: "POST",
+      body: JSON.stringify({ mode: "race_info", raceName: "CCC" }),
+      headers: expect.objectContaining({
+        Authorization: "Bearer token-2",
+        apikey: expect.any(String),
+        "content-type": "application/json",
+      }),
     });
     expect(client.auth.refreshSession).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to the cached token when proactive refresh fails", async () => {
-    const invoke = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
+    fetch.mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockResolvedValue('{"ok":true}'),
+    });
+
     const client = {
       auth: {
         getSession: vi.fn().mockResolvedValue({
@@ -47,29 +68,30 @@ describe("edgeFunctionAuth", () => {
           error: new Error("refresh failed"),
         }),
       },
-      functions: { invoke },
     };
 
     await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
       body: { mode: "race_info", raceName: "CCC" },
     });
 
-    expect(invoke).toHaveBeenCalledWith("claude-coach", {
-      body: { mode: "race_info", raceName: "CCC" },
-      headers: { Authorization: "Bearer token-1" },
+    expect(fetch).toHaveBeenCalledWith("https://rhbnzzxzltjtposwpfin.supabase.co/functions/v1/claude-coach", {
+      method: "POST",
+      body: JSON.stringify({ mode: "race_info", raceName: "CCC" }),
+      headers: expect.objectContaining({
+        Authorization: "Bearer token-1",
+      }),
     });
   });
 
   it("refreshes and retries once when the edge function reports Invalid JWT", async () => {
-    const invoke = vi
-      .fn()
+    fetch
       .mockResolvedValueOnce({
-        data: { code: 401, message: "Invalid JWT" },
-        error: { message: "Edge Function returned a non-2xx status code" },
+        ok: false,
+        text: vi.fn().mockResolvedValue('{"code":401,"message":"Invalid JWT"}'),
       })
       .mockResolvedValueOnce({
-        data: { raceInfo: { displayName: "CCC", distanceKm: 101 } },
-        error: null,
+        ok: true,
+        text: vi.fn().mockResolvedValue('{"raceInfo":{"displayName":"CCC","distanceKm":101}}'),
       });
 
     const client = {
@@ -83,7 +105,6 @@ describe("edgeFunctionAuth", () => {
           error: null,
         }),
       },
-      functions: { invoke },
     };
 
     const result = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
@@ -91,13 +112,19 @@ describe("edgeFunctionAuth", () => {
     });
 
     expect(client.auth.refreshSession).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenNthCalledWith(1, "claude-coach", {
-      body: { mode: "race_info", raceName: "CCC" },
-      headers: { Authorization: "Bearer stale-token" },
+    expect(fetch).toHaveBeenNthCalledWith(1, "https://rhbnzzxzltjtposwpfin.supabase.co/functions/v1/claude-coach", {
+      method: "POST",
+      body: JSON.stringify({ mode: "race_info", raceName: "CCC" }),
+      headers: expect.objectContaining({
+        Authorization: "Bearer stale-token",
+      }),
     });
-    expect(invoke).toHaveBeenNthCalledWith(2, "claude-coach", {
-      body: { mode: "race_info", raceName: "CCC" },
-      headers: { Authorization: "Bearer fresh-token" },
+    expect(fetch).toHaveBeenNthCalledWith(2, "https://rhbnzzxzltjtposwpfin.supabase.co/functions/v1/claude-coach", {
+      method: "POST",
+      body: JSON.stringify({ mode: "race_info", raceName: "CCC" }),
+      headers: expect.objectContaining({
+        Authorization: "Bearer fresh-token",
+      }),
     });
     expect(result.data).toEqual({ raceInfo: { displayName: "CCC", distanceKm: 101 } });
   });

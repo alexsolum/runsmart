@@ -90,8 +90,9 @@ function getUserIdFromJwt(token: string): string | null {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
-    // Base64url → Base64 → JSON
-    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    // Base64url → Base64: replace URL-safe chars, then add required = padding
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
     const payload = JSON.parse(atob(padded));
     const sub = payload?.sub;
     return typeof sub === "string" && sub ? sub : null;

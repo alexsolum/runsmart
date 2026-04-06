@@ -404,6 +404,59 @@ Deno.serve(async (req) => {
       return jsonResponse({ synthesis });
     }
 
+    // ── Race info mode ──
+    if (payload.mode === "race_info") {
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthropicKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
+
+      const raceName = payload.raceName;
+      if (!raceName) return jsonResponse({ raceInfo: null });
+
+      const RACE_INFO_SYSTEM = `You are a running race database. Return ONLY a JSON object (no markdown, no explanation) with these exact fields:
+{
+  "displayName": "full official race name",
+  "distanceKm": number,
+  "elevationGainM": number or null,
+  "terrain": "brief terrain description",
+  "location": "City, Country",
+  "keyFacts": "1-2 sentences of key training implications"
+}
+If the race is unknown or you are not confident, return: {"unknown": true}`;
+
+      try {
+        const aiResponse = await fetchWithRetry(ANTHROPIC_URL, {
+          method: "POST",
+          headers: {
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: ANTHROPIC_MODEL,
+            max_tokens: 300,
+            system: RACE_INFO_SYSTEM,
+            messages: [{ role: "user", content: `Race: ${raceName}` }],
+          }),
+        });
+
+        if (!aiResponse.ok) {
+          return jsonResponse({ raceInfo: null });
+        }
+
+        const aiData = await aiResponse.json();
+        const text = aiData.content?.[0]?.text ?? "";
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed.unknown) return jsonResponse({ raceInfo: null });
+          return jsonResponse({ raceInfo: parsed });
+        } catch {
+          return jsonResponse({ raceInfo: null });
+        }
+      } catch {
+        return jsonResponse({ raceInfo: null });
+      }
+    }
+
     // ── Chat mode (Agent Skills) ──
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const skillId = Deno.env.get("CLAUDE_COACH_SKILL_ID");

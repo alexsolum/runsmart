@@ -83,26 +83,21 @@ function getBearerToken(req: Request): string | null {
   return token;
 }
 
-function getApiKey(req: Request): string | null {
-  return req.headers.get("apikey") || req.headers.get("Apikey");
-}
-
-async function verifyAndGetUserId(token: string, apiKey: string | null): Promise<string | null> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  if (!supabaseUrl || !apiKey) return null;
-
-  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    method: "GET",
-    headers: {
-      apikey: apiKey,
-      authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) return null;
-
-  const user = await response.json();
-  return user?.id ?? null;
+// Decode a JWT payload without verifying the signature.
+// Safe to use here because Supabase's verify_jwt=true gateway already validated
+// the signature before this function runs. We only need the sub (user ID).
+function getUserIdFromJwt(token: string): string | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    // Base64url → Base64 → JSON
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(padded));
+    const sub = payload?.sub;
+    return typeof sub === "string" && sub ? sub : null;
+  } catch {
+    return null;
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -373,11 +368,12 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // 1. Auth — verify JWT with Supabase auth service (proper signature check)
+    // 1. Auth — Supabase gateway (verify_jwt=true) already validated the JWT
+    //    signature. Decode the payload to extract the user ID (sub claim).
     const accessToken = getBearerToken(req);
     if (!accessToken) return jsonResponse({ code: 401, message: "Missing bearer token" }, 401);
 
-    const userId = await verifyAndGetUserId(accessToken, getApiKey(req));
+    const userId = getUserIdFromJwt(accessToken);
     if (!userId) return jsonResponse({ code: 401, message: "Invalid JWT" }, 401);
 
     // 2. Parse
@@ -513,7 +509,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     const routeResult = await routeResponse(envelope, userId, supabase);
 
     // 9. Persist messages
-    await persistConversationTurn(supabase, sessionId, userContent, apiResult.content);
+    await persistConversationTurn(supabase, userId, sessionId, userContent, apiResult.content);
 
     // 10. Return response
     return jsonResponse({

@@ -1,41 +1,17 @@
-export async function ensureConversationExists(
-  supabase: any,
-  userId: string,
-  sessionId: string,
-) {
-  const { data, error } = await supabase
-    .from("coach_conversations")
-    .select("id")
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) throw new Error(`Conversation lookup failed: ${error.message}`);
-  if (data) return data;
-
-  const { error: insertError } = await supabase
-    .from("coach_conversations")
-    .insert({
-      id: sessionId,
-      user_id: userId,
-      title: "New conversation",
-    });
-
-  if (insertError) throw new Error(`Conversation create failed: ${insertError.message}`);
-  return { id: sessionId };
-}
+// Flat schema: coach_conversations has one row per message turn.
+// Messages are grouped by session_id (client-generated UUID).
+// user_id is stored on each row for RLS + direct lookup.
 
 export async function loadConversationHistory(
   supabase: any,
   userId: string,
   sessionId: string,
 ) {
-  await ensureConversationExists(supabase, userId, sessionId);
-
   const { data, error } = await supabase
-    .from("coach_messages")
+    .from("coach_conversations")
     .select("role, content")
-    .eq("conversation_id", sessionId)
+    .eq("user_id", userId)
+    .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(`History load failed: ${error.message}`);
@@ -44,20 +20,23 @@ export async function loadConversationHistory(
 
 export async function persistConversationTurn(
   supabase: any,
+  userId: string,
   sessionId: string,
   userContent: Record<string, unknown>,
   assistantContent: unknown,
 ) {
   const { error } = await supabase
-    .from("coach_messages")
+    .from("coach_conversations")
     .insert([
       {
-        conversation_id: sessionId,
+        user_id: userId,
+        session_id: sessionId,
         role: "user",
         content: [userContent],
       },
       {
-        conversation_id: sessionId,
+        user_id: userId,
+        session_id: sessionId,
         role: "assistant",
         content: assistantContent,
       },

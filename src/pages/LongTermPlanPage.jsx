@@ -437,11 +437,11 @@ export default function LongTermPlanPage() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Generated plan</p>
                 <h3 className="text-xl font-semibold text-slate-950">
-                  {planData?.raceGoal?.eventName || "Training Plan"}
+                  {planData?.raceGoal?.eventName || planData?.meta?.event || "Training Plan"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  {planData?.raceGoal?.eventDate
-                    ? new Date(planData.raceGoal.eventDate).toLocaleDateString(undefined, {
+                  {(planData?.raceGoal?.eventDate || planData?.meta?.eventDate)
+                    ? new Date(planData.raceGoal?.eventDate || planData.meta?.eventDate).toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",
                       year: "numeric",

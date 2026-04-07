@@ -3,6 +3,16 @@ export interface PlanValidationResult {
   errors: string[];
 }
 
+const DAY_NAME_TO_SHORT: Record<string, string> = {
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+};
+
 function toIsoDate(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return null;
@@ -131,6 +141,152 @@ function addDays(base: Date, days: number): string {
   return d.toISOString().split("T")[0];
 }
 
+function abbreviateDay(day: unknown, dateIso: string): string {
+  if (typeof day === "string") {
+    const normalized = day.trim().toLowerCase();
+    if (DAY_NAME_TO_SHORT[normalized]) return DAY_NAME_TO_SHORT[normalized];
+    if (day.length >= 3) return day.slice(0, 3);
+  }
+
+  const date = new Date(`${dateIso}T00:00:00Z`);
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+}
+
+function normalizeSport(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return "Run";
+  if (text.toLowerCase() === "running") return "Run";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function normalizeWorkoutType(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return "Easy";
+  return text
+    .split(/[\s_-]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function summarizeWeekDays(days: any[]) {
+  let totalKm = 0;
+  let totalHours = 0;
+  let sessions = 0;
+
+  for (const day of days) {
+    for (const workout of day.workouts ?? []) {
+      sessions += 1;
+      totalKm += coerceNumber(workout.distanceKm) ?? 0;
+      totalHours += (coerceNumber(workout.durationMinutes) ?? 0) / 60;
+    }
+  }
+
+  return {
+    totalKm: Math.round(totalKm * 10) / 10,
+    totalHours: Math.round(totalHours * 10) / 10,
+    sessions,
+  };
+}
+
+function derivePhaseRanges(phases: any[], weeks: any[]) {
+  const weekByPhase = new Map<string, number[]>();
+  weeks.forEach((week) => {
+    const phaseName = String(week?.phase ?? "");
+    if (!phaseName) return;
+    const bucket = weekByPhase.get(phaseName) ?? [];
+    bucket.push(Number(week.weekNumber));
+    weekByPhase.set(phaseName, bucket);
+  });
+
+  return phases.map((phase) => {
+    const bucket = weekByPhase.get(String(phase?.name ?? "")) ?? [];
+    const sorted = bucket.slice().sort((a, b) => a - b);
+    const startWeek = sorted[0] ?? Number(phase?.startWeek) ?? 1;
+    const endWeek = sorted[sorted.length - 1] ?? Number(phase?.endWeek) ?? startWeek;
+    return {
+      name: phase?.name ?? `Phase ${startWeek}`,
+      startWeek,
+      endWeek,
+      focus: phase?.focus ?? "",
+      weeklyHoursRange: phase?.weeklyHoursRange ?? null,
+    };
+  });
+}
+
+export function normalizeFullPlan(plan: any, now = new Date()) {
+  if (!plan || typeof plan !== "object") return plan;
+
+  const rawWeeks = Array.isArray(plan.weeks) ? plan.weeks : [];
+  const normalizedWeeks = rawWeeks.map((week, weekIndex) => {
+    const days = Array.isArray(week?.days) ? week.days : [];
+    const normalizedDays = days.map((day, dayIndex) => {
+      const dayDate = toIsoDate(day?.date) ?? addDays(new Date(`${week.startDate}T00:00:00Z`), dayIndex);
+      const workouts = Array.isArray(day?.workouts) ? day.workouts : [];
+      const normalizedWorkouts = workouts.map((workout, workoutIndex) => ({
+        id: workout?.id ?? `w${week.weekNumber ?? weekIndex + 1}-${dayIndex + 1}-${workoutIndex + 1}`,
+        sport: normalizeSport(workout?.sport),
+        type: normalizeWorkoutType(workout?.type),
+        name: workout?.name ?? "Workout",
+        description: workout?.description ?? "",
+        durationMinutes: coerceNumber(workout?.durationMinutes),
+        distanceKm: coerceNumber(workout?.distanceKm),
+        primaryZone: workout?.primaryZone ?? null,
+        humanReadable: workout?.humanReadable ?? workout?.description ?? workout?.name ?? "Workout",
+        completed: Boolean(workout?.completed),
+      }));
+
+      return {
+        date: dayDate,
+        dayOfWeek: abbreviateDay(day?.dayOfWeek, dayDate),
+        workouts: normalizedWorkouts,
+      };
+    });
+
+    return {
+      weekNumber: Number(week?.weekNumber) || weekIndex + 1,
+      startDate: toIsoDate(week?.startDate) ?? getCurrentWeekStartIso(now),
+      endDate: toIsoDate(week?.endDate) ?? addDays(new Date(`${toIsoDate(week?.startDate) ?? getCurrentWeekStartIso(now)}T00:00:00Z`), 6),
+      phase: week?.phase ?? "Base",
+      focus: week?.focus ?? "",
+      targetHours: coerceNumber(week?.targetHours),
+      isRecoveryWeek: Boolean(week?.isRecoveryWeek),
+      days: normalizedDays,
+      summary: week?.summary ?? summarizeWeekDays(normalizedDays),
+    };
+  });
+
+  const normalizedPhases = derivePhaseRanges(Array.isArray(plan.phases) ? plan.phases : [], normalizedWeeks);
+  const normalizedMeta = {
+    ...plan.meta,
+    eventDate: toIsoDate(plan?.meta?.eventDate) ?? toIsoDate(plan?.raceStrategy?.event?.date),
+    planStartDate: toIsoDate(plan?.meta?.planStartDate) ?? normalizedWeeks[0]?.startDate ?? getCurrentWeekStartIso(now),
+    planEndDate: toIsoDate(plan?.meta?.planEndDate) ?? normalizedWeeks[normalizedWeeks.length - 1]?.endDate ?? null,
+    totalWeeks: normalizedWeeks.length,
+    createdAt: plan?.meta?.createdAt ?? now.toISOString(),
+    updatedAt: plan?.meta?.updatedAt ?? now.toISOString(),
+  };
+
+  return {
+    ...plan,
+    meta: normalizedMeta,
+    raceGoal: {
+      eventName: normalizedMeta.event ?? plan?.raceStrategy?.event?.name ?? "Goal Race",
+      eventDate: normalizedMeta.eventDate ?? null,
+    },
+    phases: normalizedPhases,
+    weeks: normalizedWeeks,
+  };
+}
+
 function deriveBlocksFromPlan(plan: any, userId: string) {
   if (!Array.isArray(plan?.phases) || !Array.isArray(plan?.weeks) || plan.weeks.length === 0) {
     return [];
@@ -155,7 +311,8 @@ export async function saveFullPlan(
   plan: any,
   now = new Date(),
 ): Promise<{ planUpdated: boolean; error: string | null }> {
-  const validation = validateFullPlan(plan, now);
+  const normalizedPlan = normalizeFullPlan(plan, now);
+  const validation = validateFullPlan(normalizedPlan, now);
   if (!validation.valid) {
     return {
       planUpdated: false,
@@ -163,8 +320,8 @@ export async function saveFullPlan(
     };
   }
 
-  const eventName = plan?.meta?.event ?? plan?.raceStrategy?.event?.name ?? null;
-  const eventDate = plan?.meta?.eventDate ?? plan?.raceStrategy?.event?.date ?? null;
+  const eventName = normalizedPlan?.meta?.event ?? normalizedPlan?.raceStrategy?.event?.name ?? null;
+  const eventDate = normalizedPlan?.meta?.eventDate ?? normalizedPlan?.raceStrategy?.event?.date ?? null;
 
   const { data: existingPlan, error: existingErr } = await supabase
     .from("hierarchical_plans")
@@ -182,7 +339,7 @@ export async function saveFullPlan(
   const payload = {
     user_id: userId,
     status: "active",
-    plan_data: plan,
+    plan_data: normalizedPlan,
     event_name: eventName,
     event_date: eventDate,
   };
@@ -194,7 +351,7 @@ export async function saveFullPlan(
   const { error: planErr } = await writeQuery;
   if (planErr) return { planUpdated: false, error: planErr.message };
 
-  const blocks = deriveBlocksFromPlan(plan, userId);
+  const blocks = deriveBlocksFromPlan(normalizedPlan, userId);
   if (blocks.length > 0) {
     await supabase.from("training_blocks").delete().eq("user_id", userId);
     const { error: blockErr } = await supabase.from("training_blocks").insert(blocks);

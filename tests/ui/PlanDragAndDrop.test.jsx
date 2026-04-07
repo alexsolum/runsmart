@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PlanWeekCard } from "../../src/components/planner/PlanWeekCard";
 import { AppDataProvider } from "../../src/context/AppDataContext";
@@ -78,10 +78,10 @@ describe("PlanWeekCard Drag and Drop UI", () => {
     const { container } = render(
       <ToastProvider>
         <AppDataProvider>
-          <PlanWeekCard 
-            week={MOCK_WEEK} 
-            phaseColor="#3b82f6" 
-            isMobile={true} 
+          <PlanWeekCard
+            week={MOCK_WEEK}
+            phaseColor="#3b82f6"
+            isMobile={true}
           />
         </AppDataProvider>
       </ToastProvider>
@@ -90,5 +90,41 @@ describe("PlanWeekCard Drag and Drop UI", () => {
     // DndContext puts a specific div/context in the tree, but easiest is to check
     // if the mobile day selector is present
     expect(screen.getByText("Day 1 of 2")).toBeInTheDocument();
+  });
+
+  it("renders days in Monday-first order regardless of data order", () => {
+    const weekWithSundayFirst = {
+      ...MOCK_WEEK,
+      days: [
+        { date: "2026-05-10", dayOfWeek: "Sunday", workouts: [] },
+        { date: "2026-05-04", dayOfWeek: "Monday", workouts: [{ id: "w1", sport: "run", type: "easy", name: "Easy Run" }] },
+        { date: "2026-05-05", dayOfWeek: "Tuesday", workouts: [] },
+        { date: "2026-05-09", dayOfWeek: "Saturday", workouts: [] },
+      ],
+    };
+
+    render(
+      <ToastProvider>
+        <AppDataProvider>
+          <PlanWeekCard week={weekWithSundayFirst} phaseColor="#3b82f6" />
+        </AppDataProvider>
+      </ToastProvider>
+    );
+
+    const dayCells = document.querySelectorAll("[data-testid^='day-cell-']");
+    expect(dayCells[0].getAttribute("data-testid")).toBe("day-cell-2026-05-04");
+    expect(dayCells[dayCells.length - 1].getAttribute("data-testid")).toBe("day-cell-2026-05-10");
+  });
+
+  it("DragOverlay wrapper has no hardcoded fractional width class", () => {
+    render(
+      <ToastProvider>
+        <AppDataProvider>
+          <PlanWeekCard week={MOCK_WEEK} phaseColor="#3b82f6" />
+        </AppDataProvider>
+      </ToastProvider>
+    );
+    const wrapper = document.querySelector('[data-testid="week-grid-1"]');
+    expect(wrapper?.innerHTML ?? "").not.toContain("w-[calc((100%-6*0.75rem)/7)]");
   });
 });

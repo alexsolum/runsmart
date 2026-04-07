@@ -20,6 +20,7 @@ function formatHours(hours) {
 export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSelect, weekRef }) {
   const { hierarchicalPlan, showToast } = useAppData();
   const [activeWorkout, setActiveWorkout] = useState(null);
+  const [dragWidth, setDragWidth] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -32,7 +33,16 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
     })
   );
 
-  const days = week?.days ?? [];
+  const days = useMemo(() => {
+    const raw = week?.days ?? [];
+    return [...raw].sort((a, b) => {
+      const toMondayFirst = (isoDate) => {
+        const d = new Date(`${isoDate}T00:00:00Z`).getUTCDay(); // 0=Sun,1=Mon..6=Sat
+        return d === 0 ? 7 : d; // Sun becomes 7
+      };
+      return toMondayFirst(a.date) - toMondayFirst(b.date);
+    });
+  }, [week?.days]);
   const [mobileDayIndex, setMobileDayIndex] = useState(0);
   const mobileDay = days[mobileDayIndex] ?? null;
   const metricHours = useMemo(() => formatHours(week?.summary?.totalHours), [week?.summary?.totalHours]);
@@ -43,11 +53,13 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
 
   const handleDragStart = (event) => {
     setActiveWorkout(event.active.data.current.workout);
+    setDragWidth(event.active.rect.current?.initial?.width ?? null);
   };
 
   const handleDragEnd = async (event) => {
     const { active, over } = event;
     setActiveWorkout(null);
+    setDragWidth(null);
 
     if (!over) return;
 
@@ -127,8 +139,8 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
 
       <DragOverlay>
         {activeWorkout ? (
-          <div className="w-[calc((100%-6*0.75rem)/7)]">
-             <PlanWorkoutCard workout={activeWorkout} isOverlay />
+          <div style={{ width: dragWidth ? `${dragWidth}px` : undefined }}>
+            <PlanWorkoutCard workout={activeWorkout} isOverlay />
           </div>
         ) : null}
       </DragOverlay>

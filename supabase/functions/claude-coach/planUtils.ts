@@ -287,7 +287,7 @@ export function normalizeFullPlan(plan: any, now = new Date()) {
   };
 }
 
-function deriveBlocksFromPlan(plan: any, userId: string) {
+function deriveBlocksFromPlan(plan: any, userId: string, planId: string) {
   if (!Array.isArray(plan?.phases) || !Array.isArray(plan?.weeks) || plan.weeks.length === 0) {
     return [];
   }
@@ -295,6 +295,7 @@ function deriveBlocksFromPlan(plan: any, userId: string) {
   const planStartDate = new Date(`${plan.weeks[0].startDate}T00:00:00Z`);
 
   return plan.phases.map((phase: any) => ({
+    plan_id: planId,
     user_id: userId,
     phase: phase.name,
     label: phase.name,
@@ -351,12 +352,27 @@ export async function saveFullPlan(
   const { error: planErr } = await writeQuery;
   if (planErr) return { planUpdated: false, error: planErr.message };
 
-  const blocks = deriveBlocksFromPlan(normalizedPlan, userId);
-  if (blocks.length > 0) {
-    await supabase.from("training_blocks").delete().eq("user_id", userId);
-    const { error: blockErr } = await supabase.from("training_blocks").insert(blocks);
-    if (blockErr) {
-      return { planUpdated: true, error: `Plan saved but blocks failed: ${blockErr.message}` };
+  const { data: linkedTrainingPlan, error: linkedPlanErr } = await supabase
+    .from("training_plans")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("race_date", eventDate)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (linkedPlanErr) {
+    return { planUpdated: true, error: `Plan saved but blocks failed: ${linkedPlanErr.message}` };
+  }
+
+  if (linkedTrainingPlan?.id) {
+    const blocks = deriveBlocksFromPlan(normalizedPlan, userId, linkedTrainingPlan.id);
+    if (blocks.length > 0) {
+      await supabase.from("training_blocks").delete().eq("plan_id", linkedTrainingPlan.id);
+      const { error: blockErr } = await supabase.from("training_blocks").insert(blocks);
+      if (blockErr) {
+        return { planUpdated: true, error: `Plan saved but blocks failed: ${blockErr.message}` };
+      }
     }
   }
 

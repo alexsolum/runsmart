@@ -145,7 +145,6 @@ the full-plan response format.`;
       });
 
       if (invokeError) throw invokeError;
-      if (invokeData?.routeError) throw new Error(invokeData.routeError);
 
       // If Claude immediately generated a full plan, handle it
       if (invokeData?.planUpdated) {
@@ -162,6 +161,8 @@ the full-plan response format.`;
           return { sessionId, question: null, planGenerated: true };
         }
       }
+
+      if (invokeData?.routeError) throw new Error(invokeData.routeError);
 
       dispatch({ type: "plan_session_started", payload: sessionId });
       return {
@@ -187,7 +188,6 @@ the full-plan response format.`;
       });
 
       if (invokeError) throw invokeError;
-      if (invokeData?.routeError) throw new Error(invokeData.routeError);
 
       // If plan was generated, fetch and save it
       if (invokeData?.planUpdated) {
@@ -204,6 +204,8 @@ the full-plan response format.`;
           return { question: null, planGenerated: true };
         }
       }
+
+      if (invokeData?.routeError) throw new Error(invokeData.routeError);
 
       return { question: invokeData?.content || null, planGenerated: false };
     } catch (err) {

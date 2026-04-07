@@ -284,6 +284,51 @@ describe("claude-coach plan utils", () => {
     const updateEq = vi.fn().mockResolvedValue({ error: null });
     const update = vi.fn(() => ({ eq: updateEq }));
     const insert = vi.fn().mockResolvedValue({ error: null });
+
+    const supabase = {
+      from(table) {
+        if (table === "hierarchical_plans") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            order() { return this; },
+            limit() { return this; },
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: "existing-plan" }, error: null }),
+            update,
+            insert,
+          };
+        }
+
+        if (table === "training_plans") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            order() { return this; },
+            limit() { return this; },
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const result = await saveFullPlan(
+      supabase,
+      "user-1",
+      makeValidPlan(),
+      new Date("2026-04-06T12:00:00Z"),
+    );
+
+    expect(result).toEqual({ planUpdated: true, error: null });
+    expect(update).toHaveBeenCalled();
+    expect(updateEq).toHaveBeenCalledWith("id", "existing-plan");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("syncs training_blocks only when a linked legacy training plan exists", async () => {
+    const updateEq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn(() => ({ eq: updateEq }));
     const deleteEq = vi.fn().mockResolvedValue({ error: null });
     const blockInsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -297,7 +342,17 @@ describe("claude-coach plan utils", () => {
             limit() { return this; },
             maybeSingle: vi.fn().mockResolvedValue({ data: { id: "existing-plan" }, error: null }),
             update,
-            insert,
+            insert: vi.fn(),
+          };
+        }
+
+        if (table === "training_plans") {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            order() { return this; },
+            limit() { return this; },
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: "legacy-plan-1" }, error: null }),
           };
         }
 
@@ -322,9 +377,12 @@ describe("claude-coach plan utils", () => {
     );
 
     expect(result).toEqual({ planUpdated: true, error: null });
-    expect(update).toHaveBeenCalled();
-    expect(updateEq).toHaveBeenCalledWith("id", "existing-plan");
-    expect(insert).not.toHaveBeenCalled();
+    expect(deleteEq).toHaveBeenCalledWith("plan_id", "legacy-plan-1");
+    expect(blockInsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ plan_id: "legacy-plan-1", user_id: "user-1" }),
+      ]),
+    );
   });
 
   it("returns a validation error instead of writing an invalid plan", async () => {

@@ -445,6 +445,33 @@ describe("useHierarchicalPlan", () => {
     expect(result.current.error).not.toBeNull();
   });
 
+  it("sendPlanMessage still returns planGenerated when planUpdated is true even if routeError is present", async () => {
+    const invokeSpy = vi.fn().mockResolvedValue({
+      data: { planUpdated: true, routeError: "Plan saved but blocks failed: missing linked training plan" },
+      error: null,
+    });
+
+    const { client } = createMockClient({
+      invoke: invokeSpy,
+      selectHandlers: {
+        select: () => ({ data: MOCK_PLAN_ROW, error: null }),
+        update: () => ({ data: null, error: null }),
+      },
+    });
+    getSupabaseClient.mockReturnValue(client);
+
+    const { result } = renderHook(() => useHierarchicalPlan("user-1"));
+
+    let response;
+    await act(async () => {
+      response = await result.current.sendPlanMessage("session-1", "Generate the plan now.");
+    });
+
+    expect(response).toEqual({ question: null, planGenerated: true });
+    expect(result.current.plan).toEqual(MOCK_PLAN_ROW);
+    expect(result.current.error).toBeNull();
+  });
+
   // ── applyPatch ──────────────────────────────────────────────────────────────
 
   it("applyPatch calls client.rpc('apply_plan_patch', ...) and updates state", async () => {

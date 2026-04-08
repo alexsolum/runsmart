@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { ChangeCard } from "./ChangeCard";
 import CoachAvatar from "../CoachAvatar";
@@ -25,18 +26,46 @@ function ChatMessage({ msg, canApplyPatch, patchUnavailableReason, onApplyPatch,
   const patchSummary = envelope.patchSummary ?? null;
   const planUpdated = envelope.planUpdated ?? false;
 
+  // Split text into lines to detect questions
+  const lines = text.split('\n');
+  const formattedContent = lines.map((line, i) => {
+    const trimmed = line.trim();
+    if (trimmed.endsWith('?') && trimmed.length > 5) {
+      return (
+        <div key={i} className="my-3 p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r-xl">
+          <p className="m-0 text-sm font-semibold text-blue-900">{trimmed}</p>
+        </div>
+      );
+    }
+    return (
+      <ReactMarkdown 
+        key={i}
+        className="text-sm text-slate-700 leading-relaxed markdown-content"
+        components={{
+          p: ({node, ...props}) => <p className="m-0 mb-2 last:mb-0" {...props} />,
+          ul: ({node, ...props}) => <ul className="m-0 mb-2 ml-4 list-disc" {...props} />,
+          ol: ({node, ...props}) => <ol className="m-0 mb-2 ml-4 list-decimal" {...props} />,
+          li: ({node, ...props}) => <li className="mb-1 last:mb-0" {...props} />,
+        }}
+      >
+        {line}
+      </ReactMarkdown>
+    );
+  });
+
   return (
     <div className="flex gap-3 mb-4">
       <CoachAvatar size={32} className="shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         {text && (
-          <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%]">
-            <p className="m-0 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{text}</p>
+          <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] shadow-sm">
+            {formattedContent}
           </div>
         )}
         {planUpdated && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700">
-            <span>✓</span> Plan updated
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700 font-medium">
+            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-green-100 text-[10px]">✓</span> 
+            Plan updated
           </div>
         )}
         {patches && patches.length > 0 && !planUpdated && (

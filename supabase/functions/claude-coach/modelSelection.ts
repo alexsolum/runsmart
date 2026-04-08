@@ -1,5 +1,5 @@
 const DEFAULT_COACH_CHAT_MODEL = "claude-sonnet-4-20250514";
-const DEFAULT_RACE_INFO_MODEL = "claude-3-5-haiku-latest";
+const DEFAULT_RACE_INFO_MODEL = "claude-haiku-4-5";
 
 function readEnv(name: string): string | undefined {
   if (typeof Deno !== "undefined" && Deno.env) {

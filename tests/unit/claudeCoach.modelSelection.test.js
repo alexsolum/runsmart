@@ -10,7 +10,7 @@ describe("getAnthropicModelForMode", () => {
   });
 
   it("uses a cheaper model for race_info by default", () => {
-    expect(getAnthropicModelForMode("race_info")).toBe("claude-3-5-haiku-latest");
+    expect(getAnthropicModelForMode("race_info")).toBe("claude-haiku-4-5");
   });
 
   it("uses the chat model for default coach requests", () => {
@@ -29,7 +29,7 @@ describe("getAnthropicModelForMode", () => {
 
   it("uses a stronger fallback after the cheap race_info model", () => {
     expect(getAnthropicModelCandidatesForMode("race_info")).toEqual([
-      "claude-3-5-haiku-latest",
+      "claude-haiku-4-5",
       "claude-sonnet-4-20250514",
     ]);
   });

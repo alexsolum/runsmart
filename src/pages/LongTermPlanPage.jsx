@@ -7,11 +7,101 @@ import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
 import { CoachFAB } from "../components/CoachFAB";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Flag, Target, Zap, Utensils, Mountain } from "lucide-react";
 
 function normalizeNumberField(value) {
   if (value === "" || value === null || typeof value === "undefined") return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function RaceStrategyCard({ strategy }) {
+  if (!strategy) return null;
+
+  return (
+    <Card className="border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+      <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+        <div className="flex items-center gap-2 text-slate-900">
+          <Flag className="w-5 h-5 text-blue-600" />
+          <CardTitle className="text-lg font-bold">Race Strategy</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 space-y-6">
+        {strategy.event && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">Event</p>
+              <p className="text-sm font-semibold text-slate-900">{strategy.event.name}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">Distance</p>
+                <p className="text-sm font-semibold text-slate-900">{strategy.event.distance}</p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">Type</p>
+                <p className="text-sm font-semibold text-slate-900">{strategy.event.type}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            {strategy.keyTactics && strategy.keyTactics.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 text-slate-900">
+                  <Target className="w-4 h-4 text-orange-500" />
+                  <h4 className="text-sm font-bold uppercase tracking-tight">Key Tactics</h4>
+                </div>
+                <ul className="space-y-2">
+                  {strategy.keyTactics.map((tactic, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-600">
+                      <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5" />
+                      {tactic}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {strategy.pacing && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 text-slate-900">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  <h4 className="text-sm font-bold uppercase tracking-tight">Pacing</h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{strategy.pacing}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {strategy.fueling && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 text-slate-900">
+                  <Utensils className="w-4 h-4 text-green-500" />
+                  <h4 className="text-sm font-bold uppercase tracking-tight">Fueling</h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{strategy.fueling}</p>
+              </div>
+            )}
+
+            {strategy.terrain && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 text-slate-900">
+                  <Mountain className="w-4 h-4 text-slate-500" />
+                  <h4 className="text-sm font-bold uppercase tracking-tight">Terrain</h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{strategy.terrain}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function resolveWorkoutSelection(planData, selection) {
@@ -156,6 +246,12 @@ export default function LongTermPlanPage() {
               planData={planData}
               onWorkoutSelect={handleViewerWorkoutSelect}
             />
+
+            {planData?.raceStrategy && (
+              <div className="mt-12">
+                <RaceStrategyCard strategy={planData.raceStrategy} />
+              </div>
+            )}
           </div>
         )}
       </div>

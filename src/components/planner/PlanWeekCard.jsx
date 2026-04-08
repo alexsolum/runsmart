@@ -38,20 +38,35 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
 
   const days = useMemo(() => {
     const raw = week?.days ?? [];
-    const DOW_ORDER = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-    return [...raw].sort((a, b) => {
-      const key = (day) => {
-        if (day.date) {
-          const d = new Date(`${day.date}T00:00:00Z`).getUTCDay(); // 0=Sun,1=Mon..6=Sat
-          if (!Number.isNaN(d)) return d === 0 ? 7 : d;
-        }
-        return DOW_ORDER[day.dayOfWeek] ?? 8; // fallback: use dayOfWeek abbreviation
-      };
-      return key(a) - key(b);
+    
+    // We want exactly 7 slots, starting from Monday
+    const DOW_ORDER = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+    const fullWeek = Array(7).fill(null);
+
+    raw.forEach(day => {
+      let index = -1;
+      if (day.date) {
+        const d = new Date(`${day.date}T00:00:00Z`).getUTCDay(); // 0=Sun, 1=Mon...
+        index = (d === 0) ? 6 : d - 1; // Mon=0, Sun=6
+      } else if (day.dayOfWeek) {
+        // dayOfWeek might be full name or abbreviation
+        const abbrev = day.dayOfWeek.substring(0, 3);
+        index = DOW_ORDER[abbrev] ?? -1;
+      }
+
+      if (index >= 0 && index < 7) {
+        fullWeek[index] = day;
+      }
     });
+
+    return fullWeek;
   }, [week?.days]);
+
   const [mobileDayIndex, setMobileDayIndex] = useState(0);
-  const mobileDay = days[mobileDayIndex] ?? null;
+  // Filter out null days for mobile pager
+  const validDays = useMemo(() => days.filter(d => d !== null), [days]);
+  const mobileDay = validDays[mobileDayIndex] ?? null;
+
   const metricHours = useMemo(() => formatHours(week?.summary?.totalHours), [week?.summary?.totalHours]);
 
   useEffect(() => {
@@ -110,13 +125,13 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
                 data-testid={`mobile-day-indicator-${week.weekNumber}`}
                 className="text-sm font-semibold text-slate-600"
               >
-                Day {mobileDayIndex + 1} of {days.length}
+                Day {mobileDayIndex + 1} of {validDays.length}
               </div>
               <button
                 type="button"
                 className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-40"
-                onClick={() => setMobileDayIndex((current) => Math.min(days.length - 1, current + 1))}
-                disabled={mobileDayIndex === days.length - 1}
+                onClick={() => setMobileDayIndex((current) => Math.min(validDays.length - 1, current + 1))}
+                disabled={mobileDayIndex === validDays.length - 1}
               >
                 Next day
               </button>
@@ -131,15 +146,29 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
             ) : null}
           </div>
         ) : (
-          <div className="grid grid-cols-7 gap-3">
-            {days.map((day) => (
-              <PlanDayCell
-                key={day.date}
-                day={day}
-                week={week}
-                onWorkoutSelect={onWorkoutSelect}
-              />
-            ))}
+          <div className="space-y-2">
+            {/* Day Headers */}
+            <div className="grid grid-cols-7 gap-3 mb-1">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+                <div key={d} className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-3">
+              {days.map((day, idx) => (
+                day ? (
+                  <PlanDayCell
+                    key={day.date || `empty-${idx}`}
+                    day={day}
+                    week={week}
+                    onWorkoutSelect={onWorkoutSelect}
+                  />
+                ) : (
+                  <div key={`empty-${idx}`} className="rounded-[20px] bg-slate-50/50 border border-dashed border-slate-100 min-h-[100px]" />
+                )
+              ))}
+            </div>
           </div>
         )}
       </div>

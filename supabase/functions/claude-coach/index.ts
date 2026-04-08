@@ -441,8 +441,13 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
       return jsonResponse({ error: "sessionId and newMessage are required" }, 400);
     }
 
-    // 3. Load conversation history from DB
-    const history = await loadConversationHistory(supabase, userId, sessionId);
+    const skipPersist = payload.skipPersist === true;
+    const incomingHistory = Array.isArray(payload.conversationHistory) ? payload.conversationHistory : null;
+
+    // 3. Load conversation history — from payload if skipPersist, otherwise from DB
+    const history = (skipPersist && incomingHistory)
+      ? incomingHistory
+      : await loadConversationHistory(supabase, userId, sessionId);
 
     // 4. Build messages array
     const messages: Array<{ role: string; content: any }> = [];
@@ -468,8 +473,10 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     // 8. Route plan mutations
     const routeResult = await routeResponse(envelope, userId, supabase);
 
-    // 9. Persist messages
-    await persistConversationTurn(supabase, userId, sessionId, userContent, apiResult.content);
+    // 9. Persist messages (skip for ephemeral sessions)
+    if (!skipPersist) {
+      await persistConversationTurn(supabase, userId, sessionId, userContent, apiResult.content);
+    }
 
     // 10. Return response
     return jsonResponse({

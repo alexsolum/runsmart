@@ -8,8 +8,10 @@ import {
   KeyboardSensor,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { Sparkles } from "lucide-react";
 import { PlanDayCell } from "./PlanDayCell";
 import { PlanWorkoutCard } from "./PlanWorkoutCard";
+import { WeekReplanModal } from "./WeekReplanModal";
 import { useAppData } from "../../context/AppDataContext";
 
 function formatHours(hours) {
@@ -21,6 +23,7 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
   const { hierarchicalPlan, showToast } = useAppData();
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [dragWidth, setDragWidth] = useState(null);
+  const [replanOpen, setReplanOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -164,6 +167,14 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
               >
                 {week.phase}
               </span>
+              <button
+                type="button"
+                onClick={() => setReplanOpen(true)}
+                title="Replan this week with AI coach"
+                className="rounded-full p-1 bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 transition-colors"
+              >
+                <Sparkles size={13} />
+              </button>
             </div>
             <p className="mt-2 text-sm text-slate-600">{week.focus}</p>
           </div>
@@ -187,6 +198,11 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
           {content}
         </DndContext>
       ) : content}
+      <WeekReplanModal
+        open={replanOpen}
+        onOpenChange={setReplanOpen}
+        week={week}
+      />
     </article>
   );
 }

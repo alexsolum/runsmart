@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PlanWeekCard } from "../../src/components/planner/PlanWeekCard";
 import { AppDataProvider } from "../../src/context/AppDataContext";
@@ -126,5 +126,35 @@ describe("PlanWeekCard Drag and Drop UI", () => {
     );
     const wrapper = document.querySelector('[data-testid="week-grid-1"]');
     expect(wrapper?.innerHTML ?? "").not.toContain("w-[calc((100%-6*0.75rem)/7)]");
+  });
+
+  it("renders a sparkles button in the week title row", () => {
+    render(
+      <ToastProvider>
+        <AppDataProvider>
+          <PlanWeekCard week={MOCK_WEEK} phaseColor="#3b82f6" />
+        </AppDataProvider>
+      </ToastProvider>
+    );
+
+    const btn = screen.getByTitle("Replan this week with AI coach");
+    expect(btn).toBeInTheDocument();
+  });
+
+  it("opens WeekReplanModal when sparkles button is clicked", async () => {
+    render(
+      <ToastProvider>
+        <AppDataProvider>
+          <PlanWeekCard week={MOCK_WEEK} phaseColor="#3b82f6" />
+        </AppDataProvider>
+      </ToastProvider>
+    );
+
+    const btn = screen.getByTitle("Replan this week with AI coach");
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tell me what's happening this week/i)).toBeInTheDocument();
+    });
   });
 });

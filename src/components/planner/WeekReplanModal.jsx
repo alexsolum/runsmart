@@ -5,6 +5,16 @@ import { getSupabaseClient } from "../../lib/supabaseClient";
 import { ChangeCard } from "../chat/ChangeCard";
 import CoachAvatar from "../CoachAvatar";
 
+// Normalize patch entries that the AI may return with non-standard field names
+function normalizePatchEntry(entry) {
+  return {
+    week: entry.week ?? entry.weekNumber ?? entry.weekNum ?? null,
+    dayDate: entry.dayDate ?? entry.date ?? entry.isoDate ?? entry.day_date ?? null,
+    workoutId: entry.workoutId ?? entry.workout_id ?? entry.id ?? null,
+    fields: entry.fields ?? entry.changes ?? entry.adjustments ?? entry.updates ?? {},
+  };
+}
+
 function formatDate(isoDate) {
   return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
     month: "short",
@@ -87,6 +97,7 @@ export function WeekReplanModal({ open, onOpenChange, week }) {
         dayOfWeek: d.dayOfWeek,
         date: d.date,
         workouts: (d.workouts ?? []).map((w) => ({
+          id: w.id,
           type: w.type,
           name: w.name,
           distanceKm: w.distanceKm ?? null,
@@ -135,7 +146,9 @@ export function WeekReplanModal({ open, onOpenChange, week }) {
 
       if (error) throw error;
 
-      const patches = data?.patches ?? null;
+      const patches = Array.isArray(data?.patches) && data.patches.length > 0
+        ? data.patches.map(normalizePatchEntry)
+        : null;
       const patchSummary = data?.patchSummary ?? null;
 
       const assistantMsg = {

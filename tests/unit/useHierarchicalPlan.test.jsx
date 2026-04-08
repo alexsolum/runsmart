@@ -544,7 +544,7 @@ describe("useHierarchicalPlan", () => {
 
     expect(rpcSpy).toHaveBeenCalledWith("apply_plan_patch", {
       p_plan_id: MOCK_PLAN_ROW.id,
-      p_patches: JSON.stringify(patches),
+      p_patches: patches,
     });
   });
 

@@ -220,7 +220,7 @@ the full-plan response format.`;
 
     const { data, error } = await client.rpc("apply_plan_patch", {
       p_plan_id: state.plan.id,
-      p_patches: JSON.stringify(patchArray),
+      p_patches: patchArray,
     });
 
     if (error) {

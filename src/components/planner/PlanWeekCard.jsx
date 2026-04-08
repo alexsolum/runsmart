@@ -38,12 +38,16 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
 
   const days = useMemo(() => {
     const raw = week?.days ?? [];
+    const DOW_ORDER = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
     return [...raw].sort((a, b) => {
-      const toMondayFirst = (isoDate) => {
-        const d = new Date(`${isoDate}T00:00:00Z`).getUTCDay(); // 0=Sun,1=Mon..6=Sat
-        return d === 0 ? 7 : d; // Sun becomes 7
+      const key = (day) => {
+        if (day.date) {
+          const d = new Date(`${day.date}T00:00:00Z`).getUTCDay(); // 0=Sun,1=Mon..6=Sat
+          if (!Number.isNaN(d)) return d === 0 ? 7 : d;
+        }
+        return DOW_ORDER[day.dayOfWeek] ?? 8; // fallback: use dayOfWeek abbreviation
       };
-      return toMondayFirst(a.date) - toMondayFirst(b.date);
+      return key(a) - key(b);
     });
   }, [week?.days]);
   const [mobileDayIndex, setMobileDayIndex] = useState(0);

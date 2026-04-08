@@ -17,7 +17,7 @@ export function buildCoachSystemPrompt(payload: any): string {
 Allowed response envelopes:
 {"type":"conversation","content":"..."}
 {"type":"full-plan","content":"...","plan":{...}}
-{"type":"plan-patch","content":"...","patches":[...],"patchSummary":"..."}
+{"type":"plan-patch","content":"...","patches":[{"week":<weekNumber>,"dayDate":"YYYY-MM-DD","workoutId":"<exact workout id from plan>","fields":{"name":"...","durationMinutes":45}}],"patchSummary":"..."}
 {"type":"plan-phase-update","content":"...","phases":[...]}
 
 Rules:

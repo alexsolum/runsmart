@@ -32,7 +32,7 @@ export function ChangeCard({ patch, patchSummary, onAccept, onDismiss }) {
         {patch.map((entry, idx) => (
           <li key={idx} className="text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-2">
             <span className="font-semibold">Week {entry.week}, {entry.dayDate}:</span>{" "}
-            {Object.entries(entry.fields).map(([k, v]) => `${k}: ${v}`).join(", ")}
+            {Object.entries(entry.fields ?? {}).map(([k, v]) => `${k}: ${v}`).join(", ")}
           </li>
         ))}
       </ul>

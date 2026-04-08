@@ -470,8 +470,10 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
     // 7. Parse response envelope
     const envelope = extractResponseEnvelope(apiResult);
 
-    // 8. Route plan mutations
-    const routeResult = await routeResponse(envelope, userId, supabase);
+    // 8. Route plan mutations (skip for ephemeral sessions — let the client decide)
+    const routeResult = skipPersist
+      ? { planUpdated: false, error: null }
+      : await routeResponse(envelope, userId, supabase);
 
     // 9. Persist messages (skip for ephemeral sessions)
     if (!skipPersist) {

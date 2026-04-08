@@ -41,7 +41,9 @@ Hard constraints for the full plan:
 - Return exactly these top-level keys in plan: meta, assessment, zones, phases, weeks, raceStrategy.
 - plan.meta must include: id, event, eventDate, planStartDate, planEndDate, totalWeeks, generatedBy, createdAt, updatedAt.
 - plan.weeks must be a non-empty array. Each week must include: weekNumber, startDate, endDate, phase, focus, days.
+- WEEKS MUST START ON MONDAY. plan.weeks[i].startDate must always be a Monday.
 - Each day must include: date, dayOfWeek, workouts.
+- Dates and dayOfWeek must be perfectly aligned (e.g., if date is a Monday, dayOfWeek must be "Mon").
 - Each workout must include: id, sport, type, name. Include description, durationMinutes, distanceKm, primaryZone, humanReadable, completed when possible.
 - plan.meta.planStartDate must exactly equal plan.weeks[0].startDate.
 - plan.meta.totalWeeks must exactly equal plan.weeks.length.
@@ -141,15 +143,10 @@ function addDays(base: Date, days: number): string {
   return d.toISOString().split("T")[0];
 }
 
-function abbreviateDay(day: unknown, dateIso: string): string {
-  if (typeof day === "string") {
-    const normalized = day.trim().toLowerCase();
-    if (DAY_NAME_TO_SHORT[normalized]) return DAY_NAME_TO_SHORT[normalized];
-    if (day.length >= 3) return day.slice(0, 3);
-  }
-
+function abbreviateDay(_day: unknown, dateIso: string): string {
   const date = new Date(`${dateIso}T00:00:00Z`);
-  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+  const dayIndex = date.getUTCDay(); // 0=Sun, 1=Mon...
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dayIndex];
 }
 
 function normalizeSport(value: unknown): string {

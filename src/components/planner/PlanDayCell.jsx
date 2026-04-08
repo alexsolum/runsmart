@@ -32,10 +32,7 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
       )}
     >
       <div className="mb-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-          {day?.dayOfWeek}
-        </div>
-        <div className="mt-1 text-sm font-semibold text-slate-900">{formatDayDate(day?.date)}</div>
+        <div className="text-sm font-bold text-slate-900">{formatDayDate(day?.date)}</div>
       </div>
 
       {workouts.length > 0 ? (

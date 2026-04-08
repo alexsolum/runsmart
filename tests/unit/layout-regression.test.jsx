@@ -112,6 +112,31 @@ describe("styles.css — no non-layered element rules that beat Tailwind utiliti
   });
 });
 
+describe("app shell layout contract", () => {
+  it("app-shell locks desktop layout to the viewport and isolates page scrolling", () => {
+    const css = fs.readFileSync(
+      path.join(ROOT, "src/styles/index.css"),
+      "utf-8"
+    );
+    const shellRule = css.match(/\.app-shell\s*\{([^}]*)\}/);
+    expect(shellRule).toBeTruthy();
+    expect(shellRule[1]).toMatch(/height\s*:\s*100vh/);
+    expect(shellRule[1]).toMatch(/overflow\s*:\s*hidden/);
+  });
+
+  it("desktop app-sidebar stays pinned to the viewport while main content scrolls", () => {
+    const css = fs.readFileSync(
+      path.join(ROOT, "src/styles/index.css"),
+      "utf-8"
+    );
+    const sidebarRule = css.match(/\.app-sidebar\s*\{([^}]*)\}/);
+    expect(sidebarRule).toBeTruthy();
+    expect(sidebarRule[1]).toMatch(/position\s*:\s*sticky/);
+    expect(sidebarRule[1]).toMatch(/top\s*:\s*0/);
+    expect(sidebarRule[1]).toMatch(/height\s*:\s*100vh/);
+  });
+});
+
 // ─── Bug 2: Legacy .dashboard-kpi CSS box-model conflict ─────────────────────
 
 describe("legacy CSS — .dashboard-kpi no longer carries box-model properties", () => {

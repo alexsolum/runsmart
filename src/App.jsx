@@ -51,7 +51,7 @@ const NAV_GROUPS = [
 ];
 
 function Shell() {
-  const { auth, plans, activities, checkins } = useAppData();
+  const { auth, plans, activities, checkins, races } = useAppData();
   const { t } = useI18n();
   const [activePage, setActivePage] = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -69,6 +69,7 @@ function Shell() {
           plans.loadPlans(),
           activities.loadActivities({ limit: 200, ascending: false }),
           checkins.loadCheckins(),
+          races.loadRaces(),
         ]);
       } catch (loadError) {
         console.error("Failed to load initial app data", loadError);
@@ -76,7 +77,7 @@ function Shell() {
     };
 
     loadAll();
-  }, [auth.user?.id, plans.loadPlans, activities.loadActivities, checkins.loadCheckins]);
+  }, [auth.user?.id, plans.loadPlans, activities.loadActivities, checkins.loadCheckins, races.loadRaces]);
 
   const activeNavItem = useMemo(
     () => allNavItems.find((item) => item.key === activePage) ?? allNavItems[0],

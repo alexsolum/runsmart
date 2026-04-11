@@ -11,6 +11,7 @@ import DataPage from "./pages/DataPage";
 import InsightsPage from "./pages/InsightsPage";
 import DailyLogPage from "./pages/DailyLogPage";
 import MobilePage from "./pages/MobilePage";
+import RacePage from "./pages/RacePage";
 import MobileNavBar from "./components/MobileNavBar";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import { APP_NAVIGATE_EVENT } from "./lib/appNavigation";
@@ -26,6 +27,7 @@ import {
   Search,
   Bell,
   Smartphone,
+  Trophy,
 } from "lucide-react";
 
 // Static nav structure — labels are i18n keys, translated at render time
@@ -37,6 +39,7 @@ const NAV_GROUPS = [
       { key: "training-plan", labelKey: "nav.trainingPlan", icon: Calendar, component: LongTermPlanPage },
       { key: "coach", labelKey: "sidebar.coach", icon: MessageSquare, component: CoachPage },
       { key: "insights", labelKey: "sidebar.insights", icon: BarChart3, component: InsightsPage },
+      { key: "races", labelKey: "sidebar.races", icon: Trophy, component: RacePage },
     ],
   },
   {

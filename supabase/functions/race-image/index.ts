@@ -46,19 +46,11 @@ function buildSketchPrompt(p: SketchPromptParams): string {
     : `bold dark blue sans-serif text "${p.raceName}"`;
 
   const distanceClause = p.distanceKm
-    ? ` A bold dark blue hand-drawn course line winds a ${p.distanceKm}km loop across the sketch, starting and returning to the city center.`
+    ? ` A bold dark blue hand-drawn course line winds a ${p.distanceKm}km loop across the sketch, starting and returning to the start area.`
     : " A bold dark blue hand-drawn course line winds across the sketch.";
 
   const elevationClause = p.elevationGainM
     ? ` The course gains ${p.elevationGainM}m of elevation.`
-    : "";
-
-  const keyFactsClause = p.keyFacts
-    ? ` Course characteristics: ${p.keyFacts}`
-    : "";
-
-  const descriptionClause = p.description
-    ? ` Additional context: ${p.description}`
     : "";
 
   return [
@@ -69,7 +61,8 @@ function buildSketchPrompt(p: SketchPromptParams): string {
     "The sketch features dense cross-hatching, contour lines, and detailed terrain elements such as glaciers, forests, and rock formations where applicable.",
     distanceClause + elevationClause,
     "The map is covered by a dense, organized network of small hand-pencil-style labels with thin leader lines: geological features with heights, START/FINISH CP, and intermediate checkpoints distributed along the route.",
-    keyFactsClause + descriptionClause,
+    p.keyFacts ? `Course characteristics: ${p.keyFacts}` : "",
+    p.description ? `Additional context: ${p.description}` : "",
     "All label text is correctly spelled and legible. Professional, high-resolution scan quality. Meticulous technical document aesthetic. No photorealistic people, no photography style.",
   ].filter((s) => s.trim()).join(" ");
 }

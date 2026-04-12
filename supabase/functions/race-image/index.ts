@@ -206,11 +206,14 @@ Deno.serve(async (req) => {
 
     const imageUrl = urlData.publicUrl;
 
-    await supabase
+    const { error: dbUpdateError } = await supabase
       .from("races")
       .update({ image_url: imageUrl })
       .eq("id", raceId)
       .eq("user_id", userId);
+    if (dbUpdateError) {
+      console.error("race-image DB update failed:", dbUpdateError.message);
+    }
 
     return respond({ imageUrl });
   } catch (err) {

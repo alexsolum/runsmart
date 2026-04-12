@@ -86,10 +86,10 @@ export function useRaces(userId) {
         // Step 1: fetch race info via claude-coach (best-effort enrichment)
         let raceInfo = null;
         try {
-          const { data: infoData } = await client.functions.invoke("claude-coach", {
-            body: { raceName: data.name },
+          const { data: infoData, error: infoError } = await client.functions.invoke("claude-coach", {
+            body: { mode: "race_info", raceName: data.name },
           });
-          raceInfo = infoData?.raceInfo ?? null;
+          if (!infoError) raceInfo = infoData?.raceInfo ?? null;
         } catch {
           // race_info lookup failed — proceed without enrichment
         }

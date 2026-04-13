@@ -5,6 +5,12 @@ interface RaceInfo {
   terrain?: string | null;
   location?: string | null;
   keyFacts?: string | null;
+  description?: string | null;
+  registrationInfo?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  nextRaceDate?: string | null;
+  raceUrl?: string | null;
   unknown?: boolean;
 }
 

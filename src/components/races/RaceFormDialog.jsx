@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
+import { Loader2, X } from "lucide-react";
 import { useI18n } from "../../i18n/translations";
+import { getSupabaseClient } from "../../lib/supabaseClient";
+import { invokeEdgeFunctionWithSessionRetry } from "../../lib/edgeFunctionAuth";
 
 export default function RaceFormDialog({ open, onClose, onSubmit, initialData }) {
   const { t } = useI18n();
+  const client = useMemo(() => getSupabaseClient(), []);
   const isEdit = Boolean(initialData);
 
   const [form, setForm] = useState({
@@ -23,6 +27,9 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
     registration_info: "",
     image_url: "",
   });
+
+  const [raceInfo, setRaceInfo] = useState(null);
+  const [raceInfoLoading, setRaceInfoLoading] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -45,11 +52,44 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
         latitude: "", longitude: "", description: "", race_url: "",
         next_race_date: "", registration_info: "", image_url: "",
       });
+      setRaceInfo(null);
     }
   }, [initialData, open]);
 
   function handleChange(field) {
     return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  }
+
+  async function handleRaceLookup() {
+    if (!form.name.trim() || raceInfoLoading) return;
+    setRaceInfoLoading(true);
+    setRaceInfo(null);
+    try {
+      const { data, error } = await invokeEdgeFunctionWithSessionRetry(client, "claude-coach", {
+        body: { mode: "race_info", raceName: form.name.trim() },
+      });
+      if (error) throw error;
+      const info = data?.raceInfo ?? null;
+      setRaceInfo(info);
+      if (info) {
+        setForm((prev) => ({
+          ...prev,
+          location: prev.location || (info.location ?? ""),
+          distance_km: prev.distance_km || (info.distanceKm != null ? String(info.distanceKm) : ""),
+          elevation_gain_m: prev.elevation_gain_m || (info.elevationGainM != null ? String(info.elevationGainM) : ""),
+          description: prev.description || (info.description ?? ""),
+          registration_info: prev.registration_info || (info.registrationInfo ?? ""),
+          latitude: prev.latitude || (info.latitude != null ? String(info.latitude) : ""),
+          longitude: prev.longitude || (info.longitude != null ? String(info.longitude) : ""),
+          next_race_date: prev.next_race_date || (info.nextRaceDate ?? ""),
+          race_url: prev.race_url || (info.raceUrl ?? ""),
+        }));
+      }
+    } catch (err) {
+      console.error("Race info lookup failed:", err);
+    } finally {
+      setRaceInfoLoading(false);
+    }
   }
 
   function handleSubmit(e) {
@@ -67,7 +107,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
       registration_info: form.registration_info.trim() || null,
       image_url: form.image_url.trim() || null,
     };
-    onSubmit(data);
+    onSubmit(data, raceInfo);
   }
 
   return (
@@ -79,8 +119,54 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <Label htmlFor="race-name">{t("races.name")} *</Label>
-            <Input id="race-name" value={form.name} onChange={handleChange("name")} required />
+            <div className="flex gap-2 mt-1">
+              <Input
+                id="race-name"
+                value={form.name}
+                onChange={handleChange("name")}
+                required
+                className="flex-1"
+              />
+              {!isEdit && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRaceLookup}
+                  disabled={!form.name.trim() || raceInfoLoading}
+                >
+                  {raceInfoLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Slå opp →"
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Race info card */}
+          {raceInfo && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm relative">
+              <button
+                type="button"
+                onClick={() => setRaceInfo(null)}
+                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <p className="font-semibold">{raceInfo.displayName}</p>
+              <p className="text-muted-foreground mt-0.5">
+                {raceInfo.distanceKm && `${raceInfo.distanceKm}km`}
+                {raceInfo.terrain && ` · ${raceInfo.terrain}`}
+                {raceInfo.location && ` · ${raceInfo.location}`}
+              </p>
+              {raceInfo.keyFacts && (
+                <p className="mt-1 text-muted-foreground">{raceInfo.keyFacts}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <Label htmlFor="race-location">{t("races.location")}</Label>
             <Input id="race-location" value={form.location} onChange={handleChange("location")} />

@@ -389,8 +389,15 @@ Deno.serve(async (req) => {
   "elevationGainM": number or null,
   "terrain": "brief terrain description",
   "location": "City, Country",
-  "keyFacts": "1-2 sentences of key training implications"
+  "keyFacts": "1-2 sentences of key training implications",
+  "description": "2-3 sentences describing the race character, scenery, and what makes it special",
+  "registrationInfo": "brief info about registration, typical opening dates, lottery if applicable",
+  "latitude": number or null,
+  "longitude": number or null,
+  "nextRaceDate": "YYYY-MM-DD of the next known edition, or null if unknown",
+  "raceUrl": "official race website URL, or null if unknown"
 }
+All text fields (terrain, keyFacts, description, registrationInfo) MUST be written in Norwegian (bokmål).
 If the race is unknown or you are not confident, return: {"unknown": true}`;
 
       try {

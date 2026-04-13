@@ -18,6 +18,60 @@ vi.mock("../../src/components/races/StravaDetailPanel", () => ({
   default: () => React.createElement("div", { "data-testid": "strava-panel" }),
 }));
 
+vi.mock("../../src/components/races/RaceDetailView", () => ({
+  default: ({ race, onBack }) =>
+    React.createElement(
+      "div",
+      { "data-testid": "race-detail" },
+      React.createElement(
+        "button",
+        { type: "button", onClick: onBack },
+        "nav.races",
+      ),
+      React.createElement("h1", null, race.name),
+    ),
+}));
+
+vi.mock("../../src/components/races/RaceFormDialog", () => ({
+  default: () => React.createElement("div", { "data-testid": "race-form-dialog" }),
+}));
+
+vi.mock("react-leaflet", () => ({
+  MapContainer: ({ children }) => React.createElement("div", { "data-testid": "map-container" }, children),
+  TileLayer: () => React.createElement("div", { "data-testid": "tile-layer" }),
+  Marker: ({ children }) => React.createElement("div", { "data-testid": "marker" }, children),
+  Popup: ({ children }) => React.createElement("div", { "data-testid": "popup" }, children),
+  useMap: () => ({ fitBounds: vi.fn() }),
+}));
+
+vi.mock("leaflet", () => ({
+  default: {
+    divIcon: vi.fn(() => ({})),
+    latLngBounds: vi.fn(() => ({})),
+  },
+}));
+
+vi.mock("../../src/components/races/RaceMap", () => ({
+  default: ({ races, onSelectRace }) =>
+    React.createElement(
+      "div",
+      { "data-testid": "race-map" },
+      races
+        .filter((race) => race.latitude != null && race.longitude != null)
+        .map((race) =>
+          React.createElement(
+            "button",
+            {
+              key: race.id,
+              type: "button",
+              onClick: () => onSelectRace(race.id),
+            },
+            `Map ${race.name}`,
+          ),
+        ),
+    ),
+}));
+
 vi.mock("../../src/context/AppDataContext", () => {
   let _value;
   return {
@@ -64,6 +118,41 @@ describe("RaceCard", () => {
 
     fireEvent.click(screen.getByText("Boston Marathon"));
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders cover photo as banner when cover_image_url is set", () => {
+    const race = {
+      id: "race-photo",
+      name: "UTMB",
+      location: "Chamonix, France",
+      distance_km: 171,
+      elevation_gain_m: 10000,
+      cover_image_url: "https://example.com/utmb.jpg",
+      image_url: null,
+      race_participations: [],
+      race_resources: [],
+    };
+    render(<RaceCard race={race} onClick={vi.fn()} />);
+    const img = screen.getByRole("img");
+    expect(img).toHaveAttribute("src", "https://example.com/utmb.jpg");
+    expect(img).toHaveAttribute("alt", "UTMB");
+  });
+
+  it("renders gradient banner when cover_image_url is absent", () => {
+    const race = {
+      id: "race-gradient",
+      name: "Local 5K",
+      location: null,
+      distance_km: 5,
+      elevation_gain_m: null,
+      cover_image_url: null,
+      image_url: null,
+      race_participations: [],
+      race_resources: [],
+    };
+    const { container } = render(<RaceCard race={race} onClick={vi.fn()} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector(".bg-gradient-to-br")).toBeTruthy();
   });
 });
 
@@ -152,5 +241,14 @@ describe("RacePage", () => {
     fireEvent.click(screen.getByText("Boston Marathon"));
     // Should show breadcrumb with race name
     expect(screen.getByText("nav.races")).toBeTruthy();
+  });
+
+  it("navigates to detail view when clicking a map marker", () => {
+    render(<RacePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Map Boston Marathon" }));
+
+    expect(screen.getByText("nav.races")).toBeTruthy();
+    expect(screen.getByText("Boston Marathon")).toBeTruthy();
   });
 });

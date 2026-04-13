@@ -51,9 +51,23 @@ export default function RaceCard({ race, onClick }) {
       onClick={onClick}
       className="text-left border border-slate-200 rounded-xl overflow-hidden bg-white hover:shadow-md transition-shadow w-full"
     >
-      <div className={`h-20 bg-gradient-to-br ${isBucketList ? "from-amber-400 to-amber-600" : gradient} flex items-end p-3`}>
-        <span className="text-white font-bold text-base drop-shadow-sm">{race.name}</span>
-      </div>
+      {race.cover_image_url ? (
+        <div className="h-40 relative overflow-hidden">
+          <img
+            src={race.cover_image_url}
+            alt={race.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute bottom-0 left-0 p-3">
+            <span className="text-white font-bold text-base drop-shadow-sm">{race.name}</span>
+          </div>
+        </div>
+      ) : (
+        <div className={`h-40 bg-gradient-to-br ${isBucketList ? "from-amber-400 to-amber-600" : gradient} flex items-end p-3`}>
+          <span className="text-white font-bold text-base drop-shadow-sm">{race.name}</span>
+        </div>
+      )}
       <div className="p-3">
         <div className="text-xs text-slate-500 mb-2">
           {[race.location, race.distance_km && `${race.distance_km} km`, race.elevation_gain_m && `${race.elevation_gain_m}m D+`]

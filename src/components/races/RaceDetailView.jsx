@@ -162,7 +162,7 @@ export default function RaceDetailView({ race, onBack }) {
         </CardContent>
       </Card>
 
-      {/* Sub-tabs: Participations | Resources */}
+      {/* Sub-tabs: Participations | Resources | Race Info */}
       <Tabs value={subTab} onValueChange={setSubTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="participations">
@@ -171,6 +171,9 @@ export default function RaceDetailView({ race, onBack }) {
           <TabsTrigger value="resources">
             {t("races.resources")} ({resources.length})
           </TabsTrigger>
+          {race.sections && race.sections.length > 0 && (
+            <TabsTrigger value="raceinfo">Race info</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="participations">
@@ -193,6 +196,25 @@ export default function RaceDetailView({ race, onBack }) {
             onAdd={() => setAddResourceOpen(true)}
             onDelete={handleDeleteResource}
           />
+        </TabsContent>
+
+        <TabsContent value="raceinfo">
+          {race.sections && race.sections.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              {race.sections.map((section) => (
+                <Card key={section.key}>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-sm mb-2">{section.title}</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">{section.content}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              <p className="text-sm">No race info available</p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

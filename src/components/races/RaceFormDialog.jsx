@@ -138,7 +138,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
       next_race_date: form.next_race_date || null,
       registration_info: form.registration_info.trim() || null,
       image_url: form.image_url.trim() || null,
-      cover_image_url: form.cover_image_url.trim() || null,
+      cover_image_url: form.cover_image_url.trim().startsWith("https://") ? form.cover_image_url.trim() : null,
       sections: form.sections ?? null,
     };
     onSubmit(data, raceInfo);

@@ -26,6 +26,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
     next_race_date: "",
     registration_info: "",
     image_url: "",
+    sections: null,
   });
 
   const [raceInfo, setRaceInfo] = useState(null);
@@ -45,12 +46,14 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
         next_race_date: initialData.next_race_date ?? "",
         registration_info: initialData.registration_info ?? "",
         image_url: initialData.image_url ?? "",
+        sections: initialData.sections ?? null,
       });
     } else {
       setForm({
         name: "", location: "", distance_km: "", elevation_gain_m: "",
         latitude: "", longitude: "", description: "", race_url: "",
         next_race_date: "", registration_info: "", image_url: "",
+        sections: null,
       });
       setRaceInfo(null);
     }
@@ -83,6 +86,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
           longitude: prev.longitude || (info.longitude != null ? String(info.longitude) : ""),
           next_race_date: prev.next_race_date || (info.nextRaceDate ?? ""),
           race_url: prev.race_url || (info.raceUrl ?? ""),
+          sections: info.sections ?? null,
         }));
       }
     } catch (err) {
@@ -106,7 +110,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
       next_race_date: form.next_race_date || null,
       registration_info: form.registration_info.trim() || null,
       image_url: form.image_url.trim() || null,
-      ...(raceInfo?.sections ? { sections: raceInfo.sections } : {}),
+      sections: form.sections ?? null,
     };
     onSubmit(data, raceInfo);
   }

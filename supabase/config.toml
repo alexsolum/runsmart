@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.strava-sync]
 verify_jwt = false
+
+[functions.race-image]
+verify_jwt = false

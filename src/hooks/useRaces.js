@@ -64,7 +64,7 @@ export function useRaces(userId) {
     return data ?? [];
   }, [client, userId]);
 
-  const createRace = useCallback(async (raceData) => {
+  const createRace = useCallback(async (raceData, raceInfo = null) => {
     if (!client) throw new Error("Supabase is not configured");
     if (!userId) throw new Error("User is required");
     dispatch({ type: "pending" });
@@ -80,22 +80,10 @@ export function useRaces(userId) {
     dispatch({ type: "added", payload: data });
 
     // Kick off AI image generation in the background when no image was provided.
-    // The race is visible immediately; the image_url updates when generation completes.
+    // raceInfo is passed in from RaceFormDialog's lookup step — no second claude-coach call needed.
     if (!raceData.image_url) {
-      (async () => {
-        // Step 1: fetch race info via claude-coach (best-effort enrichment)
-        let raceInfo = null;
-        try {
-          const { data: infoData, error: infoError } = await client.functions.invoke("claude-coach", {
-            body: { mode: "race_info", raceName: data.name },
-          });
-          if (!infoError) raceInfo = infoData?.raceInfo ?? null;
-        } catch {
-          // race_info lookup failed — proceed without enrichment
-        }
-
-        // Step 2: generate image with all available data
-        const { data: imgData } = await client.functions.invoke("race-image", {
+      client.functions
+        .invoke("race-image", {
           body: {
             raceId: data.id,
             raceName: data.name,
@@ -107,17 +95,18 @@ export function useRaces(userId) {
             description: data.description ?? undefined,
             raceDate: data.next_race_date ?? undefined,
           },
+        })
+        .then(({ data: imgData }) => {
+          if (imgData?.imageUrl) {
+            dispatch({
+              type: "updated",
+              payload: { ...data, image_url: imgData.imageUrl },
+            });
+          }
+        })
+        .catch(() => {
+          // Image generation is best-effort — silently ignore failures.
         });
-
-        if (imgData?.imageUrl) {
-          dispatch({
-            type: "updated",
-            payload: { ...data, image_url: imgData.imageUrl },
-          });
-        }
-      })().catch(() => {
-        // Image generation is best-effort — silently ignore failures.
-      });
     }
 
     return data;

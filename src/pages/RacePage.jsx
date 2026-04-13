@@ -15,8 +15,8 @@ export default function RacePage() {
     [racesCtx.races, selectedRaceId],
   );
 
-  const handleAddRace = useCallback(async (data) => {
-    const created = await racesCtx.createRace(data);
+  const handleAddRace = useCallback(async (data, raceInfo) => {
+    const created = await racesCtx.createRace(data, raceInfo);
     setAddOpen(false);
     setSelectedRaceId(created.id);
   }, [racesCtx]);

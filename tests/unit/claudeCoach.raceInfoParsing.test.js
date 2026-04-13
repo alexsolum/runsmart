@@ -32,4 +32,18 @@ describe("parseRaceInfoResponse", () => {
   it("returns null when the model marks the race as unknown", () => {
     expect(parseRaceInfoResponse('{"unknown":true}')).toBeNull();
   });
+
+  it("preserves wikipediaTitle when present", () => {
+    const parsed = parseRaceInfoResponse(
+      '{"displayName":"Boston Marathon","distanceKm":42.2,"wikipediaTitle":"Boston Marathon"}',
+    );
+    expect(parsed?.wikipediaTitle).toBe("Boston Marathon");
+  });
+
+  it("accepts null wikipediaTitle", () => {
+    const parsed = parseRaceInfoResponse(
+      '{"displayName":"Local 5K","distanceKm":5,"wikipediaTitle":null}',
+    );
+    expect(parsed?.wikipediaTitle).toBeNull();
+  });
 });

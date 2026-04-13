@@ -248,7 +248,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
             <Input id="race-image" type="url" value={form.image_url} onChange={handleChange("image_url")} />
           </div>
           <div>
-            <Label htmlFor="race-cover-image">Race photo (URL)</Label>
+            <Label htmlFor="race-cover-image">{t("races.coverImageUrl")}</Label>
             <Input
               id="race-cover-image"
               type="url"
@@ -259,7 +259,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
               }}
             />
             {coverImageAutoFilled && (
-              <p className="text-xs text-slate-400 mt-1">Auto-filled from Wikipedia</p>
+              <p className="text-xs text-muted-foreground mt-1">Auto-filled from Wikipedia</p>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-2">

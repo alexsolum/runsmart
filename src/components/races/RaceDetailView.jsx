@@ -12,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import { Pencil, Plus } from "lucide-react";
+import { BookOpen, Pencil, Plus, Trophy } from "lucide-react";
 import ParticipationAccordion from "./ParticipationAccordion";
 import ResourceList from "./ResourceList";
 import RaceFormDialog from "./RaceFormDialog";
@@ -166,10 +166,12 @@ export default function RaceDetailView({ race, onBack }) {
       <Tabs value={subTab} onValueChange={setSubTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="participations">
-            {t("races.participations")} ({participations.length})
+            <Trophy aria-hidden="true" />
+            <span>{t("races.participations")} ({participations.length})</span>
           </TabsTrigger>
           <TabsTrigger value="resources">
-            {t("races.resources")} ({resources.length})
+            <BookOpen aria-hidden="true" />
+            <span>{t("races.resources")} ({resources.length})</span>
           </TabsTrigger>
         </TabsList>
 

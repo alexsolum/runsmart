@@ -391,6 +391,7 @@ export const SAMPLE_RACES = [
     next_race_date: "2027-04-19",
     registration_info: "Qualifier",
     image_url: null,
+    cover_image_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Boston_Marathon_Finish_Line.jpg/1280px-Boston_Marathon_Finish_Line.jpg",
     created_at: "2026-01-15T10:00:00Z",
     race_participations: [
       {
@@ -451,6 +452,7 @@ export const SAMPLE_RACES = [
     next_race_date: "2027-06-28",
     registration_info: "Lottery + qualifier",
     image_url: null,
+    cover_image_url: null,
     created_at: "2026-02-01T10:00:00Z",
     race_participations: [],
     race_resources: [],

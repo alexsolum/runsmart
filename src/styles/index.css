@@ -464,7 +464,13 @@ progress {
   }
 
   .tabs-03-content {
-    animation: tabs-03-fade-in 160ms ease-out;
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .tabs-03-content {
+      animation: tabs-03-fade-in 160ms ease-out;
+    }
   }
 }
 

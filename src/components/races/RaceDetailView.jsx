@@ -12,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import { Pencil, Plus } from "lucide-react";
+import { BookOpen, Pencil, Plus, Route, Trophy } from "lucide-react";
 import ParticipationAccordion from "./ParticipationAccordion";
 import ResourceList from "./ResourceList";
 import RaceFormDialog from "./RaceFormDialog";
@@ -91,24 +91,54 @@ export default function RaceDetailView({ race, onBack }) {
 
       {/* Hero Card */}
       <Card className="overflow-hidden mb-6">
-        <div className="h-24 bg-gradient-to-br from-blue-500 to-blue-700 flex items-end p-5 relative">
-          <div>
-            <h2 className="text-white font-bold text-xl drop-shadow-sm">{race.name}</h2>
-            {race.location && (
-              <p className="text-blue-100 text-sm">{race.location}</p>
-            )}
+        {/* Hero — cover photo or gradient fallback */}
+        {race.cover_image_url ? (
+          <div className="h-64 relative overflow-hidden">
+            <img
+              src={race.cover_image_url}
+              alt={race.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-5">
+              <div>
+                <h2 className="text-white font-bold text-xl drop-shadow-sm">{race.name}</h2>
+                {race.location && (
+                  <p className="text-white/80 text-sm">{race.location}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setEditOpen(true)}>
+                  <Pencil size={14} className="mr-1" />
+                  {t("races.editRace")}
+                </Button>
+                <Button size="sm" variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setAddParticipationOpen(true)}>
+                  <Plus size={14} className="mr-1" />
+                  {t("races.addParticipation")}
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="ml-auto flex gap-2">
-            <Button size="sm" variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setEditOpen(true)}>
-              <Pencil size={14} className="mr-1" />
-              {t("races.editRace")}
-            </Button>
-            <Button size="sm" variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setAddParticipationOpen(true)}>
-              <Plus size={14} className="mr-1" />
-              {t("races.addParticipation")}
-            </Button>
+        ) : (
+          <div className="h-24 bg-gradient-to-br from-blue-500 to-blue-700 flex items-end p-5 relative">
+            <div>
+              <h2 className="text-white font-bold text-xl drop-shadow-sm">{race.name}</h2>
+              {race.location && (
+                <p className="text-blue-100 text-sm">{race.location}</p>
+              )}
+            </div>
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setEditOpen(true)}>
+                <Pencil size={14} className="mr-1" />
+                {t("races.editRace")}
+              </Button>
+              <Button size="sm" variant="secondary" className="bg-white/20 border-white/30 text-white hover:bg-white/30" onClick={() => setAddParticipationOpen(true)}>
+                <Plus size={14} className="mr-1" />
+                {t("races.addParticipation")}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         <CardContent className="p-5">
           {/* Stats row */}
@@ -159,6 +189,20 @@ export default function RaceDetailView({ race, onBack }) {
               <p className="text-sm text-slate-600 leading-relaxed">{race.description}</p>
             </>
           )}
+
+          {race.image_url && (
+            <>
+              <Separator className="mb-4 mt-4" />
+              <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">Route sketch</p>
+              <div className="bg-slate-50 rounded-lg p-3 flex justify-center">
+                <img
+                  src={race.image_url}
+                  alt={`${race.name} route sketch`}
+                  className="max-h-48 object-contain"
+                />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -166,13 +210,18 @@ export default function RaceDetailView({ race, onBack }) {
       <Tabs value={subTab} onValueChange={setSubTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="participations">
-            {t("races.participations")} ({participations.length})
+            <Trophy aria-hidden="true" />
+            <span>{t("races.participations")} ({participations.length})</span>
           </TabsTrigger>
           <TabsTrigger value="resources">
-            {t("races.resources")} ({resources.length})
+            <BookOpen aria-hidden="true" />
+            <span>{t("races.resources")} ({resources.length})</span>
           </TabsTrigger>
           {race.sections && race.sections.length > 0 && (
-            <TabsTrigger value="raceinfo">Race info</TabsTrigger>
+            <TabsTrigger value="raceinfo">
+              <Route aria-hidden="true" />
+              <span>Race info</span>
+            </TabsTrigger>
           )}
         </TabsList>
 

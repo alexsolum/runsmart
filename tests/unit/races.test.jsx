@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import { makeAppData, SAMPLE_RACES } from "./mockAppData";
@@ -75,7 +75,7 @@ vi.mock("../../src/components/races/RaceMap", () => ({
 vi.mock("../../src/context/AppDataContext", () => {
   let _value;
   return {
-    useAppData: () => _value,
+    useAppData: vi.fn(() => _value),
     AppDataProvider: ({ children }) => children,
     __setMockValue: (v) => { _value = v; },
   };
@@ -90,7 +90,7 @@ import RaceCard from "../../src/components/races/RaceCard";
 import RaceListView from "../../src/components/races/RaceListView";
 import ParticipationAccordion from "../../src/components/races/ParticipationAccordion";
 import ResourceList from "../../src/components/races/ResourceList";
-import { __setMockValue } from "../../src/context/AppDataContext";
+import { __setMockValue, useAppData } from "../../src/context/AppDataContext";
 
 describe("RaceCard", () => {
   it("renders history race with participation count and PR", () => {
@@ -250,5 +250,87 @@ describe("RacePage", () => {
 
     expect(screen.getByText("nav.races")).toBeTruthy();
     expect(screen.getByText("Boston Marathon")).toBeTruthy();
+  });
+});
+
+describe("RaceDetailView (real)", () => {
+  let RaceDetailViewReal;
+
+  beforeAll(async () => {
+    const mod = await vi.importActual("../../src/components/races/RaceDetailView");
+    RaceDetailViewReal = mod.default;
+  });
+
+  function makeRace(overrides = {}) {
+    return {
+      id: "race-detail-test",
+      name: "UTMB",
+      location: "Chamonix, France",
+      distance_km: 171,
+      elevation_gain_m: 10000,
+      cover_image_url: null,
+      image_url: null,
+      description: null,
+      next_race_date: null,
+      registration_info: null,
+      race_participations: [],
+      race_resources: [],
+      sections: [],
+      ...overrides,
+    };
+  }
+
+  function renderDetail(raceOverrides = {}) {
+    const race = makeRace(raceOverrides);
+    const appData = makeAppData({
+      races: {
+        races: [race],
+        loading: false,
+        error: null,
+        loadRaces: vi.fn().mockResolvedValue([race]),
+        createRace: vi.fn().mockResolvedValue(race),
+        updateRace: vi.fn().mockResolvedValue(race),
+        deleteRace: vi.fn().mockResolvedValue(undefined),
+        addParticipation: vi.fn().mockResolvedValue({}),
+        updateParticipation: vi.fn().mockResolvedValue({}),
+        deleteParticipation: vi.fn().mockResolvedValue(undefined),
+        addResource: vi.fn().mockResolvedValue({}),
+        deleteResource: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+    vi.mocked(useAppData).mockReturnValue(appData);
+    return render(<RaceDetailViewReal race={race} onBack={vi.fn()} />);
+  }
+
+  it("renders cover photo hero when cover_image_url is set", () => {
+    const { container } = renderDetail({
+      cover_image_url: "https://example.com/utmb.jpg",
+    });
+    const imgs = container.querySelectorAll("img");
+    const heroImg = Array.from(imgs).find(
+      (img) => img.getAttribute("src") === "https://example.com/utmb.jpg"
+    );
+    expect(heroImg).toBeTruthy();
+  });
+
+  it("renders gradient banner when cover_image_url is absent", () => {
+    const { container } = renderDetail({ cover_image_url: null });
+    expect(container.querySelector(".bg-gradient-to-br")).toBeTruthy();
+  });
+
+  it("renders AI sketch section when image_url is set", () => {
+    const { container } = renderDetail({
+      image_url: "https://example.com/sketch.png",
+    });
+    expect(screen.getByText(/Route sketch/i)).toBeTruthy();
+    const sketchImg = container.querySelector(
+      `img[src="https://example.com/sketch.png"]`
+    );
+    expect(sketchImg).toBeTruthy();
+  });
+
+  it("hides AI sketch section when image_url is null", () => {
+    renderDetail({ image_url: null });
+    expect(screen.queryByText(/Route sketch/i)).toBeNull();
   });
 });

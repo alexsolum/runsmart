@@ -26,11 +26,13 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
     next_race_date: "",
     registration_info: "",
     image_url: "",
+    cover_image_url: "",
     sections: null,
   });
 
   const [raceInfo, setRaceInfo] = useState(null);
   const [raceInfoLoading, setRaceInfoLoading] = useState(false);
+  const [coverImageAutoFilled, setCoverImageAutoFilled] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -46,15 +48,19 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
         next_race_date: initialData.next_race_date ?? "",
         registration_info: initialData.registration_info ?? "",
         image_url: initialData.image_url ?? "",
+        cover_image_url: initialData.cover_image_url ?? "",
         sections: initialData.sections ?? null,
       });
+      setCoverImageAutoFilled(false);
     } else {
       setForm({
         name: "", location: "", distance_km: "", elevation_gain_m: "",
         latitude: "", longitude: "", description: "", race_url: "",
         next_race_date: "", registration_info: "", image_url: "",
+        cover_image_url: "",
         sections: null,
       });
+      setCoverImageAutoFilled(false);
       setRaceInfo(null);
     }
   }, [initialData, open]);
@@ -88,6 +94,28 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
           race_url: prev.race_url || (info.raceUrl ?? ""),
           sections: info.sections ?? null,
         }));
+        // Wikipedia photo fetch
+        if (info?.wikipediaTitle) {
+          try {
+            const wikiRes = await fetch(
+              `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(info.wikipediaTitle)}`
+            );
+            if (wikiRes.ok) {
+              const wikiData = await wikiRes.json();
+              const photoUrl =
+                wikiData.originalimage?.source ?? wikiData.thumbnail?.source ?? null;
+              if (photoUrl) {
+                setForm((prev) => ({
+                  ...prev,
+                  cover_image_url: prev.cover_image_url || photoUrl,
+                }));
+                setCoverImageAutoFilled(true);
+              }
+            }
+          } catch {
+            // silent — field stays empty if fetch fails
+          }
+        }
       }
     } catch (err) {
       console.error("Race info lookup failed:", err);
@@ -110,6 +138,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
       next_race_date: form.next_race_date || null,
       registration_info: form.registration_info.trim() || null,
       image_url: form.image_url.trim() || null,
+      cover_image_url: form.cover_image_url.trim() || null,
       sections: form.sections ?? null,
     };
     onSubmit(data, raceInfo);
@@ -217,6 +246,21 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
           <div>
             <Label htmlFor="race-image">{t("races.imageUrl")}</Label>
             <Input id="race-image" type="url" value={form.image_url} onChange={handleChange("image_url")} />
+          </div>
+          <div>
+            <Label htmlFor="race-cover-image">Race photo (URL)</Label>
+            <Input
+              id="race-cover-image"
+              type="url"
+              value={form.cover_image_url}
+              onChange={(e) => {
+                setCoverImageAutoFilled(false);
+                setForm((prev) => ({ ...prev, cover_image_url: e.target.value }));
+              }}
+            />
+            {coverImageAutoFilled && (
+              <p className="text-xs text-slate-400 mt-1">Auto-filled from Wikipedia</p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>{t("races.cancel")}</Button>

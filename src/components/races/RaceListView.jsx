@@ -1,8 +1,9 @@
 import React from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { Button } from "../ui/button";
-import { Plus, MapPin } from "lucide-react";
+import { Flag, Plus, Trophy } from "lucide-react";
 import RaceCard from "./RaceCard";
+import RaceMap from "./RaceMap";
 import { useI18n } from "../../i18n/translations";
 
 export default function RaceListView({ races, activeTab, onTabChange, onSelectRace, onAddRace }) {
@@ -13,20 +14,20 @@ export default function RaceListView({ races, activeTab, onTabChange, onSelectRa
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* Map placeholder */}
-      <div className="bg-slate-100 border border-slate-200 rounded-xl h-40 flex items-center justify-center gap-2 text-slate-400 text-sm mb-6">
-        <MapPin size={18} />
-        {t("races.mapPlaceholder")}
+      <div className="mb-6">
+        <RaceMap races={races} onSelectRace={onSelectRace} />
       </div>
 
       <Tabs value={activeTab} onValueChange={onTabChange}>
         <div className="flex items-center justify-between mb-4">
           <TabsList>
             <TabsTrigger value="history">
-              {t("races.history")} ({historyRaces.length})
+              <Trophy aria-hidden="true" />
+              <span>{t("races.history")} ({historyRaces.length})</span>
             </TabsTrigger>
             <TabsTrigger value="bucket-list">
-              {t("races.bucketList")} ({bucketListRaces.length})
+              <Flag aria-hidden="true" />
+              <span>{t("races.bucketList")} ({bucketListRaces.length})</span>
             </TabsTrigger>
           </TabsList>
           <Button size="sm" onClick={onAddRace}>

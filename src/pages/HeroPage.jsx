@@ -12,11 +12,15 @@ import ActivitiesTable from "../components/dashboard/ActivitiesTable";
 import {
   Activity,
   Clock,
+  Compass,
   MapPin,
   Heart,
+  BarChart3,
   TrendingUp,
   Mountain,
   Download,
+  Bell,
+  FileText,
 } from "lucide-react";
 
 const STORAGE_KEY = "runsmart.dashboard.filters";
@@ -420,11 +424,26 @@ export default function HeroPage() {
       {/* ── Tabs ── */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="alle-lop">Alle løp</TabsTrigger>
-          <TabsTrigger value="analytics" disabled>Analytics</TabsTrigger>
-          <TabsTrigger value="reports" disabled>Reports</TabsTrigger>
-          <TabsTrigger value="notifications" disabled>Notifications</TabsTrigger>
+          <TabsTrigger value="overview">
+            <Compass aria-hidden="true" />
+            <span>Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="alle-lop">
+            <Activity aria-hidden="true" />
+            <span>Alle løp</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" disabled>
+            <BarChart3 aria-hidden="true" />
+            <span>Analytics</span>
+          </TabsTrigger>
+          <TabsTrigger value="reports" disabled>
+            <FileText aria-hidden="true" />
+            <span>Reports</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" disabled>
+            <Bell aria-hidden="true" />
+            <span>Notifications</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Overview Tab ── */}

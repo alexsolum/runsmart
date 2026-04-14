@@ -382,22 +382,31 @@ Deno.serve(async (req) => {
       const raceName = payload.raceName;
       if (!raceName) return jsonResponse({ raceInfo: null });
 
-      const RACE_INFO_SYSTEM = `You are a running race database. Return ONLY a JSON object (no markdown, no explanation) with these exact fields:
+      const RACE_INFO_SYSTEM = `You are a running race database and encyclopedia. Return ONLY a JSON object (no markdown, no explanation) with these exact fields:
 {
   "displayName": "full official race name",
   "distanceKm": number,
   "elevationGainM": number or null,
-  "terrain": "brief terrain description",
-  "location": "City, Country",
-  "keyFacts": "1-2 sentences of key training implications",
-  "description": "2-3 sentences describing the race character, scenery, and what makes it special",
-  "registrationInfo": "brief info about registration, typical opening dates, lottery if applicable",
+  "terrain": "kort terrengbeskrivelse",
+  "location": "By, Land",
+  "keyFacts": "1-2 setninger om viktige treningsimplikasjoner",
+  "description": "2-3 setninger om løpets karakter, sceneri og hva som gjør det spesielt",
+  "registrationInfo": "kort info om påmelding, typiske åpningsdatoer, lotteri hvis aktuelt",
   "latitude": number or null,
   "longitude": number or null,
-  "nextRaceDate": "YYYY-MM-DD of the next known edition, or null if unknown",
-  "raceUrl": "official race website URL, or null if unknown"
+  "nextRaceDate": "YYYY-MM-DD for neste kjente utgave, eller null",
+  "raceUrl": "offisiell nettside-URL, eller null",
+  "wikipediaTitle": "the exact English Wikipedia article title for this race, e.g. \"Boston Marathon\" or \"Ultra-Trail du Mont-Blanc\". Return null if no Wikipedia article exists for this specific race.",
+  "sections": [
+    { "key": "overview", "title": "Oversikt", "content": "Hva løpet er, distanse, sted, når det holdes, hva som gjør det kjent. 2-4 setninger." },
+    { "key": "course_terrain", "title": "Rute og terreng", "content": "Rutebeskrivelse, høydeprofil, underlag, viktige stigninger/nedoverbakker, depotplasseringer. 3-5 setninger." },
+    { "key": "history", "title": "Historie", "content": "Når det startet, grunnleggelseshistorie, hvordan det har utviklet seg, viktige milepæler. 2-4 setninger." },
+    { "key": "notable_results", "title": "Merkverdige resultater", "content": "Løyperekorder (M/K), kjente vinnere, ikoniske prestasjoner, minneverdige utgaver. 2-4 setninger." },
+    { "key": "reputation", "title": "Rykte og status", "content": "Løpets plass i løpeverdenen (major-serie, kvalifiseringsløp, bucket-list), hva løpere sier om det, vanskelighetsgrad. 2-3 setninger." },
+    { "key": "training_implications", "title": "Treningsråd", "content": "Hva du bør forberede deg på, viktige krav (høyde, varme, teknisk krevende), anbefalt treningsfokus. 2-3 setninger." }
+  ]
 }
-All text fields (terrain, keyFacts, description, registrationInfo) MUST be written in Norwegian (bokmål).
+All text fields and all section titles and content MUST be written in Norwegian (bokmål). Section content should be factual plain text (no markdown). If you lack confident information for a section, write a brief honest note.
 If the race is unknown or you are not confident, return: {"unknown": true}`;
 
       try {
@@ -411,7 +420,7 @@ If the race is unknown or you are not confident, return: {"unknown": true}`;
             },
             body: JSON.stringify({
               model,
-              max_tokens: 300,
+              max_tokens: 2000,
               system: RACE_INFO_SYSTEM,
               messages: [{ role: "user", content: `Race: ${raceName}` }],
             }),

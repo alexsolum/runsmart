@@ -38,6 +38,9 @@ import {
   ReferenceLine,
 } from "recharts";
 
+const DEFAULT_INSIGHT_REFRESH_INTERVAL_HOURS = 24;
+const SYNTHESIS_CACHE_KEY_PREFIX = "runsmart-insights-synthesis";
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function fmtDate(value) {
@@ -387,22 +390,50 @@ function DecouplingTooltip({ active, payload, locale, copy }) {
   return null;
 }
 
-// ── Synthesis cache (module-level, survives navigation, resets on full page reload) ──
-const SYNTHESIS_CACHE = {
-  // keyed by lang: { text: string, cachedAt: number }
-};
-const SYNTHESIS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+function getSynthesisCacheKey(userId, lang) {
+  return `${SYNTHESIS_CACHE_KEY_PREFIX}-${userId}-${lang}`;
+}
+
+function readSynthesisCache(userId, lang) {
+  if (!userId || typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(getSynthesisCacheKey(userId, lang));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.text !== "string" || typeof parsed.fetchedAt !== "string") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSynthesisCache(userId, lang, text, fetchedAt) {
+  if (!userId || typeof localStorage === "undefined") return;
+  localStorage.setItem(
+    getSynthesisCacheKey(userId, lang),
+    JSON.stringify({ userId, lang, text, fetchedAt }),
+  );
+}
 
 export function __resetInsightsSynthesisCacheForTests() {
-  Object.keys(SYNTHESIS_CACHE).forEach((key) => {
-    delete SYNTHESIS_CACHE[key];
-  });
+  if (typeof localStorage === "undefined") return;
+  const keys = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith(SYNTHESIS_CACHE_KEY_PREFIX)) {
+      keys.push(key);
+    }
+  }
+  keys.forEach((key) => localStorage.removeItem(key));
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
   const {
+    auth,
     activities,
     checkins,
     plans,
@@ -498,6 +529,15 @@ export default function InsightsPage() {
             vsLastWeek: "km vs forrige uke",
             vsFourWeeksAgo: "vs for 4 uker siden",
             eightWeeks: "uker",
+            insightRefreshLabel: "Oppdateringsfrekvens for AI-innsikt",
+            insightRefreshHint: "Velg hvor ofte AI-innsikten skal oppdateres automatisk.",
+            insightRefreshCached: "Bruker bufret innsikt",
+            insightRefreshUpdated: "Sist oppdatert",
+            refreshNow: "Oppdater nå",
+            refreshInterval12Hours: "Hver 12. time",
+            refreshInterval24Hours: "Daglig",
+            refreshInterval72Hours: "Hver 3. dag",
+            refreshInterval168Hours: "Ukentlig",
           }
         : {
             title: "Training analysis & insights",
@@ -580,6 +620,15 @@ export default function InsightsPage() {
             vsLastWeek: "km vs last week",
             vsFourWeeksAgo: "vs 4 weeks ago",
             eightWeeks: "wks",
+            insightRefreshLabel: "Insight refresh frequency",
+            insightRefreshHint: "Choose how often AI insights should refresh automatically.",
+            insightRefreshCached: "Using cached insight",
+            insightRefreshUpdated: "Last updated",
+            refreshNow: "Refresh now",
+            refreshInterval12Hours: "Every 12 hours",
+            refreshInterval24Hours: "Daily",
+            refreshInterval72Hours: "Every 3 days",
+            refreshInterval168Hours: "Weekly",
           },
     [lang],
   );
@@ -834,24 +883,52 @@ export default function InsightsPage() {
 
   const [synthesis, setSynthesis] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
-  const synthesisFetchedRef = useRef(false);
+  const [synthesisFetchedAt, setSynthesisFetchedAt] = useState(null);
+  const [synthesisFromCache, setSynthesisFromCache] = useState(false);
+  const [refreshIntervalHours, setRefreshIntervalHours] = useState(DEFAULT_INSIGHT_REFRESH_INTERVAL_HOURS);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const fetchAttemptKeyRef = useRef(null);
+  const userId = auth?.user?.id ?? null;
 
-  // When language changes: restore from cache if valid, otherwise clear and allow fetch
   useEffect(() => {
-    if (!hasData) {
-      synthesisFetchedRef.current = false;
+    if (!userId) return;
+    runnerProfile.loadProfile?.();
+  }, [runnerProfile.loadProfile, userId]);
+
+  useEffect(() => {
+    const nextInterval = Number.isFinite(runnerProfile.insightRefreshIntervalHours)
+      ? runnerProfile.insightRefreshIntervalHours
+      : DEFAULT_INSIGHT_REFRESH_INTERVAL_HOURS;
+    setRefreshIntervalHours(nextInterval);
+  }, [runnerProfile.insightRefreshIntervalHours]);
+
+  useEffect(() => {
+    if (!hasData || !userId) {
+      fetchAttemptKeyRef.current = null;
       setSynthesis(null);
+      setSynthesisFetchedAt(null);
+      setSynthesisFromCache(false);
+      setSynthesisLoading(false);
       return;
     }
-    const cached = SYNTHESIS_CACHE[lang];
-    const isValid = cached && Date.now() - cached.cachedAt < SYNTHESIS_CACHE_TTL_MS;
-    synthesisFetchedRef.current = isValid;
-    setSynthesis(isValid ? cached.text : null);
-  }, [hasData, lang]);
 
-  useEffect(() => {
-    if (!hasData || synthesisFetchedRef.current) return;
-    synthesisFetchedRef.current = true;
+    const isForcedRefresh = refreshNonce > 0;
+    const cached = readSynthesisCache(userId, lang);
+    const cacheAgeMs = cached ? Date.now() - new Date(cached.fetchedAt).getTime() : Number.POSITIVE_INFINITY;
+    const maxAgeMs = refreshIntervalHours * 60 * 60 * 1000;
+    const isFresh = cached && cacheAgeMs < maxAgeMs;
+
+    if (isFresh && !isForcedRefresh) {
+      setSynthesis(cached.text);
+      setSynthesisFetchedAt(cached.fetchedAt);
+      setSynthesisFromCache(true);
+      setSynthesisLoading(false);
+      return;
+    }
+
+    const fetchAttemptKey = `${userId}:${lang}:${refreshIntervalHours}:${refreshNonce}`;
+    if (fetchAttemptKeyRef.current === fetchAttemptKey) return;
+    fetchAttemptKeyRef.current = fetchAttemptKey;
     setSynthesisLoading(true);
 
     (async () => {
@@ -870,18 +947,48 @@ export default function InsightsPage() {
         if (data?.synthesis) {
           const { text, isTrusted } = sanitizeSynthesisText(data.synthesis);
           if (isTrusted || hasRequiredSynthesisHeadings(text, lang)) {
-            // Store in module-level cache before setting state
-            SYNTHESIS_CACHE[lang] = { text, cachedAt: Date.now() };
+            const fetchedAt = new Date().toISOString();
+            writeSynthesisCache(userId, lang, text, fetchedAt);
             setSynthesis(text);
+            setSynthesisFetchedAt(fetchedAt);
+            setSynthesisFromCache(false);
           }
         }
       } catch {
         // silent fail — callout is omitted
       } finally {
         setSynthesisLoading(false);
+        if (refreshNonce !== 0) {
+          setRefreshNonce(0);
+        }
       }
     })();
-  }, [activities, checkins, dailyLogs, hasData, invokeInsightsSynthesis, lang, plans.plans, runnerProfile, trainingBlocks]);
+  }, [
+    activities,
+    checkins,
+    dailyLogs,
+    hasData,
+    invokeInsightsSynthesis,
+    lang,
+    plans.plans,
+    refreshIntervalHours,
+    refreshNonce,
+    runnerProfile,
+    trainingBlocks,
+    userId,
+  ]);
+
+  const handleRefreshIntervalChange = async (event) => {
+    const nextValue = Number(event.target.value);
+    setRefreshIntervalHours(nextValue);
+    fetchAttemptKeyRef.current = null;
+    await runnerProfile.saveProfile?.(runnerProfile.background ?? "", nextValue);
+  };
+
+  const handleManualRefresh = () => {
+    fetchAttemptKeyRef.current = null;
+    setRefreshNonce((current) => current + 1);
+  };
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -899,6 +1006,35 @@ export default function InsightsPage() {
           </p>
         </div>
       </div>
+
+      {hasData && (
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <label
+              className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1"
+              htmlFor="insight-refresh-frequency"
+            >
+              {copy.insightRefreshLabel}
+            </label>
+            <select
+              id="insight-refresh-frequency"
+              aria-label={copy.insightRefreshLabel}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              value={String(refreshIntervalHours)}
+              onChange={handleRefreshIntervalChange}
+            >
+              <option value="12">{copy.refreshInterval12Hours}</option>
+              <option value="24">{copy.refreshInterval24Hours}</option>
+              <option value="72">{copy.refreshInterval72Hours}</option>
+              <option value="168">{copy.refreshInterval168Hours}</option>
+            </select>
+            <p className="m-0 mt-1 text-xs text-slate-500">{copy.insightRefreshHint}</p>
+          </div>
+          <Button type="button" variant="outline" onClick={handleManualRefresh}>
+            {copy.refreshNow}
+          </Button>
+        </div>
+      )}
 
       {/* Synthesis callout — above KPI strip */}
       {synthesisLoading && <SkeletonBlock height={120} data-testid="synthesis-skeleton" />}
@@ -932,6 +1068,14 @@ export default function InsightsPage() {
             >
               {synthesis}
             </ReactMarkdown>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
+            {synthesisFromCache ? <span>{copy.insightRefreshCached}</span> : null}
+            {synthesisFetchedAt ? (
+              <span>
+                {copy.insightRefreshUpdated}: {new Date(synthesisFetchedAt).toLocaleString(locale)}
+              </span>
+            ) : null}
           </div>
         </div>
       )}

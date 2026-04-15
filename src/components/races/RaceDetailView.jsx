@@ -235,7 +235,19 @@ export default function RaceDetailView({ race, onBack }) {
               </Button>
             </div>
           ) : (
-            <ParticipationAccordion participations={participations} />
+            <div className="space-y-6">
+              <ParticipationAccordion participations={participations} />
+              <div className="flex justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAddParticipationOpen(true)}
+                >
+                  <Plus size={14} className="mr-1" />
+                  {t("races.addParticipation")}
+                </Button>
+              </div>
+            </div>
           )}
         </TabsContent>
 

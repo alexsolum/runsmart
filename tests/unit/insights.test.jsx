@@ -5,7 +5,7 @@
  * data stored in the Supabase `activities` table.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import InsightsPage, { __resetInsightsSynthesisCacheForTests } from "../../src/pages/InsightsPage";
 import { makeAppData, SAMPLE_ACTIVITIES } from "./mockAppData";
 
@@ -20,15 +20,31 @@ vi.mock("../../src/lib/coachPayload.js", () => ({
 import { useAppData } from "../../src/context/AppDataContext";
 import { buildCoachPayload } from "../../src/lib/coachPayload.js";
 
+function createLocalStorageMock(seed = {}) {
+  const store = { ...seed };
+  return {
+    getItem: vi.fn((key) => (key in store ? store[key] : null)),
+    setItem: vi.fn((key, value) => {
+      store[key] = String(value);
+    }),
+    removeItem: vi.fn((key) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      Object.keys(store).forEach((key) => delete store[key]);
+    }),
+    key: vi.fn((index) => Object.keys(store)[index] ?? null),
+    get length() {
+      return Object.keys(store).length;
+    },
+    __store: store,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   __resetInsightsSynthesisCacheForTests();
-  vi.stubGlobal("localStorage", {
-    getItem: vi.fn(() => "en"),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-  });
+  vi.stubGlobal("localStorage", createLocalStorageMock({ "runsmart-lang": "en" }));
 });
 
 describe("Insights — page structure", () => {
@@ -392,5 +408,124 @@ describe("Insights — synthesis callout (INSG-02)", () => {
     expect(screen.queryByTestId("synthesis-callout")).toBeNull();
     expect(screen.queryByTestId("synthesis-skeleton")).toBeNull();
     expect(invokeInsightsSynthesis).not.toHaveBeenCalled();
+  });
+
+  it("uses cached synthesis from localStorage without calling the edge function", () => {
+    const fetchedAt = new Date().toISOString();
+    vi.stubGlobal(
+      "localStorage",
+      createLocalStorageMock({
+        "runsmart-lang": "en",
+        "runsmart-insights-synthesis-user-1-en": JSON.stringify({
+          text: "Mileage Trend: cached insight.\nIntensity Distribution: cached.\nLong-Run Progression: cached.\nRace Readiness: cached.",
+          fetchedAt,
+          lang: "en",
+          userId: "user-1",
+        }),
+      }),
+    );
+    const invokeInsightsSynthesis = vi.fn();
+    useAppData.mockReturnValue(makeAppData({ invokeInsightsSynthesis }));
+
+    render(<InsightsPage />);
+
+    expect(screen.getByTestId("synthesis-callout")).toHaveTextContent("Mileage Trend: cached insight.");
+    expect(screen.getByText(new RegExp(`Last updated.*${new Date(fetchedAt).toLocaleString()}`, "i"))).toBeInTheDocument();
+    expect(screen.getByText(/Using cached insight/i)).toBeInTheDocument();
+    expect(invokeInsightsSynthesis).not.toHaveBeenCalled();
+  });
+
+  it("fetches again when the cached synthesis is older than the selected interval", async () => {
+    const staleAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    vi.stubGlobal(
+      "localStorage",
+      createLocalStorageMock({
+        "runsmart-lang": "en",
+        "runsmart-insights-synthesis-user-1-en": JSON.stringify({
+          text: "Mileage Trend: stale.\nIntensity Distribution: stale.\nLong-Run Progression: stale.\nRace Readiness: stale.",
+          fetchedAt: staleAt,
+          lang: "en",
+          userId: "user-1",
+        }),
+      }),
+    );
+    const invokeInsightsSynthesis = vi.fn().mockResolvedValue({
+      synthesis: [
+        "Mileage Trend: refreshed.",
+        "Intensity Distribution: refreshed.",
+        "Long-Run Progression: refreshed.",
+        "Race Readiness: refreshed.",
+      ].join("\n"),
+    });
+    useAppData.mockReturnValue(makeAppData({
+      invokeInsightsSynthesis,
+      runnerProfile: {
+        background: "",
+        loading: false,
+        error: null,
+        insightRefreshIntervalHours: 24,
+        loadProfile: vi.fn().mockResolvedValue(undefined),
+        saveProfile: vi.fn().mockResolvedValue(undefined),
+      },
+    }));
+
+    render(<InsightsPage />);
+
+    await waitFor(() => expect(invokeInsightsSynthesis).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("synthesis-callout")).toHaveTextContent("Mileage Trend: refreshed.");
+  });
+
+  it("allows changing the refresh interval and persists it through runner profile", async () => {
+    const saveProfile = vi.fn().mockResolvedValue(undefined);
+    useAppData.mockReturnValue(makeAppData({
+      runnerProfile: {
+        background: "",
+        loading: false,
+        error: null,
+        insightRefreshIntervalHours: 24,
+        loadProfile: vi.fn().mockResolvedValue(undefined),
+        saveProfile,
+      },
+    }));
+
+    render(<InsightsPage />);
+
+    fireEvent.change(screen.getByLabelText(/Insight refresh frequency/i), {
+      target: { value: "72" },
+    });
+
+    await waitFor(() => expect(saveProfile).toHaveBeenCalled());
+    expect(saveProfile).toHaveBeenCalledWith("", 72);
+  });
+
+  it("allows manually refreshing the synthesis even when cache is still fresh", async () => {
+    const fetchedAt = new Date().toISOString();
+    vi.stubGlobal(
+      "localStorage",
+      createLocalStorageMock({
+        "runsmart-lang": "en",
+        "runsmart-insights-synthesis-user-1-en": JSON.stringify({
+          text: "Mileage Trend: cached insight.\nIntensity Distribution: cached.\nLong-Run Progression: cached.\nRace Readiness: cached.",
+          fetchedAt,
+          lang: "en",
+          userId: "user-1",
+        }),
+      }),
+    );
+    const invokeInsightsSynthesis = vi.fn().mockResolvedValue({
+      synthesis: [
+        "Mileage Trend: manual refresh.",
+        "Intensity Distribution: manual refresh.",
+        "Long-Run Progression: manual refresh.",
+        "Race Readiness: manual refresh.",
+      ].join("\n"),
+    });
+    useAppData.mockReturnValue(makeAppData({ invokeInsightsSynthesis }));
+
+    render(<InsightsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Refresh now/i }));
+
+    await waitFor(() => expect(invokeInsightsSynthesis).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("synthesis-callout")).toHaveTextContent("Mileage Trend: manual refresh.");
   });
 });

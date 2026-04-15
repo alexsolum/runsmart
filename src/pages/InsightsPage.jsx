@@ -436,12 +436,27 @@ export default function InsightsPage() {
             fatigueLegend: "Tretthet (ATL)",
             formLegend: "Overskudd (TSB)",
             aerobicEfficiencyTitle: "Utholdenhetseffektivitet",
-            aerobicEfficiencyDesc: "Effektivitetsfaktor for flate, aerobe løp og sykkeløkter de siste 365 dagene. 30-dagers snitt glatter ut støy fra varme, søvn og hverdagsbelastning.",
+            aerobicEfficiencyDesc: "Effektivitetsfaktor for flate, aerobe løp og sykkeløkter de siste 2 årene. 30-dagers snitt glatter ut støy fra varme, søvn og hverdagsbelastning.",
+            howToReadTitle: "Hvordan lese diagrammet",
+            howToReadBody: "Effektivitetsfaktor = hastighet pr. puls. En høyere verdi betyr at du løper raskere på samme puls (eller har lavere puls på samme tempo) — altså bedre form. Den mørke linjen er 30-dagers snittet. Prikkene er enkeltøkter og vil naturlig sprike pga. varme, søvn og terreng — fokuser på linjen. Den stiplede Start-linjen viser hvor du lå for 90 dager siden.",
+            howToReadGood: "Stigende linje over Start = framgang",
+            howToReadBad: "Fallende linje under Start = mindre effektiv (tretthet, detrening, varme eller sykdom)",
+            insightHeadline: "Hva sier dataene dine?",
+            insightStrongUp: "Sterk framgang. Effektiviteten din har steget {pct}% de siste 90 dagene — pulsen ligger lavere på sammenlignbart tempo. Hold fast ved rytmen som har virket.",
+            insightMildUp: "Gradvis framgang. Effektiviteten er opp {pct}% mot 90 dager siden. Fortsatt konsekvent aerob trening vil bygge videre på dette.",
+            insightStable: "Stabil form. Effektiviteten har holdt seg flat ({pct}%) over 90 dager. For å bryte platået kan du prøve å øke aerobt volum, terskeløkter, eller sjekke restitusjon og søvn.",
+            insightMildDown: "Liten nedgang ({pct}%). Mulige årsaker: akkumulert tretthet, mindre konsekvent trening, varmestress eller sykdom. Se etter mønstre før du endrer planen.",
+            insightStrongDown: "Tydelig nedgang ({pct}%). Det kan tyde på overtretthet, lengre sykefravær, detrening eller vedvarende stressfaktorer. Vurder noen lettere uker og gjennomgå søvn, kosthold og ytre belastning.",
             aerobicEfficiencyEmpty: "Ingen kvalifiserende aerobe referanseøkter ennå. Trenger minst 30 minutter, moderat puls og relativt flat trasé.",
             decouplingTitle: "Decoupling vs. varighet",
             decouplingDesc: "Når Pa:HR holder seg under 5 %, tåler du varigheten aerobt. Høyere tall antyder at motoren slipper opp senere i økta.",
             decouplingEmpty: "Ingen økter med deldata nok til å beregne Pa:HR ennå.",
             rollingAverage: "30-dagers snitt",
+            trendLabel: "90d trend",
+            trendImproving: "bedre form",
+            trendDeclining: "lavere form",
+            trendStable: "stabil",
+            baselineLabel: "Start",
             target: "Mål",
             avgHr: "Snittpuls",
             efficiency: "Effektivitet",
@@ -503,12 +518,27 @@ export default function InsightsPage() {
             fatigueLegend: "Fatigue (ATL)",
             formLegend: "Form (TSB)",
             aerobicEfficiencyTitle: "Endurance Efficiency",
-            aerobicEfficiencyDesc: "Efficiency factor for flat, aerobic runs and rides over the past 365 days. A 30-day average smooths noise from heat, sleep, and day-to-day stress.",
+            aerobicEfficiencyDesc: "Efficiency factor for flat, aerobic runs and rides over the past 2 years. A 30-day average smooths noise from heat, sleep, and day-to-day stress.",
+            howToReadTitle: "How to read this chart",
+            howToReadBody: "Efficiency factor = speed per heartbeat. Higher means you're running faster at the same heart rate (or with a lower heart rate at the same pace) — better fitness. The dark line is the 30-day average. Dots are individual sessions and will naturally scatter due to heat, sleep, and terrain — focus on the line. The dashed Baseline shows where you were 90 days ago.",
+            howToReadGood: "Line trending above Baseline = improving",
+            howToReadBad: "Line falling below Baseline = less efficient (fatigue, detraining, heat, or illness)",
+            insightHeadline: "What your data says",
+            insightStrongUp: "Strong improvement. Your efficiency is up {pct}% over 90 days — your heart rate is lower at comparable paces. Keep doing what's working.",
+            insightMildUp: "Gradual improvement. Efficiency is up {pct}% versus 90 days ago. Consistent aerobic training should keep building on this.",
+            insightStable: "Holding steady. Efficiency has been flat ({pct}%) over 90 days. To break the plateau, try adding aerobic volume, threshold work, or auditing recovery and sleep.",
+            insightMildDown: "Slight decline ({pct}%). Possible causes: accumulated fatigue, inconsistent training, heat stress, or illness. Look for patterns before changing the plan.",
+            insightStrongDown: "Notable decline ({pct}%). This could indicate overtraining, extended illness, detraining, or sustained life stress. Consider an easier block and review sleep, nutrition, and external load.",
             aerobicEfficiencyEmpty: "No qualifying aerobic reference sessions yet. Activities need 30+ minutes, controlled heart rate, and relatively flat terrain.",
             decouplingTitle: "Decoupling vs. Duration",
             decouplingDesc: "When Pa:HR stays under 5%, your aerobic durability is holding for that duration. Higher values suggest the engine fades later in the session.",
             decouplingEmpty: "No sessions with enough split data to calculate Pa:HR yet.",
             rollingAverage: "30-day average",
+            trendLabel: "90d trend",
+            trendImproving: "improving",
+            trendDeclining: "declining",
+            trendStable: "stable",
+            baselineLabel: "Baseline",
             target: "Target",
             avgHr: "Avg HR",
             efficiency: "Efficiency",
@@ -620,9 +650,61 @@ export default function InsightsPage() {
   // ── Aerobic Efficiency Logic ─────────────────────────────────────────────
 
   const aerobicEfficiencyData = useMemo(
-    () => computeEnduranceEfficiency(activities.activities, { windowDays: 365 }),
+    () => computeEnduranceEfficiency(activities.activities, { windowDays: 730 }),
     [activities.activities],
   );
+
+  const aerobicEfficiencyTrend = useMemo(() => {
+    const points = aerobicEfficiencyData.points;
+    if (!points.length) return null;
+    const latest = points[points.length - 1];
+    const latestAvg = latest.rollingAverage;
+    if (!latestAvg) return null;
+    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+    const cutoff = latest.x - ninetyDaysMs;
+    let baselinePoint = null;
+    for (let i = points.length - 1; i >= 0; i -= 1) {
+      if (points[i].x <= cutoff && points[i].rollingAverage) {
+        baselinePoint = points[i];
+        break;
+      }
+    }
+    if (!baselinePoint) baselinePoint = points[0];
+    const baselineAvg = baselinePoint.rollingAverage;
+    if (!baselineAvg) return null;
+    const deltaPct = ((latestAvg - baselineAvg) / baselineAvg) * 100;
+    return {
+      baselineAvg,
+      latestAvg,
+      deltaPct,
+      direction: deltaPct > 0.5 ? "up" : deltaPct < -0.5 ? "down" : "neutral",
+    };
+  }, [aerobicEfficiencyData.points]);
+
+  const aerobicEfficiencyInsight = useMemo(() => {
+    if (!aerobicEfficiencyTrend) return null;
+    const { deltaPct, direction } = aerobicEfficiencyTrend;
+    const abs = Math.abs(deltaPct);
+    let level;
+    let key;
+    if (direction === "up" && abs >= 3) {
+      level = "positive";
+      key = "strongUp";
+    } else if (direction === "up") {
+      level = "positive";
+      key = "mildUp";
+    } else if (direction === "neutral") {
+      level = "neutral";
+      key = "stable";
+    } else if (abs < 3) {
+      level = "caution";
+      key = "mildDown";
+    } else {
+      level = "warning";
+      key = "strongDown";
+    }
+    return { level, key, deltaPct };
+  }, [aerobicEfficiencyTrend]);
 
   const kpiData = useMemo(() => {
     const now = new Date();
@@ -1010,10 +1092,23 @@ export default function InsightsPage() {
                   <span className="text-lg font-mono font-bold text-slate-900">
                     {aerobicEfficiencyData.points.at(-1)?.rollingAverage?.toFixed(3) ?? "—"}
                   </span>
+                  {aerobicEfficiencyTrend && (
+                    <span
+                      className={`block text-[11px] font-semibold ${
+                        aerobicEfficiencyTrend.direction === "up"
+                          ? "text-emerald-600"
+                          : aerobicEfficiencyTrend.direction === "down"
+                          ? "text-rose-600"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {aerobicEfficiencyTrend.deltaPct > 0 ? "+" : ""}
+                      {aerobicEfficiencyTrend.deltaPct.toFixed(1)}% {copy.trendLabel}
+                    </span>
+                  )}
                   <span className="block text-[10px] text-slate-400">
-                    HR cap {Math.round(aerobicEfficiencyData.maxHeartRate * 0.8)} bpm
+                    HR cap {Math.round(aerobicEfficiencyData.maxHeartRate * 0.8)} bpm · {aerobicEfficiencyData.points.length} pts
                   </span>
-                  <span className="block text-[9px] text-slate-400">{aerobicEfficiencyData.points.length} pts</span>
                 </div>
               )}
             </CardHeader>
@@ -1045,21 +1140,43 @@ export default function InsightsPage() {
                     tickLine={false}
                   />
                   <Tooltip content={<EfficiencyTooltip locale={locale} copy={copy} />} />
-                  <Scatter
-                    name={copy.efficiencyFactor}
-                    data={aerobicEfficiencyData.points}
-                    shape={(props) => {
-                      const { cx, cy, fill } = props;
-                      return <circle cx={cx} cy={cy} r={5} fill={fill} fillOpacity={0.75} />;
+                  {aerobicEfficiencyTrend && (
+                    <ReferenceLine
+                      y={aerobicEfficiencyTrend.baselineAvg}
+                      stroke="#94a3b8"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: copy.baselineLabel,
+                        position: "insideTopLeft",
+                        fill: "#94a3b8",
+                        fontSize: 10,
+                      }}
+                    />
+                  )}
+                  <Line
+                    type="linear"
+                    dataKey="efficiencyFactor"
+                    stroke="transparent"
+                    isAnimationActive={false}
+                    dot={(props) => {
+                      const { cx, cy, payload, index } = props;
+                      if (cx == null || cy == null) return null;
+                      const isRun = payload?.type?.toLowerCase() === "run";
+                      return (
+                        <circle
+                          key={`ef-dot-${index}`}
+                          cx={cx}
+                          cy={cy}
+                          r={3}
+                          fill={isRun ? "#2563eb" : "#059669"}
+                          fillOpacity={0.45}
+                          stroke="none"
+                        />
+                      );
                     }}
-                  >
-                    {aerobicEfficiencyData.points.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.type?.toLowerCase() === "run" ? "#2563eb" : "#059669"}
-                      />
-                    ))}
-                  </Scatter>
+                    activeDot={{ r: 5, strokeWidth: 0 }}
+                    name={copy.efficiencyFactor}
+                  />
                   <Line
                     type="monotone"
                     dataKey="rollingAverage"
@@ -1067,10 +1184,56 @@ export default function InsightsPage() {
                     strokeWidth={3}
                     dot={false}
                     activeDot={false}
+                    isAnimationActive={false}
                     name={copy.rollingAverage}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+              )}
+
+              {aerobicEfficiencyData.points.length > 0 && (
+                <div className="mt-5 space-y-3">
+                  {aerobicEfficiencyInsight && (
+                    <div
+                      className={`rounded-lg border p-3 text-xs leading-relaxed ${
+                        aerobicEfficiencyInsight.level === "positive"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                          : aerobicEfficiencyInsight.level === "warning"
+                          ? "border-rose-200 bg-rose-50 text-rose-900"
+                          : aerobicEfficiencyInsight.level === "caution"
+                          ? "border-amber-200 bg-amber-50 text-amber-900"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider opacity-70">
+                        {copy.insightHeadline}
+                      </div>
+                      <div>
+                        {copy[`insight${aerobicEfficiencyInsight.key[0].toUpperCase()}${aerobicEfficiencyInsight.key.slice(1)}`]?.replace(
+                          "{pct}",
+                          `${aerobicEfficiencyInsight.deltaPct > 0 ? "+" : ""}${aerobicEfficiencyInsight.deltaPct.toFixed(1)}`,
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <details className="group rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    <summary className="cursor-pointer font-semibold text-slate-700 marker:text-slate-400">
+                      {copy.howToReadTitle}
+                    </summary>
+                    <p className="mt-2 leading-relaxed">{copy.howToReadBody}</p>
+                    <ul className="mt-2 space-y-1">
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 text-emerald-600">▲</span>
+                        <span>{copy.howToReadGood}</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="mt-0.5 text-rose-600">▼</span>
+                        <span>{copy.howToReadBad}</span>
+                      </li>
+                    </ul>
+                  </details>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -333,4 +333,22 @@ describe("RaceDetailView (real)", () => {
     renderDetail({ image_url: null });
     expect(screen.queryByText(/Route sketch/i)).toBeNull();
   });
+
+  it("shows a centered add participation button below existing participations", () => {
+    renderDetail({
+      race_participations: [
+        {
+          id: "part-1",
+          race_date: "2025-05-30",
+          finish_time: "09:06:09",
+          notes: "Strong day",
+          strava_activity_id: "12345",
+          photo_album_url: null,
+        },
+      ],
+    });
+
+    const buttons = screen.getAllByRole("button", { name: "races.addParticipation" });
+    expect(buttons).toHaveLength(2);
+  });
 });

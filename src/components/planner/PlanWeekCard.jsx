@@ -111,29 +111,31 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
     <>
       <div data-testid={`week-grid-${week.weekNumber}`}>
         {isMobile ? (
-          <div className="rounded-[24px] bg-white p-3">
+          <div className="rounded-[18px] p-3" style={{ background: "var(--surface)" }}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <button
                 type="button"
-                className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-40"
+                className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                style={{ background: "var(--paper-raised)", color: "var(--ink)" }}
                 onClick={() => setMobileDayIndex((current) => Math.max(0, current - 1))}
                 disabled={mobileDayIndex === 0}
               >
-                Previous day
+                ← Prev
               </button>
               <div
                 data-testid={`mobile-day-indicator-${week.weekNumber}`}
-                className="text-sm font-semibold text-slate-600"
+                style={{ fontFamily: "var(--font-family-mono)", fontSize: 11, color: "var(--ink-muted)" }}
               >
-                Day {mobileDayIndex + 1} of {validDays.length}
+                {mobileDayIndex + 1} / {validDays.length}
               </div>
               <button
                 type="button"
-                className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-40"
+                className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                style={{ background: "var(--paper-raised)", color: "var(--ink)" }}
                 onClick={() => setMobileDayIndex((current) => Math.min(validDays.length - 1, current + 1))}
                 disabled={mobileDayIndex === validDays.length - 1}
               >
-                Next day
+                Next →
               </button>
             </div>
 
@@ -150,7 +152,18 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
             {/* Day Headers */}
             <div className="grid grid-cols-7 gap-3 mb-1">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-                <div key={d} className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center">
+                <div
+                  key={d}
+                  className="text-center"
+                  style={{
+                    fontFamily: "var(--font-family-mono)",
+                    fontSize: 9,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: "var(--ink-muted)",
+                    opacity: 0.6,
+                  }}
+                >
                   {d}
                 </div>
               ))}
@@ -165,7 +178,11 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
                     onWorkoutSelect={onWorkoutSelect}
                   />
                 ) : (
-                  <div key={`empty-${idx}`} className="rounded-[20px] bg-slate-50/50 border border-dashed border-slate-100 min-h-[100px]" />
+                  <div
+                    key={`empty-${idx}`}
+                    className="rounded-2xl min-h-[100px]"
+                    style={{ background: "var(--paper-raised)", opacity: 0.4 }}
+                  />
                 )
               ))}
             </div>
@@ -187,15 +204,26 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
     <article
       ref={weekRef}
       data-testid={`week-card-${week.weekNumber}`}
-      className="rounded-[28px] bg-[var(--pa-surface-container-low)] p-4 shadow-sm"
+      className="rounded-[24px] p-4"
+      style={{ background: "var(--paper-raised)", boxShadow: "var(--shadow-lift)" }}
     >
-      <div className="mb-4 rounded-[24px] bg-white px-4 py-3">
+      <div className="mb-4 rounded-[18px] px-4 py-3" style={{ background: "var(--surface)" }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-slate-900">{`Week ${week.weekNumber}`}</span>
               <span
-                className="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white"
+                style={{
+                  fontFamily: "var(--font-family-mono)",
+                  fontSize: 11,
+                  color: "var(--ink)",
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {`WK ${week.weekNumber}`}
+              </span>
+              <span
+                className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white"
                 style={{ background: phaseColor }}
               >
                 {week.phase}
@@ -204,20 +232,35 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
                 type="button"
                 onClick={() => setReplanOpen(true)}
                 title="Replan this week with AI coach"
-                className="rounded-full p-1 bg-blue-50 hover:bg-blue-100 text-blue-400 hover:text-blue-600 transition-colors"
+                className="rounded-full p-1 transition-colors"
+                style={{ background: "var(--accent-race-soft)", color: "var(--accent-race)" }}
               >
                 <Sparkles size={13} />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-600">{week.focus}</p>
+            {week.focus && (
+              <p
+                className="mt-1"
+                style={{
+                  fontFamily: "var(--font-family-serif)",
+                  fontStyle: "italic",
+                  fontSize: 12,
+                  color: "var(--ink-muted)",
+                  margin: "4px 0 0",
+                }}
+              >
+                {week.focus}
+              </p>
+            )}
           </div>
 
           <div
             data-testid={`week-metrics-${week.weekNumber}`}
-            className="flex shrink-0 items-center gap-3 text-sm font-semibold text-slate-700"
+            className="flex shrink-0 items-center gap-3"
+            style={{ fontFamily: "var(--font-family-mono)", fontSize: 12, color: "var(--ink)", fontWeight: 600 }}
           >
             <span>{week.summary?.totalKm ?? 0} km</span>
-            <span>{metricHours ?? "0 hr"}</span>
+            <span style={{ color: "var(--ink-muted)" }}>{metricHours ?? "0 hr"}</span>
           </div>
         </div>
       </div>

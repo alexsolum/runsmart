@@ -31,7 +31,13 @@ export function PlanWorkoutCard({ workout, dayDate, onWorkoutSelect, isOverlay =
   });
 
   if (isDragging && !isOverlay) {
-    return <div ref={setNodeRef} className="h-20 w-full rounded-2xl bg-slate-100/50 border-2 border-dashed border-slate-300" />;
+    return (
+      <div
+        ref={setNodeRef}
+        className="h-20 w-full rounded-2xl"
+        style={{ background: "var(--paper-raised)", opacity: 0.5 }}
+      />
+    );
   }
 
   return (
@@ -42,28 +48,59 @@ export function PlanWorkoutCard({ workout, dayDate, onWorkoutSelect, isOverlay =
       type="button"
       onClick={() => onWorkoutSelect?.(workout)}
       className={cn(
-        "w-full rounded-2xl px-3 py-2 text-left transition-transform",
+        "w-full rounded-xl px-3 py-2 text-left transition-transform",
         !isOverlay && "hover:-translate-y-0.5",
-        isOverlay && "cursor-grabbing shadow-xl rotate-2"
+        isOverlay && "cursor-grabbing rotate-2"
       )}
       style={{
         background: `var(${meta.colorContainerToken})`,
-        borderLeft: `3px solid var(${meta.colorToken})`,
-        touchAction: "none", // Prevent scrolling while dragging on touch devices
+        borderLeft: `2px solid var(${meta.colorToken})`,
+        boxShadow: isOverlay ? "var(--shadow-lift)" : undefined,
+        touchAction: "none",
       }}
     >
+      {/* Workout type — italic serif badge */}
       <div
-        className="truncate text-[11px] font-bold uppercase tracking-[0.14em]"
-        style={{ color: `var(${meta.colorToken})` }}
+        className="truncate"
+        style={{
+          fontFamily: "var(--font-family-serif)",
+          fontStyle: "italic",
+          fontSize: 11,
+          color: `var(${meta.colorToken})`,
+          lineHeight: 1.3,
+        }}
       >
         {workout?.type ?? meta.label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-slate-900">
+      {/* Workout name */}
+      <div
+        className="mt-0.5 truncate text-xs font-semibold"
+        style={{ color: "var(--ink)" }}
+      >
         {workout?.name ?? "Planned session"}
       </div>
-      <div className="mt-1 text-xs text-slate-600">{formatMetric(workout)}</div>
+      {/* Distance / duration in mono */}
+      <div
+        style={{
+          fontFamily: "var(--font-family-mono)",
+          fontSize: 11,
+          color: "var(--ink-muted)",
+          marginTop: 2,
+        }}
+      >
+        {formatMetric(workout)}
+      </div>
       {workout?.humanReadable ? (
-        <div className="mt-1 truncate text-xs text-slate-500">{workout.humanReadable}</div>
+        <div
+          className="mt-1 truncate"
+          style={{
+            fontSize: 10,
+            color: "var(--ink-muted)",
+            fontFamily: "var(--font-family-sans)",
+          }}
+        >
+          {workout.humanReadable}
+        </div>
       ) : null}
     </button>
   );

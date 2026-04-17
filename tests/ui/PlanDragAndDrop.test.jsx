@@ -70,7 +70,7 @@ describe("PlanWeekCard Drag and Drop UI", () => {
       </ToastProvider>
     );
 
-    expect(screen.getByText("Week 1")).toBeInTheDocument();
+    expect(screen.getByText("WK 1")).toBeInTheDocument();
     expect(screen.getByText("Easy Run")).toBeInTheDocument();
   });
 
@@ -89,7 +89,7 @@ describe("PlanWeekCard Drag and Drop UI", () => {
 
     // DndContext puts a specific div/context in the tree, but easiest is to check
     // if the mobile day selector is present
-    expect(screen.getByText("Day 1 of 2")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-day-indicator-1")).toBeInTheDocument();
   });
 
   it("renders days in Monday-first order regardless of data order", () => {

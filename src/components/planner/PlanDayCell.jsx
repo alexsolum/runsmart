@@ -19,7 +19,7 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
 
   const workouts = day?.workouts ?? [];
   const emptyCopy = workouts.length === 0
-    ? (week?.isRecoveryWeek === true ? "Rest day" : "No session planned")
+    ? (week?.isRecoveryWeek === true ? "Rest" : "—")
     : null;
 
   return (
@@ -27,12 +27,25 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
       ref={setNodeRef}
       data-testid={`day-cell-${day?.date}`}
       className={cn(
-        "flex min-h-[190px] flex-col rounded-3xl border transition-all p-3",
-        isOver ? "border-primary bg-primary/5 shadow-inner scale-[1.02]" : "border-slate-200 bg-white/90"
+        "flex min-h-[190px] flex-col rounded-2xl transition-all p-3",
       )}
+      style={{
+        background: isOver ? "var(--accent-race-soft)" : "var(--surface)",
+        boxShadow: isOver ? "var(--shadow-lift)" : "none",
+        transform: isOver ? "scale(1.02)" : undefined,
+      }}
     >
-      <div className="mb-3">
-        <div className="text-sm font-bold text-slate-900">{formatDayDate(day?.date)}</div>
+      <div className="mb-2">
+        <div
+          style={{
+            fontFamily: "var(--font-family-mono)",
+            fontSize: 10,
+            color: "var(--ink-muted)",
+            letterSpacing: "0.06em",
+          }}
+        >
+          {formatDayDate(day?.date)}
+        </div>
       </div>
 
       {workouts.length > 0 ? (
@@ -47,7 +60,15 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
           ))}
         </div>
       ) : (
-        <div className="mt-auto rounded-2xl bg-slate-50 px-3 py-4 text-sm font-medium text-slate-500">
+        <div
+          className="mt-auto px-2 py-3 text-center"
+          style={{
+            fontFamily: "var(--font-family-mono)",
+            fontSize: 11,
+            color: "var(--ink-muted)",
+            opacity: 0.5,
+          }}
+        >
           {emptyCopy}
         </div>
       )}

@@ -15,8 +15,8 @@ export default function TrainingVolumeChart({ data, overlayFilter }) {
       <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="gradDistance" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+            <stop offset="5%" stopColor="#6B7A5A" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="#6B7A5A" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="gradLoad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3} />
@@ -47,7 +47,7 @@ export default function TrainingVolumeChart({ data, overlayFilter }) {
           <Area
             type="monotone"
             dataKey="distance"
-            stroke="#2563eb"
+            stroke="#6B7A5A"
             fillOpacity={1}
             fill="url(#gradDistance)"
             name="Distance (km)"

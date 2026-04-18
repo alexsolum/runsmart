@@ -1,10 +1,10 @@
 function phaseColorFor(name) {
   const normalized = String(name ?? "").toLowerCase();
-  if (normalized.includes("base")) return "var(--pa-brand-sky, #3b82f6)";
-  if (normalized.includes("build")) return "var(--pa-brand-blue, #2563eb)";
-  if (normalized.includes("peak")) return "var(--pa-brand-plum, #7c3aed)";
-  if (normalized.includes("taper")) return "var(--pa-brand-amber, #d97706)";
-  return "var(--pa-brand-green, #16a34a)";
+  if (normalized.includes("base")) return "var(--phase-base, #6B7A5A)";
+  if (normalized.includes("build")) return "var(--phase-build, #8B6F3F)";
+  if (normalized.includes("peak")) return "var(--phase-peak, #B03A2E)";
+  if (normalized.includes("taper")) return "var(--phase-taper, #4A5E6B)";
+  return "var(--phase-recovery, #7C6F8A)";
 }
 
 export function PhaseTimeline({ phases = [], activeWeekNumber, isMobile = false }) {

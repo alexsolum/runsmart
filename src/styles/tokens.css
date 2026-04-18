@@ -1,18 +1,41 @@
 :root {
   color-scheme: light;
 
-  /* Colors */
-  --color-bg: #f6f7fb;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f8fafc;
-  --color-text: #0f172a;
-  --color-text-muted: #64748b;
-  --color-border: #e2e8f0;
-  --color-primary: #2563eb;
-  --color-primary-soft: #dbeafe;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
+  /* ── Editorial palette ── */
+  --ink:               #0B1738;
+  --ink-muted:         #4A5578;
+  --paper:             #F4EFE6;
+  --paper-raised:      #FAF7F1;
+  --surface:           #FFFFFF;
+
+  /* Accent — reserved for race-day, PRs, countdowns */
+  --accent-race:       #D84426;
+  --accent-race-soft:  #F7DCCF;
+
+  /* Phase colors */
+  --phase-base:        #6B7A5A;
+  --phase-build:       #8B6F3F;
+  --phase-peak:        #B03A2E;
+  --phase-taper:       #4A5E6B;
+  --phase-recovery:    #7C6F8A;
+
+  /* Signal colors */
+  --signal-good:       #2F6B4F;
+  --signal-warn:       #B17200;
+  --signal-risk:       #8A2E1E;
+
+  /* Legacy semantic aliases (used by existing component code) */
+  --color-bg:            var(--paper);
+  --color-surface:       var(--surface);
+  --color-surface-muted: var(--paper-raised);
+  --color-text:          var(--ink);
+  --color-text-muted:    var(--ink-muted);
+  --color-border:        rgba(11, 23, 56, 0.12);
+  --color-primary:       var(--accent-race);
+  --color-primary-soft:  var(--accent-race-soft);
+  --color-success:       var(--signal-good);
+  --color-warning:       var(--signal-warn);
+  --color-danger:        var(--signal-risk);
 
   /* Spacing */
   --space-1: 4px;
@@ -30,17 +53,28 @@
   --radius-xl: 20px;
   --radius-pill: 999px;
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  /* Elevation — tonal navy shadow, no hard borders */
+  --shadow-lift:  0 12px 28px rgba(11, 23, 56, 0.06);
+  --shadow-sm:    0 2px 8px rgba(11, 23, 56, 0.04);
+  --shadow-md:    0 8px 24px rgba(11, 23, 56, 0.07);
+  --shadow-focus: 0 0 0 3px rgba(216, 68, 38, 0.22);
 
-  /* Type */
-  --font-family-sans: "DM Sans", sans-serif;
-  --font-family-serif: "Instrument Serif", Georgia, serif;
-  --font-family-mono: "JetBrains Mono", monospace;
+  /* ── Typography roles ── */
+  --font-family-sans:    "DM Sans", sans-serif;
+  --font-family-serif:   "Instrument Serif", Georgia, serif;
+  --font-family-mono:    "JetBrains Mono", monospace;
   --font-family-display: "Outfit", "DM Sans", sans-serif;
-  --font-size-sm: 12px;
-  --font-size-md: 14px;
-  --font-size-lg: 16px;
+
+  /* Size scale */
+  --font-size-sm:         12px;
+  --font-size-md:         14px;
+  --font-size-lg:         16px;
+  --type-display-xl:      56px;
+
+  /* Type role tokens */
+  --type-cover:           700 clamp(28px, 4vw, 40px)/1.1 var(--font-family-display);
+  --type-headline-italic: italic 400 clamp(20px, 3vw, 28px)/1.3 var(--font-family-serif);
+  --type-body:            400 14px/1.6 var(--font-family-sans);
+  --type-data:            500 14px/1 var(--font-family-mono);
+  --type-caption:         400 11px/1.4 var(--font-family-sans);
 }

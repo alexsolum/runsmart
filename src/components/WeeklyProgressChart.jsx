@@ -39,8 +39,8 @@ export default function WeeklyProgressChart({ days, totalExecuted, totalPlanned 
         <ComposedChart data={days} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="gradExecuted" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.5} />
-              <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
+              <stop offset="5%" stopColor="#6B7A5A" stopOpacity={0.5} />
+              <stop offset="95%" stopColor="#6B7A5A" stopOpacity={0.05} />
             </linearGradient>
             <linearGradient id="gradPlanned" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.4} />
@@ -92,7 +92,7 @@ export default function WeeklyProgressChart({ days, totalExecuted, totalPlanned 
             type="monotone"
             dataKey="executed"
             stackId="progress"
-            stroke="#2563eb"
+            stroke="#6B7A5A"
             strokeWidth={2}
             fill="url(#gradExecuted)"
             name="executed"

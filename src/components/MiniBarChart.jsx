@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function MiniBarChart({ data, color = "#2563eb", height = 40, width = 80 }) {
+export default function MiniBarChart({ data, color = "#6B7A5A", height = 40, width = 80 }) {
   const max = Math.max(...data, 1);
   const barWidth = width / data.length - 2;
   return (

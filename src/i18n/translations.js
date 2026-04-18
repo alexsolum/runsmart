@@ -307,6 +307,7 @@ export const TRANSLATIONS = {
     // App shell navigation groups
     "nav.general": "General",
     "nav.other": "Other",
+    "nav.intelligence": "Intelligence",
     "nav.trainingPlan": "Training Plan",
     "nav.weeklyPlan": "Weekly Plan",
     "nav.dailyLog": "Daily Log",
@@ -702,6 +703,7 @@ export const TRANSLATIONS = {
     // App shell navigation groups
     "nav.general": "Generelt",
     "nav.other": "Annet",
+    "nav.intelligence": "Innsikt",
     "nav.trainingPlan": "Treningsplan",
     "nav.weeklyPlan": "Ukeplan",
     "nav.dailyLog": "Dagslogg",

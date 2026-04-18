@@ -1166,8 +1166,8 @@ export default function InsightsPage() {
                   >
                     <defs>
                       <linearGradient id="ctlGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0.01} />
+                        <stop offset="5%" stopColor="#6B7A5A" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#6B7A5A" stopOpacity={0.01} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1190,7 +1190,7 @@ export default function InsightsPage() {
                       type="monotone"
                       dataKey="ctl"
                       name={copy.fitnessLegend}
-                      stroke="#2563eb"
+                      stroke="#6B7A5A"
                       strokeWidth={2.5}
                       fill="url(#ctlGrad)"
                       dot={false}
@@ -1582,7 +1582,7 @@ export default function InsightsPage() {
                           ? "#94a3b8"
                           : fitnessScore < 65
                           ? "#0ea5e9"
-                          : "#2563eb",
+                          : "#6B7A5A",
                     }}
                   />
                 </div>

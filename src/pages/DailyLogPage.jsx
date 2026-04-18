@@ -162,7 +162,7 @@ function WellnessTimeline({ logs }) {
   const y = (v) => mg.top + (1 - (v - 1) / 4) * iH;
 
   const series = [
-    { key: "training_quality", color: "#2563eb", label: "Training" },
+    { key: "training_quality", color: "#6B7A5A", label: "Training" },
     { key: "sleep_quality",    color: "#7c3aed", label: "Sleep" },
     { key: "mood",             color: "#16a34a", label: "Mood" },
     { key: "fatigue",          color: "#ef4444", label: "Fatigue" },

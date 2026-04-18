@@ -1297,30 +1297,19 @@ export default function InsightsPage() {
                       }}
                     />
                   )}
-                  <Line
-                    type="linear"
+                  <Scatter
                     dataKey="efficiencyFactor"
-                    stroke="transparent"
-                    isAnimationActive={false}
-                    dot={(props) => {
-                      const { cx, cy, payload, index } = props;
-                      if (cx == null || cy == null) return null;
-                      const isRun = payload?.type?.toLowerCase() === "run";
-                      return (
-                        <circle
-                          key={`ef-dot-${index}`}
-                          cx={cx}
-                          cy={cy}
-                          r={3}
-                          fill={isRun ? "#2563eb" : "#059669"}
-                          fillOpacity={0.45}
-                          stroke="none"
-                        />
-                      );
-                    }}
-                    activeDot={{ r: 5, strokeWidth: 0 }}
                     name={copy.efficiencyFactor}
-                  />
+                    fillOpacity={0.45}
+                    isAnimationActive={false}
+                  >
+                    {aerobicEfficiencyData.points.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.type?.toLowerCase() === "run" ? "#2563eb" : "#059669"}
+                      />
+                    ))}
+                  </Scatter>
                   <Line
                     type="monotone"
                     dataKey="rollingAverage"

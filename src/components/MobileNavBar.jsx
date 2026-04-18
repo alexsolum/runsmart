@@ -1,9 +1,9 @@
 import React from "react";
 
 const TABS = [
-  { key: "mobile", tab: "analytics", icon: "📊", label: "Analytics" },
-  { key: "mobile", tab: "week",      icon: "📅", label: "Week"      },
-  { key: "coach",  tab: null,        icon: "🏃", label: "Coach"     },
+  { key: "mobile",       tab: "analytics", icon: "📊", label: "Analytics"    },
+  { key: "mobile",       tab: "week",      icon: "📅", label: "Week"         },
+  { key: "intelligence", tab: null,        icon: "⚡", label: "Intelligence" },
 ];
 
 export default function MobileNavBar({ activePage, activeMobileTab, onNavigate }) {

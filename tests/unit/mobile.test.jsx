@@ -29,7 +29,7 @@ describe("MobileNavBar", () => {
     );
     expect(screen.getByLabelText("Analytics")).toBeInTheDocument();
     expect(screen.getByLabelText("Week")).toBeInTheDocument();
-    expect(screen.getByLabelText("Coach")).toBeInTheDocument();
+    expect(screen.getByLabelText("Intelligence")).toBeInTheDocument();
   });
 
   it("marks analytics tab is-active when activePage=mobile and activeMobileTab=analytics", () => {
@@ -42,7 +42,7 @@ describe("MobileNavBar", () => {
     );
     expect(screen.getByLabelText("Analytics")).toHaveClass("is-active");
     expect(screen.getByLabelText("Week")).not.toHaveClass("is-active");
-    expect(screen.getByLabelText("Coach")).not.toHaveClass("is-active");
+    expect(screen.getByLabelText("Intelligence")).not.toHaveClass("is-active");
   });
 
   it("marks week tab is-active when activePage=mobile and activeMobileTab=week", () => {
@@ -57,21 +57,21 @@ describe("MobileNavBar", () => {
     expect(screen.getByLabelText("Analytics")).not.toHaveClass("is-active");
   });
 
-  it("marks coach tab is-active when activePage=coach", () => {
+  it("marks intelligence tab is-active when activePage=intelligence", () => {
     render(
       <MobileNavBar
-        activePage="coach"
+        activePage="intelligence"
         activeMobileTab="analytics"
         onNavigate={vi.fn()}
       />
     );
-    expect(screen.getByLabelText("Coach")).toHaveClass("is-active");
+    expect(screen.getByLabelText("Intelligence")).toHaveClass("is-active");
   });
 
   it("calls onNavigate with (mobile, analytics) when analytics tab clicked", () => {
     const onNavigate = vi.fn();
     render(
-      <MobileNavBar activePage="coach" activeMobileTab={null} onNavigate={onNavigate} />
+      <MobileNavBar activePage="intelligence" activeMobileTab={null} onNavigate={onNavigate} />
     );
     fireEvent.click(screen.getByLabelText("Analytics"));
     expect(onNavigate).toHaveBeenCalledWith("mobile", "analytics");
@@ -80,19 +80,19 @@ describe("MobileNavBar", () => {
   it("calls onNavigate with (mobile, week) when week tab clicked", () => {
     const onNavigate = vi.fn();
     render(
-      <MobileNavBar activePage="coach" activeMobileTab={null} onNavigate={onNavigate} />
+      <MobileNavBar activePage="intelligence" activeMobileTab={null} onNavigate={onNavigate} />
     );
     fireEvent.click(screen.getByLabelText("Week"));
     expect(onNavigate).toHaveBeenCalledWith("mobile", "week");
   });
 
-  it("calls onNavigate with (coach, null) when coach tab clicked", () => {
+  it("calls onNavigate with (intelligence, null) when intelligence tab clicked", () => {
     const onNavigate = vi.fn();
     render(
       <MobileNavBar activePage="mobile" activeMobileTab="analytics" onNavigate={onNavigate} />
     );
-    fireEvent.click(screen.getByLabelText("Coach"));
-    expect(onNavigate).toHaveBeenCalledWith("coach", null);
+    fireEvent.click(screen.getByLabelText("Intelligence"));
+    expect(onNavigate).toHaveBeenCalledWith("intelligence", null);
   });
 });
 

@@ -8,13 +8,17 @@ vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
-vi.mock("../../src/domain/compute", () => ({
-  generateCoachingInsights: vi.fn(),
-}));
+vi.mock("../../src/domain/compute", async () => {
+  const actual = await vi.importActual("../../src/domain/compute");
+  return {
+    ...actual,
+    generateCoachingInsights: vi.fn(),
+  };
+});
 
 import { useAppData } from "../../src/context/AppDataContext";
 
-function makeEmptyAppData() {
+function makeNoTrainingContextAppData() {
   const base = makeAppData();
   return makeAppData({
     activities: {
@@ -70,14 +74,20 @@ describe("LongTermPlanPage", () => {
   });
 
   it("hides AI coach notes when there is no meaningful training context", () => {
-    generateCoachingInsights.mockReturnValue([]);
-    useAppData.mockReturnValue(makeEmptyAppData());
+    generateCoachingInsights.mockReturnValue([
+      {
+        type: "info",
+        titleKey: "coach.getStarted",
+        descKey: "coach.getStartedDesc",
+        priority: 5,
+      },
+    ]);
+    useAppData.mockReturnValue(makeNoTrainingContextAppData());
 
     render(<LongTermPlanPage />);
 
     expect(screen.getByTestId("plan-current-week")).toBeInTheDocument();
     expect(screen.queryByTestId("plan-ai-notes")).toBeNull();
-    expect(screen.queryByText("Deep fatigue accumulation")).toBeNull();
   });
 
   it("switches to Sesong and mounts the existing season plan viewer", () => {
@@ -85,7 +95,8 @@ describe("LongTermPlanPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Sesong" }));
 
-    expect(screen.getByTestId("plan-season-view")).toBeInTheDocument();
-    expect(screen.getByTestId("week-card-1")).toBeInTheDocument();
+    const seasonView = screen.getByTestId("plan-season-view");
+    expect(seasonView).toBeInTheDocument();
+    expect(within(seasonView).getByText("Base")).toBeInTheDocument();
   });
 });

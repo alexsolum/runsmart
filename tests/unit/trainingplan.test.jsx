@@ -66,7 +66,7 @@ describe("LongTermPlanPage", () => {
     render(<LongTermPlanPage />);
 
     expect(screen.getByTestId("plan-ai-notes")).toBeInTheDocument();
-    expect(screen.getByText("coach.deepFatigue")).toBeInTheDocument();
+    expect(screen.getByText("Deep fatigue accumulation")).toBeInTheDocument();
   });
 
   it("hides AI coach notes when there is no meaningful training context", () => {
@@ -77,7 +77,7 @@ describe("LongTermPlanPage", () => {
 
     expect(screen.getByTestId("plan-current-week")).toBeInTheDocument();
     expect(screen.queryByTestId("plan-ai-notes")).toBeNull();
-    expect(screen.queryByText("coach.deepFatigue")).toBeNull();
+    expect(screen.queryByText("Deep fatigue accumulation")).toBeNull();
   });
 
   it("switches to Sesong and mounts the existing season plan viewer", () => {

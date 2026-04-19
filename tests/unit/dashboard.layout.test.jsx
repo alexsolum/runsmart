@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import HeroPage from "../../src/pages/HeroPage";
+import IntelligencePage from "../../src/pages/IntelligencePage";
 import { makeAppData } from "./mockAppData";
 
 vi.mock("../../src/context/AppDataContext", () => ({
@@ -22,58 +22,45 @@ beforeEach(() => {
 
 describe("Dashboard layout — hero panels", () => {
   it("renders the readiness panel heading", () => {
-    render(<HeroPage />);
+    render(<IntelligencePage />);
     expect(screen.getByText("Beredskap")).toBeInTheDocument();
   });
 
-  it("renders the today's-workout panel with 'I dag' label", () => {
-    render(<HeroPage />);
-    expect(screen.getAllByText("I dag").length).toBeGreaterThan(0);
+  it("renders the today's-workout panel with 'I DAG' label", () => {
+    render(<IntelligencePage />);
+    expect(screen.getAllByText("I DAG").length).toBeGreaterThan(0);
   });
 });
 
 describe("Dashboard layout — phase ribbon", () => {
   it("renders the Sesongplan panel heading", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Sesongplan/i)).toBeInTheDocument();
+    render(<IntelligencePage />);
+    expect(screen.getByText(/SESONGPLAN/i)).toBeInTheDocument();
   });
 });
 
-describe("Dashboard layout — weekly progression", () => {
-  it("renders the Ukens progresjon panel", () => {
-    render(<HeroPage />);
-    expect(screen.getByText("Ukens progresjon")).toBeInTheDocument();
+describe("Dashboard layout — season plan card", () => {
+  it("renders the race title", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText(/Stockholm Marathon/i)).toBeInTheDocument();
   });
 });
 
-describe("Dashboard layout — race countdown", () => {
-  it("renders an A-løp label", () => {
-    render(<HeroPage />);
-    expect(screen.getAllByText(/A-løp/i).length).toBeGreaterThan(0);
+describe("Dashboard layout — readiness rows", () => {
+  it("renders the six readiness vitals", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText("Form (CTL)")).toBeInTheDocument();
+    expect(screen.getByText("Tretthet")).toBeInTheDocument();
+    expect(screen.getByText("Søvn 7d")).toBeInTheDocument();
   });
 });
 
-describe("Dashboard layout — fitness & efficiency panels", () => {
-  it("renders the Formkurve panel", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Formkurve/i)).toBeInTheDocument();
-  });
-
-  it("renders the Aerob effektivitet panel", () => {
-    render(<HeroPage />);
-    expect(screen.getByText("Aerob effektivitet")).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard layout — activity & upcoming panels", () => {
-  it("renders the Aktivitet (recent activities) panel", () => {
-    render(<HeroPage />);
-    expect(screen.getByText("Aktivitet")).toBeInTheDocument();
-  });
-
-  it("renders the Kommende økter (up-next) panel", () => {
-    render(<HeroPage />);
-    expect(screen.getByText("Kommende økter")).toBeInTheDocument();
+describe("Dashboard layout — segmented switch", () => {
+  it("renders Faser/Uker/Dager controls", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText("Faser")).toBeInTheDocument();
+    expect(screen.getByText("Uker")).toBeInTheDocument();
+    expect(screen.getByText("Dager")).toBeInTheDocument();
   });
 });
 
@@ -82,7 +69,7 @@ describe("Dashboard layout — empty states", () => {
     useAppData.mockReturnValue(makeAppData({
       activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
     }));
-    render(<HeroPage />);
+    render(<IntelligencePage />);
     expect(screen.getAllByText(/Koble Strava i Data/i).length).toBeGreaterThan(0);
   });
 });

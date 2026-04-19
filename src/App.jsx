@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { AppDataProvider, useAppData } from "./context/AppDataContext";
 import { ToastProvider } from "./context/ToastContext";
 import AuthPage from "./pages/AuthPage";
-import HeroPage from "./pages/HeroPage";
 import IntelligencePage from "./pages/IntelligencePage";
 import LongTermPlanPage from "./pages/LongTermPlanPage";
 import RoadmapPage from "./pages/RoadmapPage";

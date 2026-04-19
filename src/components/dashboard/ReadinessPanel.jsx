@@ -1,72 +1,70 @@
 import { useMemo } from "react";
 import { useAppData } from "../../context/AppDataContext";
-import { computeTrainingLoad, computeTrainingLoadState } from "../../domain/compute";
-import PanelHead from "../ui/PanelHead";
-import Track from "../ui/Track";
+import { computeTrainingLoad } from "../../domain/compute";
 
 function scoreLabel(score) {
-  if (score >= 85) return "Utmerket";
-  if (score >= 70) return "Klar";
-  if (score >= 50) return "Moderat";
-  return "Sliten";
+  if (score >= 85) return "UTMERKET";
+  if (score >= 70) return "KLAR";
+  if (score >= 50) return "MODERAT";
+  return "SLITEN";
+}
+
+function avg(values) {
+  const list = values.filter((v) => typeof v === "number" && Number.isFinite(v));
+  if (!list.length) return null;
+  return list.reduce((sum, value) => sum + value, 0) / list.length;
 }
 
 export default function ReadinessPanel() {
   const { activities, checkins, dailyLogs } = useAppData();
 
-  const { score, vitals } = useMemo(() => {
+  const { score, rows, empty } = useMemo(() => {
     const acts = activities?.activities ?? [];
+    const logs = dailyLogs?.logs ?? dailyLogs?.dailyLogs ?? [];
+    const chks = checkins?.checkins ?? [];
+
+    if (!acts.length) {
+      return { score: 0, rows: [], empty: true };
+    }
+
     const series = computeTrainingLoad(acts);
-    const state = computeTrainingLoadState(series);
     const latest = series.length ? series[series.length - 1] : null;
-
-    const latestLog = (dailyLogs?.dailyLogs ?? []).slice(-1)[0];
-    const latestCheckin = (checkins?.checkins ?? []).slice(-1)[0];
-
     const tsb = latest?.tsb ?? 0;
     const atl = latest?.atl ?? 0;
     const ctl = latest?.ctl ?? 0;
 
-    // Normalize TSB to 0–100 (TSB range roughly -40..+40)
-    const tsbPct = Math.min(100, Math.max(0, ((tsb + 40) / 80) * 100));
+    const sleep7d = avg(logs.slice(-7).map((log) => log.sleep_quality));
+    const hrv7d = avg(logs.slice(-7).map((log) => log.hrv));
+    const rpe7d = avg(logs.slice(-7).map((log) => log.training_quality));
+    const rhr7d = avg(logs.slice(-7).map((log) => log.resting_hr ?? log.restingHeartRate));
 
-    const sleepScore = latestLog?.sleep_quality ?? latestCheckin?.sleep_quality ?? 5;
-    const sleepPct = (sleepScore / 10) * 100;
+    const latestCheckin = chks.slice(-1)[0];
+    const fatigue = latestCheckin?.fatigue ?? avg(logs.slice(-7).map((log) => log.fatigue)) ?? 3;
 
-    const fatigueRaw = latestLog?.fatigue ?? latestCheckin?.fatigue ?? 5;
-    const fatiguePct = Math.max(0, 100 - (fatigueRaw / 10) * 100);
+    const rawScore = 78 + Math.max(-18, Math.min(12, tsb)) - Math.max(0, fatigue - 2) * 4;
+    const displayScore = Math.max(0, Math.min(100, Math.round(rawScore)));
 
-    const rpe = latestCheckin?.rpe ?? latestLog?.training_quality ?? 5;
-    const rpePct = Math.max(0, 100 - ((rpe - 1) / 9) * 100);
-
-    const hrv = latestLog?.hrv ?? null;
-    const rhr = latestLog?.rhr ?? null;
-
-    const rawScore = Math.round((tsbPct * 0.4) + (sleepPct * 0.25) + (fatiguePct * 0.25) + (rpePct * 0.1));
-    const displayScore = Math.min(100, Math.max(0, rawScore));
-
-    const vitalsList = [
-      { name: "Form (CTL)", pct: Math.min(100, (ctl / 80) * 100), num: ctl.toFixed(1) },
-      { name: "Tretthet (ATL)", pct: Math.min(100, (atl / 80) * 100), num: atl.toFixed(1) },
-      { name: "Overskudd (TSB)", pct: tsbPct, num: tsb > 0 ? `+${tsb.toFixed(1)}` : tsb.toFixed(1) },
-      { name: "Søvn", pct: sleepPct, num: `${sleepScore}/10` },
+    const readinessRows = [
+      { name: "Form (CTL)", num: ctl ? ctl.toFixed(1) : "—" },
+      { name: "Tretthet", num: atl ? atl.toFixed(1) : "—" },
+      { name: "Søvn 7d", num: sleep7d != null ? `${sleep7d.toFixed(1)}/5` : "—" },
+      { name: "HRV 7d", num: hrv7d != null ? `${Math.round(hrv7d)}` : "—" },
+      { name: "RPE 7d", num: rpe7d != null ? `${rpe7d.toFixed(1)}/5` : "—" },
+      { name: "Hvilepuls", num: rhr7d != null ? `${Math.round(rhr7d)} bpm` : "—" },
     ];
 
-    if (hrv != null) vitalsList.push({ name: "HRV", pct: Math.min(100, (hrv / 100) * 100), num: String(hrv) });
-    if (rhr != null) vitalsList.push({ name: "RHR", pct: Math.min(100, Math.max(0, 100 - ((rhr - 35) / 65) * 100)), num: `${rhr} bpm` });
-
-    return { score: displayScore, vitals: vitalsList };
+    return { score: displayScore, rows: readinessRows, empty: false };
   }, [activities, checkins, dailyLogs]);
-
-  const empty = !(activities?.activities?.length);
 
   return (
     <div className="readiness">
-      <PanelHead
-        eyebrow="Form i dag"
-        title="Beredskap"
-        sub="Sammensatt av form, tretthet, søvn og HRV"
-      />
+      <div className="panel-head">
+        <div className="title-wrap">
+          <p className="cc-label">FORM I DAG</p>
+          <h3>Beredskap</h3>
+          <p className="body-sm">Sammensatt av form, tretthet, søvn og HRV</p>
+        </div>
+      </div>
 
       {empty ? (
         <div className="empty-hint">Ingen aktiviteter synkronisert enda. Koble Strava i Data.</div>
@@ -77,12 +75,12 @@ export default function ReadinessPanel() {
             <span className="of">/ 100</span>
             <span className="status">{scoreLabel(score)}</span>
           </div>
-          <div className="vitals">
-            {vitals.map((v, i) => (
-              <div key={i} className="vital">
-                <span className="name">{v.name}</span>
-                <Track pct={v.pct} />
-                <span className="num">{v.num}</span>
+          <div className="readiness-rows">
+            {rows.map((row, i) => (
+              <div key={i} className="readiness-row">
+                <span className="name">{row.name}</span>
+                <span className="dots" aria-hidden="true" />
+                <span className="num">{row.num}</span>
               </div>
             ))}
           </div>

@@ -10,22 +10,42 @@ function todayISODate() {
 function extractTodayWorkout(planData) {
   if (!planData) return null;
   const today = todayISODate();
+  let fallbackWorkout = null;
+
+  for (const week of planData.weeks ?? []) {
+    for (const day of week.days ?? []) {
+      const d = day.date ?? day.workout_date ?? "";
+      if (!fallbackWorkout && day.workouts?.[0]) {
+        fallbackWorkout = { ...day.workouts[0], phaseName: week.phase ?? "Base" };
+      }
+      if (d === today) {
+        const workout = (day.workouts && day.workouts[0]) || day;
+        return { ...workout, phaseName: week.phase ?? "Base" };
+      }
+    }
+  }
 
   const phases = planData.phases ?? planData.blocks ?? [];
   for (const phase of phases) {
     for (const week of phase.weeks ?? []) {
       for (const day of week.days ?? []) {
         const d = day.date ?? day.workout_date ?? "";
-        if (d === today) return { ...day, phaseName: phase.name ?? phase.type ?? "Base" };
+        if (!fallbackWorkout && day.workouts?.[0]) {
+          fallbackWorkout = { ...day.workouts[0], phaseName: phase.name ?? phase.type ?? "Base" };
+        }
+        if (d === today) return { ...(day.workouts?.[0] || day), phaseName: phase.name ?? phase.type ?? "Base" };
       }
     }
   }
 
-  // fallback: flat days array
   for (const day of planData.days ?? []) {
     if ((day.date ?? day.workout_date ?? "") === today) return day;
+    if (!fallbackWorkout && (day.workouts?.[0] || day.name || day.workout_name)) {
+      fallbackWorkout = day.workouts?.[0] || day;
+    }
   }
-  return null;
+
+  return fallbackWorkout;
 }
 
 function phaseKind(name = "") {
@@ -54,64 +74,73 @@ export default function HeroToday() {
   const dateStr = formatDateNorwegian(now);
   const timeStr = now.toTimeString().slice(0, 5);
 
-  const kind = workout ? phaseKind(workout.phaseName ?? workout.workout_type ?? workout.type ?? "") : "ghost";
-  const phaseLabel = workout?.phaseName ?? "Gjenoppbygging";
-  const workoutTitle = workout?.workout_name ?? workout?.name ?? workout?.description ?? "Ingen økt planlagt";
-  const workoutSub = workout?.notes ?? workout?.details ?? "Sjekk treningsplanen for detaljer.";
+  const kind = workout ? phaseKind(workout.phaseName ?? workout.type ?? "") : "ghost";
+  const phaseLabel = (workout?.phaseName ?? "Gjenoppbygging").toUpperCase();
+  const workoutTitle = workout?.name ?? workout?.workout_name ?? workout?.description ?? "Ingen økt planlagt";
+  const workoutSub = workout?.humanReadable ?? workout?.notes ?? workout?.details ?? "Sjekk treningsplanen for detaljer.";
 
   const targets = useMemo(() => {
-    if (!workout) return [];
-    const t = [];
-    if (workout.distance_km) t.push({ lbl: "Distanse", val: workout.distance_km, unit: "km", sub: "" });
-    if (workout.duration_min) t.push({ lbl: "Varighet", val: workout.duration_min, unit: "min", sub: "" });
-    if (workout.pace_target) t.push({ lbl: "Mål-tempo", val: workout.pace_target, unit: "/km", sub: "" });
-    if (workout.hr_target ?? workout.heart_rate_target) {
-      t.push({ lbl: "Mål-puls", val: workout.hr_target ?? workout.heart_rate_target, unit: "bpm", sub: "" });
+    if (!workout) {
+      return [
+        { lbl: "DISTANSE", val: "—", unit: "" },
+        { lbl: "VARIGHET", val: "—", unit: "" },
+      ];
     }
-    return t;
+    const list = [];
+    const distance = workout.distanceKm ?? workout.distance_km;
+    const duration = workout.durationMinutes ?? workout.duration_min;
+    const hr = workout.hr_target ?? workout.heart_rate_target ?? workout.primaryZone;
+    const elev = workout.elevationM ?? workout.elevation_m ?? workout.elevation_gain;
+    if (distance) list.push({ lbl: "DISTANSE", val: distance, unit: "km" });
+    if (duration) list.push({ lbl: "VARIGHET", val: duration, unit: "min" });
+    if (hr) list.push({ lbl: "MAKS HR", val: hr, unit: "" });
+    if (elev) list.push({ lbl: "HØYDE", val: elev, unit: "m" });
+    return list.length > 0
+      ? list
+      : [
+          { lbl: "DISTANSE", val: "—", unit: "" },
+          { lbl: "VARIGHET", val: "—", unit: "" },
+        ];
   }, [workout]);
 
   return (
     <div className="today">
-        <div className="flex center between">
-          <div className="flex center gap-8">
-            <Chip kind={kind}>
-              <span className="dot" style={{ background: "currentColor" }} /> {phaseLabel.toUpperCase()}
-            </Chip>
-            <span className="date-row">
-              <span style={{ color: "#7aa9ef" }}>●</span> {dateStr} · {timeStr}
-            </span>
-          </div>
-          <div className="flex center gap-8" style={{ color: "#aab4c6", fontSize: 12 }}>
-            <Icon name="sparkle" size={13} /> Generert av Trener
-          </div>
+      <div className="flex center between">
+        <div className="flex center gap-8">
+          <Chip kind={kind}>
+            <span className="dot" style={{ background: "currentColor" }} /> {phaseLabel}
+          </Chip>
+          <span className="date-row">
+            <span style={{ color: "#7aa9ef" }}>●</span> {dateStr} · {timeStr}
+          </span>
+          <span className="weather-pill" aria-label="weather">
+            <Icon name="sparkle" size={11} /> JUSTERT FOR VÆR
+          </span>
         </div>
-
-        <div>
-          <span className="cc-label" style={{ color: "#7aa9ef" }}>I dag</span>
-          <h1>{workoutTitle}</h1>
-          <p className="subtitle">{workoutSub}</p>
+        <div className="flex center gap-8" style={{ color: "#aab4c6", fontSize: 12 }}>
+          <Icon name="sparkle" size={13} /> Generert av Trener
         </div>
+      </div>
 
-        {targets.length > 0 && (
-          <div className="target-grid">
-            {targets.map((t, i) => (
-              <div key={i} className="target">
-                <div className="lbl">{t.lbl}</div>
-                <div className="val">
-                  {t.val}
-                  {t.unit && <span style={{ fontSize: 13, color: "#aab4c6", marginLeft: 4 }}>{t.unit}</span>}
-                </div>
-                {t.sub && <div className="sub">{t.sub}</div>}
+      <div>
+        <span className="cc-label" style={{ color: "#7aa9ef" }}>I DAG</span>
+        <h1>{workoutTitle}</h1>
+        <p className="subtitle">{workoutSub}</p>
+      </div>
+
+      {targets.length > 0 && (
+        <div className="target-grid">
+          {targets.map((target, i) => (
+            <div key={i} className="target">
+              <div className="lbl">{target.lbl}</div>
+              <div className="val">
+                {target.val}
+                {target.unit && <span style={{ fontSize: 13, color: "#aab4c6", marginLeft: 4 }}>{target.unit}</span>}
               </div>
-            ))}
-          </div>
-        )}
-
-        <div className="cta-row">
-          <button className="btn primary"><Icon name="play" size={13} /> Start økten</button>
-          <button className="btn ghost" style={{ color: "#aab4c6" }}>Flytt til i morgen</button>
+            </div>
+          ))}
         </div>
+      )}
     </div>
   );
 }

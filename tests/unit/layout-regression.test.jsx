@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 import PageContainer from "../../src/components/layout/PageContainer";
 import Section from "../../src/components/layout/Section";
-import HeroPage from "../../src/pages/HeroPage";
+import IntelligencePage from "../../src/pages/IntelligencePage";
 import { makeAppData } from "./mockAppData";
 
 vi.mock("../../src/context/AppDataContext", () => ({
@@ -198,9 +198,9 @@ describe("Section — heading uses tracking-tight (activates sans-serif override
   });
 });
 
-describe("HeroPage — control-center dashboard renders", () => {
+describe("IntelligencePage — control-center dashboard renders", () => {
   it("renders the canvas grid wrapper", () => {
-    const { container } = render(<HeroPage />);
+    const { container } = render(<IntelligencePage />);
     expect(container.querySelector(".canvas")).toBeInTheDocument();
   });
 });
@@ -221,7 +221,7 @@ describe("PageContainer + Section integration", () => {
   });
 
   it("renders dashboard with .canvas wrapper — no legacy PageContainer", () => {
-    const { container } = render(<HeroPage />);
+    const { container } = render(<IntelligencePage />);
     // New dashboard uses .canvas grid, not PageContainer's .max-w-7xl
     expect(container.querySelector(".canvas")).toBeInTheDocument();
   });

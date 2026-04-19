@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
 import { makeAppData } from "./mockAppData";
+import { generateCoachingInsights } from "../../src/domain/compute";
 
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
+}));
+
+vi.mock("../../src/domain/compute", () => ({
+  generateCoachingInsights: vi.fn(),
 }));
 
 import { useAppData } from "../../src/context/AppDataContext";
@@ -30,6 +35,7 @@ function makeEmptyAppData() {
 beforeEach(() => {
   vi.clearAllMocks();
   useAppData.mockReturnValue(makeAppData());
+  generateCoachingInsights.mockReturnValue([]);
 });
 
 describe("LongTermPlanPage", () => {
@@ -48,19 +54,30 @@ describe("LongTermPlanPage", () => {
   });
 
   it("renders AI coach notes when non-generic insights are available", () => {
+    generateCoachingInsights.mockReturnValue([
+      {
+        type: "warning",
+        titleKey: "coach.deepFatigue",
+        descKey: "coach.deepFatigueDesc",
+        priority: 2,
+      },
+    ]);
+
     render(<LongTermPlanPage />);
 
     expect(screen.getByTestId("plan-ai-notes")).toBeInTheDocument();
-    expect(screen.getByText("AI Coach Notes")).toBeInTheDocument();
+    expect(screen.getByText("coach.deepFatigue")).toBeInTheDocument();
   });
 
   it("hides AI coach notes when there is no meaningful training context", () => {
+    generateCoachingInsights.mockReturnValue([]);
     useAppData.mockReturnValue(makeEmptyAppData());
 
     render(<LongTermPlanPage />);
 
+    expect(screen.getByTestId("plan-current-week")).toBeInTheDocument();
     expect(screen.queryByTestId("plan-ai-notes")).toBeNull();
-    expect(screen.queryByText("AI Coach Notes")).toBeNull();
+    expect(screen.queryByText("coach.deepFatigue")).toBeNull();
   });
 
   it("switches to Sesong and mounts the existing season plan viewer", () => {
@@ -69,6 +86,6 @@ describe("LongTermPlanPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sesong" }));
 
     expect(screen.getByTestId("plan-season-view")).toBeInTheDocument();
-    expect(screen.getByText("Base")).toBeInTheDocument();
+    expect(screen.getByTestId("week-card-1")).toBeInTheDocument();
   });
 });

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
-import PageContainer from "../components/layout/PageContainer";
 import { PlanViewer } from "../components/planner/PlanViewer";
 import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
@@ -214,38 +213,53 @@ export default function LongTermPlanPage() {
     }
   }, [hierarchicalPlan, selectedWorkout]);
 
+  function handleReplanAI() {
+    window.dispatchEvent(new CustomEvent("rs:coach-ask", {
+      detail: "Jeg vil gjennomgå treningsplanen min. Kan du se på progresjonen og belastningen og foreslå justeringer?"
+    }));
+  }
+
   return (
-    <PageContainer>
-      {/* Editorial header */}
-      <div>
-        <span
-          className="block mb-2"
-          style={{ font: "var(--type-caption)", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--ink-muted)" }}
-        >
-          CH. 02 · PLAN
-        </span>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="m-0 mb-1" style={{ font: "var(--type-cover)", color: "var(--ink)" }}>
-              Training Plan
-            </h2>
-            <p className="m-0 text-sm" style={{ color: "var(--ink-muted)" }}>
-              Phases and training blocks towards your goal race.
-            </p>
-          </div>
+    <div className="canvas">
+      {/* Page header */}
+      <div className="full" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <p className="cc-label" style={{ marginBottom: 4 }}>Treningsplan</p>
+          <h1 className="display-md" style={{ margin: 0 }}>Treningsplan</h1>
+          <p className="body-sm" style={{ marginTop: 6 }}>Faser og treningsblokker mot målløpet ditt.</p>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
           {hierarchicalPlan?.plan && (
-            <Button variant="outline" onClick={() => setIntakeOpen(true)}>
-              Regenerate Plan
-            </Button>
+            <button
+              type="button"
+              onClick={handleReplanAI}
+              style={{
+                background: "var(--primary)",
+                color: "#fff",
+                border: 0,
+                borderRadius: "var(--r-md)",
+                padding: "9px 18px",
+                fontFamily: "var(--ff-display)",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+              }}
+            >
+              <span>✦</span>
+              Replanlegg med AI
+            </button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setIntakeOpen(true)}>
+            Generer ny plan
+          </Button>
         </div>
       </div>
 
       {/* Plan Section */}
-      <div
-        className="rounded-[var(--radius-xl)] p-6"
-        style={{ background: "var(--paper-raised)", boxShadow: "var(--shadow-lift)" }}
-      >
+      <div className="panel full" style={{ gap: 20 }}>
         {hierarchicalPlan?.loading ? (
           <div className="text-center py-8">
             <p className="text-sm" style={{ color: "var(--ink-muted)" }}>Loading plan…</p>
@@ -330,6 +344,6 @@ export default function LongTermPlanPage() {
         onSave={handleWorkoutSave}
       />
 
-    </PageContainer>
+    </div>
   );
 }

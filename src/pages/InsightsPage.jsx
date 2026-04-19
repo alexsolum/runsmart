@@ -3,7 +3,6 @@ import ReactMarkdown from "react-markdown";
 import { useAppData } from "../context/AppDataContext";
 import { useI18n } from "../i18n/translations.js";
 import { buildCoachPayload } from "../lib/coachPayload.js";
-import PageContainer from "../components/layout/PageContainer";
 import {
   computeLongRuns,
   computeTrainingLoad,
@@ -993,22 +992,19 @@ export default function InsightsPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <PageContainer id="insights">
+    <div id="insights" className="canvas">
 
       {/* Page header */}
-      <div className="mb-6 flex justify-between items-end gap-4 max-[800px]:flex-col max-[800px]:items-start">
+      <div className="full" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16 }}>
         <div>
-          <h2 className="m-0 mb-1 text-2xl font-bold font-sans text-slate-900">
-            {copy.title}
-          </h2>
-          <p className="m-0 text-sm text-slate-500">
-            {copy.subtitle}
-          </p>
+          <p className="cc-label" style={{ marginBottom: 4 }}>Innsikt</p>
+          <h1 className="display-md" style={{ margin: 0 }}>{copy.title}</h1>
+          <p className="body-sm" style={{ marginTop: 6 }}>{copy.subtitle}</p>
         </div>
       </div>
 
       {hasData && (
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="full mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <label
               className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1"
@@ -1037,10 +1033,10 @@ export default function InsightsPage() {
       )}
 
       {/* Synthesis callout — above KPI strip */}
-      {synthesisLoading && <SkeletonBlock height={120} data-testid="synthesis-skeleton" />}
+      {synthesisLoading && <SkeletonBlock height={120} data-testid="synthesis-skeleton" className="full" />}
       {!synthesisLoading && synthesis && (
-        <div 
-          className="insights-coach-synthesis bg-blue-50/50 border border-blue-100 rounded-xl p-6 mb-8 shadow-sm" 
+        <div
+          className="insights-coach-synthesis full bg-blue-50/50 border border-blue-100 rounded-xl p-6 mb-8 shadow-sm"
           data-testid="synthesis-callout"
         >
           <div className="prose prose-slate max-w-none prose-sm">
@@ -1081,7 +1077,7 @@ export default function InsightsPage() {
       )}
 
       {/* KPI strip — kpi-strip / kpi-card classes preserved for tests */}
-      <div className="kpi-strip grid grid-cols-4 gap-4 mb-6 max-[960px]:grid-cols-2 max-[600px]:grid-cols-1">
+      <div className="kpi-strip full grid grid-cols-4 gap-4 mb-6 max-[960px]:grid-cols-2 max-[600px]:grid-cols-1">
         {isLoading ? (
           <>
             <SkeletonBlock height={90} />
@@ -1121,7 +1117,7 @@ export default function InsightsPage() {
 
       {/* Empty state */}
       {!isLoading && !hasData && (
-        <div className="text-center py-20 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div className="full text-center py-20 bg-white rounded-xl border border-slate-100 shadow-sm">
           <div className="text-5xl mb-4">📊</div>
           <p className="font-semibold text-slate-700 m-0 mb-1 text-base">{copy.noDataTitle}</p>
           <p className="text-sm text-slate-500 m-0 mb-6 max-w-sm mx-auto">
@@ -1137,7 +1133,7 @@ export default function InsightsPage() {
 
       {/* Loading skeletons */}
       {isLoading && (
-        <div className="grid gap-6">
+        <div className="full grid gap-6">
           <SkeletonBlock height={300} />
           <div className="grid grid-cols-2 gap-6 max-[800px]:grid-cols-1">
             <SkeletonBlock height={260} />
@@ -1149,7 +1145,7 @@ export default function InsightsPage() {
 
       {/* ── Charts ──────────────────────────────────────────────────────── */}
       {!isLoading && hasData && (
-        <div className="grid gap-6">
+        <div className="full grid gap-6">
 
           {/* Training Load Trend — full width */}
           {trainingLoadSeries.length >= 7 && (
@@ -1417,14 +1413,30 @@ export default function InsightsPage() {
             </CardContent>
           </Card>
 
-          {/* Training load state overlay callout */}
+          {/* "Hva betyr dette?" — TSB interpretation panel */}
           {loadState && (
-            <div className="coach-adaptation-note" data-testid="load-state-callout">
-              <p>
-                <strong>
-                  {LOAD_STATE_LABELS[lang][loadState.state] ?? loadState.stateLabel} · {LOAD_STATE_LABELS[lang][loadState.trendLabel] ?? loadState.trendLabel}
-                </strong>
-                {" - "}
+            <div className="panel" data-testid="load-state-callout">
+              <div className="panel-head">
+                <div className="title-wrap">
+                  <p className="cc-label">Hva betyr dette?</p>
+                  <h3>
+                    {LOAD_STATE_LABELS[lang][loadState.state] ?? loadState.stateLabel}
+                    {" · "}
+                    {LOAD_STATE_LABELS[lang][loadState.trendLabel] ?? loadState.trendLabel}
+                  </h3>
+                </div>
+                <span
+                  className="num"
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: loadState.tsb > 5 ? "var(--ok)" : loadState.tsb < -10 ? "var(--risk)" : "var(--ink-muted)",
+                  }}
+                >
+                  TSB {loadState.tsb > 0 ? "+" : ""}{Math.round(loadState.tsb)}
+                </span>
+              </div>
+              <p className="body-sm" style={{ margin: 0, lineHeight: 1.6 }}>
                 {((OVERLAY_MESSAGES[loadState.state]?.[loadState.trendLabel]?.[lang]) ?? "")
                   .replace("{tsb}", Math.round(loadState.tsb))}
               </p>
@@ -1756,6 +1768,6 @@ export default function InsightsPage() {
 
         </div>
       )}
-    </PageContainer>
+    </div>
   );
 }

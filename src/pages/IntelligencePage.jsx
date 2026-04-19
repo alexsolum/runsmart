@@ -6,7 +6,10 @@ import SeasonPlanCard from "../components/dashboard/SeasonPlanCard";
 export default function IntelligencePage() {
   return (
     <div className="canvas" id="intelligence">
-      <div style={{ gridColumn: "span 12", display: "flex", flexDirection: "column", gap: 22 }}>
+      <div
+        className="dashboard-stack"
+        style={{ gridColumn: "span 12", display: "flex", flexDirection: "column", gap: 22 }}
+      >
         <HeroToday />
         <ReadinessPanel />
         <SeasonPlanCard />

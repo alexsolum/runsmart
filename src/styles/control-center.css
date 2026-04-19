@@ -1049,3 +1049,9 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   font-size: 11px;
   color: #cdd6e6;
 }
+
+@media (min-width: 1281px) {
+  #intelligence .dashboard-stack {
+    max-width: calc(100% - 420px);
+  }
+}

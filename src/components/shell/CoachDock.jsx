@@ -9,6 +9,11 @@ const SUGGESTIONS = [
   "Status mot A-løpet",
 ];
 
+function shouldCollapseForViewport() {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth <= 1180;
+}
+
 export default function CoachDock() {
   const { auth, activities, trainingBlocks, checkins, hierarchicalPlan, coachConversations } =
     useAppData();
@@ -16,11 +21,21 @@ export default function CoachDock() {
   const { sessions, messages, activeSessionId, setActiveSessionId, startNewSession } =
     coachConversations;
 
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(!shouldCollapseForViewport());
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [optimistic, setOptimistic] = useState([]);
   const bodyRef = useRef(null);
+
+  useEffect(() => {
+    function syncDockMode() {
+      setOpen(!shouldCollapseForViewport());
+    }
+
+    window.addEventListener("resize", syncDockMode);
+    syncDockMode();
+    return () => window.removeEventListener("resize", syncDockMode);
+  }, []);
 
   // Session init
   useEffect(() => {

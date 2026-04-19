@@ -4,10 +4,21 @@ import { getSupabaseClient } from "../lib/supabaseClient";
 /**
  * Manages coach chat sessions and messages.
  *
- * Sessions live in coach_conversations and message turns live in coach_messages.
- * The hook normalizes that split schema back into the UI shape expected by the
- * conversation sidebar and chat panel.
+ * The live schema stores one message turn per row in coach_conversations and
+ * groups threads via session_id. This hook normalizes that flat structure back
+ * into the UI shape expected by the chat surfaces.
  */
+function previewText(content) {
+  if (Array.isArray(content)) {
+    const textBlock = content.find((block) => block?.type === "text" && typeof block.text === "string");
+    if (textBlock?.text) return textBlock.text;
+  }
+
+  if (typeof content === "string") return content;
+
+  return null;
+}
+
 export function useCoachConversations(userId) {
   const client = useMemo(() => getSupabaseClient(), []);
   const [sessions, setSessions] = useState([]);
@@ -25,20 +36,33 @@ export function useCoachConversations(userId) {
     try {
       const { data, error: err } = await client
         .from("coach_conversations")
-        .select("id, title, created_at, updated_at")
+        .select("id, session_id, role, content, created_at")
         .eq("user_id", userId)
-        .order("updated_at", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (err) throw err;
 
-      const sessionList = (data ?? []).map((row) => ({
-        session_id: row.id,
-        firstMessage: row.title || "New conversation",
-        createdAt: row.created_at,
-        updatedAt: row.updated_at ?? row.created_at,
-      }));
+      const grouped = new Map();
+      for (const row of data ?? []) {
+        const existing = grouped.get(row.session_id);
+        const preview = previewText(row.content);
+        if (!existing) {
+          grouped.set(row.session_id, {
+            session_id: row.session_id,
+            firstMessage: preview || "New conversation",
+            createdAt: row.created_at,
+            updatedAt: row.created_at,
+          });
+          continue;
+        }
 
-      setSessions(sessionList);
+        if (new Date(row.created_at) < new Date(existing.createdAt)) {
+          existing.createdAt = row.created_at;
+          if (preview) existing.firstMessage = preview;
+        }
+      }
+
+      setSessions(Array.from(grouped.values()));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -58,9 +82,9 @@ export function useCoachConversations(userId) {
       setError(null);
 
       const { data, error: err } = await client
-        .from("coach_messages")
-        .select("id, role, content, created_at")
-        .eq("conversation_id", sessionId)
+        .from("coach_conversations")
+        .select("id, session_id, role, content, created_at")
+        .eq("session_id", sessionId)
         .order("created_at", { ascending: true });
 
       if (err) throw err;

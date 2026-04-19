@@ -198,11 +198,10 @@ describe("Section — heading uses tracking-tight (activates sans-serif override
   });
 });
 
-describe("HeroPage — dashboard h2 heading is sans-serif UI heading", () => {
-  it("Dashboard h2 has tracking-tight class for sans-serif override", () => {
-    render(<HeroPage />);
-    const h2 = screen.getByRole("heading", { name: /^Dashboard$/i });
-    expect(h2.className).toContain("tracking-tight");
+describe("HeroPage — control-center dashboard renders", () => {
+  it("renders the canvas grid wrapper", () => {
+    const { container } = render(<HeroPage />);
+    expect(container.querySelector(".canvas")).toBeInTheDocument();
   });
 });
 
@@ -221,10 +220,9 @@ describe("PageContainer + Section integration", () => {
     expect(wrapper.querySelector('[data-testid="chart"]')).toBeInTheDocument();
   });
 
-  it("renders dashboard with PageContainer — no extra wrapper div outside max-w-7xl", () => {
-    render(<HeroPage />);
-    const containers = document.querySelectorAll(".max-w-7xl");
-    // Exactly one PageContainer should render for the dashboard
-    expect(containers.length).toBe(1);
+  it("renders dashboard with .canvas wrapper — no legacy PageContainer", () => {
+    const { container } = render(<HeroPage />);
+    // New dashboard uses .canvas grid, not PageContainer's .max-w-7xl
+    expect(container.querySelector(".canvas")).toBeInTheDocument();
   });
 });

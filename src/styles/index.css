@@ -2,14 +2,15 @@
 @import './tokens.css';
 @import './pa-tokens.css';
 @import '../../styles.css';
+@import './control-center.css';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "DM Sans", system-ui, sans-serif;
-  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-serif: "Manrope", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
-  --font-display: "Outfit", "DM Sans", system-ui, sans-serif;
+  --font-display: "Manrope", system-ui, sans-serif;
   --font-manrope: "Manrope", system-ui, sans-serif;
   --font-inter: "Inter", system-ui, sans-serif;
 }
@@ -21,32 +22,32 @@
 
 @layer base {
   :root {
-    --background: #F4EFE6;
-    --foreground: #0B1738;
-    --card: #FFFFFF;
-    --card-foreground: #0B1738;
-    --popover: #FFFFFF;
-    --popover-foreground: #0B1738;
-    --primary: #D84426;
-    --primary-foreground: #FFFFFF;
-    --secondary: #FAF7F1;
-    --secondary-foreground: #0B1738;
-    --muted: #FAF7F1;
-    --muted-foreground: #4A5578;
-    --accent: #F7DCCF;
-    --accent-foreground: #D84426;
-    --destructive: #8A2E1E;
-    --destructive-foreground: #FFFFFF;
-    --border: rgba(11, 23, 56, 0.12);
-    --input: rgba(11, 23, 56, 0.12);
-    --ring: #D84426;
+    --background: #f3f4f7;
+    --foreground: #0e1a2d;
+    --card: #ffffff;
+    --card-foreground: #0e1a2d;
+    --popover: #ffffff;
+    --popover-foreground: #0e1a2d;
+    --primary: #003371;
+    --primary-foreground: #ffffff;
+    --secondary: #eceef3;
+    --secondary-foreground: #0e1a2d;
+    --muted: #eceef3;
+    --muted-foreground: #4a566a;
+    --accent: #e7eef8;
+    --accent-foreground: #003371;
+    --destructive: #b23030;
+    --destructive-foreground: #ffffff;
+    --border: rgba(14, 26, 45, 0.08);
+    --input: rgba(14, 26, 45, 0.08);
+    --ring: #003371;
     --shadcn-radius: 0.375rem;
-    /* Chart palette — phase + signal colors */
-    --chart-1: #6B7A5A;
-    --chart-2: #8B6F3F;
-    --chart-3: #B03A2E;
-    --chart-4: #4A5E6B;
-    --chart-5: #7C6F8A;
+    /* Chart palette — phase colors */
+    --chart-1: #1f7a4d;
+    --chart-2: #00499c;
+    --chart-3: #6b3fb0;
+    --chart-4: #b46a12;
+    --chart-5: #b23030;
   }
 }
 
@@ -81,21 +82,22 @@
 }
 
 /* ── Typography utilities ── */
-.font-serif  { font-family: var(--font-family-serif); }
-.font-mono   { font-family: var(--font-family-mono); }
+.font-serif    { font-family: var(--ff-display); }
+.font-mono     { font-family: var(--ff-mono); }
+.font-display  { font-family: var(--ff-display); }
 
 /* Mono for KPI/stat values — large numeric displays */
 .dashboard-kpi strong,
 .kpi-card .kpi-value,
 .mobile-kpi-value {
-  font-family: var(--font-family-mono);
+  font-family: var(--ff-mono);
 }
 
-/* Brand text uses serif for distinction */
+/* Brand/display text */
 .app-sidebar__brand,
 .sidebar-logo,
 .topbar-logo {
-  font-family: var(--font-family-serif);
+  font-family: var(--ff-display);
 }
 
 #root {

@@ -1185,3 +1185,91 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
     grid-template-columns: 1fr;
   }
 }
+
+.plan-side-card {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-lowest);
+  box-shadow: var(--shadow-1);
+}
+
+.plan-side-card__header {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-next-weeks,
+.plan-ai-notes {
+  display: grid;
+  gap: 10px;
+}
+
+.plan-next-week-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid rgba(11, 23, 56, 0.06);
+}
+
+.plan-next-week-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.plan-next-week-row__title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.plan-next-week-row__meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.plan-next-week-row__summary {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.plan-ai-note {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--paper-raised);
+  border-left: 4px solid rgba(11, 23, 56, 0.1);
+}
+
+.plan-ai-note--positive {
+  border-left-color: var(--ok);
+}
+
+.plan-ai-note--warning,
+.plan-ai-note--danger {
+  border-left-color: var(--warn);
+}
+
+.plan-ai-note__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.plan-ai-note__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}

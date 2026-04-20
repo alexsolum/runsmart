@@ -13,6 +13,9 @@ export default function ParticipationFormDialog({ open, onClose, onSubmit, initi
   const [form, setForm] = useState({
     race_date: "",
     finish_time: "",
+    overall_place: "",
+    total_finishers: "",
+    is_pb: false,
     notes: "",
     strava_activity_id: "",
     photo_album_url: "",
@@ -23,12 +26,24 @@ export default function ParticipationFormDialog({ open, onClose, onSubmit, initi
       setForm({
         race_date: initialData.race_date ?? "",
         finish_time: initialData.finish_time ?? "",
+        overall_place: initialData.overall_place ?? "",
+        total_finishers: initialData.total_finishers ?? "",
+        is_pb: initialData.is_pb ?? false,
         notes: initialData.notes ?? "",
         strava_activity_id: initialData.strava_activity_id ?? "",
         photo_album_url: initialData.photo_album_url ?? "",
       });
     } else {
-      setForm({ race_date: "", finish_time: "", notes: "", strava_activity_id: "", photo_album_url: "" });
+      setForm({
+        race_date: "",
+        finish_time: "",
+        overall_place: "",
+        total_finishers: "",
+        is_pb: false,
+        notes: "",
+        strava_activity_id: "",
+        photo_album_url: "",
+      });
     }
   }, [initialData, open]);
 
@@ -36,11 +51,18 @@ export default function ParticipationFormDialog({ open, onClose, onSubmit, initi
     return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
   }
 
+  function handleToggle(field) {
+    return (e) => setForm((prev) => ({ ...prev, [field]: e.target.checked }));
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     const data = {
       race_date: form.race_date,
       finish_time: form.finish_time.trim() || null,
+      overall_place: form.overall_place ? Number(form.overall_place) : null,
+      total_finishers: form.total_finishers ? Number(form.total_finishers) : null,
+      is_pb: Boolean(form.is_pb),
       notes: form.notes.trim() || null,
       strava_activity_id: form.strava_activity_id.trim() || null,
       photo_album_url: form.photo_album_url.trim() || null,
@@ -62,6 +84,25 @@ export default function ParticipationFormDialog({ open, onClose, onSubmit, initi
           <div>
             <Label htmlFor="part-time">{t("races.finishTime")}</Label>
             <Input id="part-time" placeholder="HH:MM:SS" value={form.finish_time} onChange={handleChange("finish_time")} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="part-place">Overall place</Label>
+              <Input id="part-place" type="number" min="1" value={form.overall_place} onChange={handleChange("overall_place")} />
+            </div>
+            <div>
+              <Label htmlFor="part-finishers">Field size</Label>
+              <Input id="part-finishers" type="number" min="1" value={form.total_finishers} onChange={handleChange("total_finishers")} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="part-pb"
+              type="checkbox"
+              checked={form.is_pb}
+              onChange={handleToggle("is_pb")}
+            />
+            <Label htmlFor="part-pb">Mark as PB</Label>
           </div>
           <div>
             <Label htmlFor="part-notes">{t("races.raceNotes")}</Label>

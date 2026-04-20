@@ -850,6 +850,52 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
 .race-stats .v small { color: var(--ink-muted); font-weight: 400; margin-left: 2px; }
 .race-stats .lbl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-subtle); margin-bottom: 2px; display: block; }
 
+.race-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.race-stat-card {
+  background: var(--surface-lowest);
+  border-radius: var(--r-xl);
+  padding: 18px;
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.race-stat-card.accent { background: var(--primary-050); }
+.race-stat-card strong {
+  font-family: var(--ff-display);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--ink-strong);
+}
+.race-stat-card p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.placement-medal {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.placement-medal.gold { background: #f7e08b; color: #6d5200; }
+.placement-medal.silver { background: #dce3ed; color: #445062; }
+.placement-medal.bronze { background: #e7c5a6; color: #724624; }
+.placement-medal.stone { background: var(--surface-sunken); color: var(--ink-muted); }
+
 .medal {
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -944,6 +990,7 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   .app { grid-template-columns: 72px 1fr; }
   .brand-name, .brand-tag, .nav-section, .nav-item span.lbl, .sidebar-footer .email { display: none; }
   .nav-item { justify-content: center; }
+  .race-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
   .canvas { padding: 12px; gap: 12px; }

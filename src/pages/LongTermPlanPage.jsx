@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { PlanViewer } from "../components/planner/PlanViewer";
-import { FourWeekGrid } from "../components/planner/FourWeekGrid";
+import { PlanWeekCard } from "../components/planner/PlanWeekCard";
 import { SimpleWeekGrid } from "../components/planner/SimpleWeekGrid";
 import { Next4WeeksList } from "../components/planner/Next4WeeksList";
 import { AiCoachNotes } from "../components/planner/AiCoachNotes";
@@ -134,67 +134,85 @@ function resolveWorkoutSelection(planData, selection) {
   };
 }
 
-function plannerTypeForWorkout(workout) {
-  const rawType = String(workout?.type ?? "").trim();
-  if (rawType === "Workout") return "Intervals";
-  return rawType || "Easy";
+function phaseColorFor(name) {
+  const normalized = String(name ?? "").toLowerCase();
+  if (normalized.includes("base")) return "var(--phase-base, #6B7A5A)";
+  if (normalized.includes("build")) return "var(--phase-build, #8B6F3F)";
+  if (normalized.includes("peak")) return "var(--phase-peak, #B03A2E)";
+  if (normalized.includes("taper")) return "var(--phase-taper, #4A5E6B)";
+  return "var(--phase-recovery, #7C6F8A)";
 }
 
-function buildFourWeekPlannerSource(planData, planId) {
-  const sourcePlanId = planId ?? "hierarchical-plan";
+function detectMobileView() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(max-width: 600px)").matches;
+}
+
+function buildFourWeekWeeks(planData) {
   const startMonday = currentMondayIso();
   const endIso = isoDateOffset(startMonday, 27);
-  const weeks = (planData?.weeks ?? []).filter(
-    (week) => week?.startDate <= endIso && week?.endDate >= startMonday,
-  );
+  return (planData?.weeks ?? [])
+    .filter((week) => week?.startDate <= endIso && week?.endDate >= startMonday)
+    .slice(0, 4);
+}
 
-  const entries = weeks.flatMap((week) =>
-    (week?.days ?? []).flatMap((day) =>
-      (day?.workouts ?? []).map((workout) => ({
-        id: `${week.weekNumber}-${day.date}-${workout.id}`,
-        plan_id: sourcePlanId,
-        workout_date: day.date,
-        workout_type: plannerTypeForWorkout(workout),
-        distance_km: workout?.distanceKm ?? null,
-        duration_min: workout?.durationMinutes ?? null,
-        description: workout?.description ?? workout?.name ?? workout?.humanReadable ?? null,
-        completed: Boolean(workout?.completed),
-      })),
-    ),
-  );
-
-  const blocks = weeks.map((week) => ({
-    id: `week-${week.weekNumber}`,
-    plan_id: sourcePlanId,
-    phase: week?.phase ?? null,
-    start_date: week?.startDate,
-    end_date: week?.endDate,
-    target_km: week?.summary?.totalKm ?? null,
-    notes: week?.focus ?? null,
-  }));
+function buildWorkoutSelection(phaseName, meta) {
+  const dayDate = meta?.day?.date ?? null;
+  const dayLabel = meta?.day?.dayOfWeek && dayDate
+    ? `${meta.day.dayOfWeek} ${new Date(`${dayDate}T00:00:00Z`).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })}`
+    : meta?.day?.dayOfWeek ?? null;
 
   return {
-    planId: sourcePlanId,
-    entries,
-    blocks,
+    phaseName,
+    weekNumber: meta?.week?.weekNumber ?? null,
+    dayDate,
+    dayLabel,
+    workout: meta?.workout ?? null,
   };
+}
+
+function FourWeekPlanCards({ weeks, onWorkoutSelect }) {
+  const [isMobile, setIsMobile] = useState(() => detectMobileView());
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+
+    const media = window.matchMedia("(max-width: 600px)");
+    const handleChange = (event) => setIsMobile(event.matches);
+    setIsMobile(media.matches);
+    media.addEventListener?.("change", handleChange);
+    return () => media.removeEventListener?.("change", handleChange);
+  }, []);
+
+  return (
+    <div className="space-y-4" data-testid="plan-four-week-view">
+      {weeks.map((week) => (
+        <PlanWeekCard
+          key={week.weekNumber}
+          week={week}
+          phaseColor={phaseColorFor(week?.phase)}
+          isMobile={isMobile}
+          onWorkoutSelect={(workout, meta) => onWorkoutSelect?.(buildWorkoutSelection(week?.phase ?? null, {
+            ...meta,
+            workout,
+          }))}
+        />
+      ))}
+    </div>
+  );
 }
 
 export default function LongTermPlanPage() {
   const { activities, checkins, plans, hierarchicalPlan } = useAppData();
 
-  const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [formError, setFormError] = useState(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [workoutSaving, setWorkoutSaving] = useState(false);
   const [viewMode, setViewMode] = useState("Uke");
-
-  useEffect(() => {
-    if (!selectedPlanId && plans.plans.length > 0) {
-      setSelectedPlanId(plans.plans[0].id);
-    }
-  }, [plans.plans, selectedPlanId]);
 
   const planData = hierarchicalPlan?.plan?.plan_data ?? null;
   const planPageModel = useMemo(
@@ -221,10 +239,7 @@ export default function LongTermPlanPage() {
     });
   }, [planData]);
 
-  const fourWeekPlannerSource = useMemo(
-    () => buildFourWeekPlannerSource(planData, selectedPlanId ?? hierarchicalPlan?.plan?.id ?? null),
-    [hierarchicalPlan?.plan?.id, planData, selectedPlanId],
-  );
+  const fourWeekWeeks = useMemo(() => buildFourWeekWeeks(planData), [planData]);
 
   const handleViewerWorkoutSelect = useCallback((selection) => {
     setSelectedWorkout(selection ?? null);
@@ -303,14 +318,9 @@ export default function LongTermPlanPage() {
 
     if (viewMode === "4 uker") {
       return (
-        <FourWeekGrid
-          entries={fourWeekPlannerSource.entries}
-          loading={false}
-          planId={fourWeekPlannerSource.planId}
-          blocks={fourWeekPlannerSource.blocks}
-          onEdit={() => {}}
-          onToggleCompleted={() => {}}
-          onCreateForDate={() => {}}
+        <FourWeekPlanCards
+          weeks={fourWeekWeeks}
+          onWorkoutSelect={handleViewerWorkoutSelect}
         />
       );
     }

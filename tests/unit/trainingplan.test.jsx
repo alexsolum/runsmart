@@ -164,7 +164,11 @@ describe("LongTermPlanPage", () => {
     render(<LongTermPlanPage />);
     fireEvent.click(screen.getByRole("button", { name: "4 uker" }));
 
-    expect(screen.getByText("4 x 5 min for week 1")).toBeInTheDocument();
-    expect(screen.getByText("4 x 5 min for week 2")).toBeInTheDocument();
+    expect(screen.getByTestId("week-card-1")).toBeInTheDocument();
+    expect(screen.getByTestId("week-card-4")).toBeInTheDocument();
+    expect(screen.getAllByTitle("Replan this week with AI coach")).toHaveLength(4);
+    expect(screen.getByTestId("week-metrics-1")).toHaveTextContent("60 km");
+    expect(screen.getByText("Key workout 1")).toBeInTheDocument();
+    expect(screen.getByText("Key workout 2")).toBeInTheDocument();
   });
 });

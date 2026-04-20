@@ -3,33 +3,25 @@ import { useAppData } from "../context/AppDataContext";
 import Segmented from "../components/ui/Segmented";
 import RaceCardDone from "../components/races/RaceCardDone";
 import RaceCardDream from "../components/races/RaceCardDream";
+import RaceStatsRow from "../components/races/RaceStatsRow";
 import RaceDetailView from "../components/races/RaceDetailView";
 import RaceFormDialog from "../components/races/RaceFormDialog";
 
 const TABS = ["Gjennomført", "Drømmer"];
 
-function raceYear(race, done) {
-  if (done) {
-    const parts = race.race_participations ?? [];
-    if (parts.length > 0) {
-      const sorted = [...parts].sort((a, b) =>
-        new Date(b.race_date) - new Date(a.race_date)
-      );
-      return sorted[0].race_date
-        ? new Date(sorted[0].race_date).getUTCFullYear()
-        : 0;
-    }
-  }
-  const raw = race.race_date ?? race.next_race_date;
+function rowYear(row, done) {
+  const raw = done
+    ? row.participation?.race_date
+    : row.race?.next_race_date ?? row.race?.race_date;
   return raw ? new Date(raw).getUTCFullYear() : 0;
 }
 
-function groupByYear(races, done = false) {
+function groupByYear(rows, done = false) {
   const map = new Map();
-  for (const r of races) {
-    const year = raceYear(r, done);
+  for (const row of rows) {
+    const year = rowYear(row, done);
     if (!map.has(year)) map.set(year, []);
-    map.get(year).push(r);
+    map.get(year).push(row);
   }
   return [...map.entries()].sort((a, b) => b[0] - a[0]);
 }
@@ -45,18 +37,31 @@ export default function RacePage() {
     [racesCtx.races, selectedRaceId],
   );
 
-  const doneRaces = useMemo(
-    () => racesCtx.races.filter((r) => (r.race_participations ?? []).length > 0),
+  const doneRows = useMemo(
+    () =>
+      racesCtx.races.flatMap((race) =>
+        (race.race_participations ?? []).map((participation) => ({
+          race,
+          participation,
+          id: `${race.id}-${participation.id}`,
+        })),
+      ),
     [racesCtx.races],
   );
 
-  const dreamRaces = useMemo(
-    () => racesCtx.races.filter((r) => (r.race_participations ?? []).length === 0),
+  const dreamRows = useMemo(
+    () =>
+      racesCtx.races
+        .filter(
+          (race) =>
+            (race.race_participations ?? []).length === 0 || race.next_race_date,
+        )
+        .map((race) => ({ race, id: race.id })),
     [racesCtx.races],
   );
 
-  const doneByYear = useMemo(() => groupByYear(doneRaces, true), [doneRaces]);
-  const dreamByYear = useMemo(() => groupByYear(dreamRaces, false), [dreamRaces]);
+  const doneByYear = useMemo(() => groupByYear(doneRows, true), [doneRows]);
+  const dreamByYear = useMemo(() => groupByYear(dreamRows, false), [dreamRows]);
 
   const handleAddRace = useCallback(async (data, raceInfo) => {
     const created = await racesCtx.createRace(data, raceInfo);
@@ -74,7 +79,6 @@ export default function RacePage() {
   }
 
   const activeGroups = activeTab === "Gjennomført" ? doneByYear : dreamByYear;
-  const Card = activeTab === "Gjennomført" ? RaceCardDone : RaceCardDream;
   const emptyMsg = activeTab === "Gjennomført"
     ? "Ingen fullførte løp ennå. Legg til ditt første løp nedenfor."
     : "Ingen drømmeløp ennå. Legg til et løp du vil gjennomføre.";
@@ -83,60 +87,66 @@ export default function RacePage() {
     <>
       <div className="canvas">
         <div className="full" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Page header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <p className="cc-label">Løp</p>
-              <h1 className="display-md" style={{ margin: 0 }}>Løpshistorikk</h1>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+              <div>
+                <p className="cc-label">LØPSSENTER · VEGG OG DRØMMER</p>
+                <h1 className="display-md" style={{ margin: 0 }}>Løp</h1>
+                <p className="body-sm" style={{ marginTop: 8, maxWidth: 720 }}>
+                  Alt du har gjennomført og alt du sikter mot. Sorter gjerne etter år for å se hvordan sesongen bygde seg.
+                </p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <Segmented
+                  options={TABS}
+                  value={activeTab}
+                  onChange={setActiveTab}
+                />
+                <button className="btn-primary" type="button" onClick={() => setAddOpen(true)}>
+                  + Legg til løp
+                </button>
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Segmented
-                options={TABS}
-                value={activeTab}
-                onChange={setActiveTab}
-              />
-              <button
-                className="btn-primary"
-                type="button"
-                onClick={() => setAddOpen(true)}
-                style={{
-                  background: "var(--primary)",
-                  color: "#fff",
-                  border: 0,
-                  borderRadius: "var(--r-md)",
-                  padding: "8px 16px",
-                  fontFamily: "var(--ff-display)",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                + Legg til løp
-              </button>
-            </div>
+
+            <RaceStatsRow
+              doneRows={doneRows}
+              dreamRaces={dreamRows.map((row) => row.race)}
+            />
           </div>
 
-          {/* Timeline */}
           {activeGroups.length === 0 ? (
             <p className="body-sm" style={{ padding: "40px 0", textAlign: "center" }}>
               {emptyMsg}
             </p>
           ) : (
             <div className="race-timeline">
-              {activeGroups.map(([year, races]) => (
+              {activeGroups.map(([year, rows]) => (
                 <div key={year} className="year-block">
                   <div className="year">
                     {year || "—"}
-                    <span className="sub">{races.length} løp</span>
+                    <span className="sub">
+                      {activeTab === "Gjennomført"
+                        ? `${rows.length} fullføringer`
+                        : `${rows.length} planlagt`}
+                    </span>
                   </div>
                   <div className="race-list">
-                    {races.map((race) => (
-                      <Card
-                        key={race.id}
-                        race={race}
-                        onClick={() => setSelectedRaceId(race.id)}
-                      />
-                    ))}
+                    {rows.map((row) =>
+                      activeTab === "Gjennomført" ? (
+                        <RaceCardDone
+                          key={row.id}
+                          race={row.race}
+                          participation={row.participation}
+                          onClick={() => setSelectedRaceId(row.race.id)}
+                        />
+                      ) : (
+                        <RaceCardDream
+                          key={row.id}
+                          race={row.race}
+                          onClick={() => setSelectedRaceId(row.race.id)}
+                        />
+                      ),
+                    )}
                   </div>
                 </div>
               ))}

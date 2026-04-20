@@ -36,6 +36,24 @@ vi.mock("../../src/components/races/RaceFormDialog", () => ({
   default: () => React.createElement("div", { "data-testid": "race-form-dialog" }),
 }));
 
+vi.mock("../../src/components/races/RaceCardDone", () => ({
+  default: ({ race, onClick }) =>
+    React.createElement(
+      "button",
+      { type: "button", onClick, "data-testid": `done-card-${race.id}` },
+      race.name,
+    ),
+}));
+
+vi.mock("../../src/components/races/RaceCardDream", () => ({
+  default: ({ race, onClick }) =>
+    React.createElement(
+      "button",
+      { type: "button", onClick, "data-testid": `dream-card-${race.id}` },
+      race.name,
+    ),
+}));
+
 vi.mock("react-leaflet", () => ({
   MapContainer: ({ children }) => React.createElement("div", { "data-testid": "map-container" }, children),
   TileLayer: () => React.createElement("div", { "data-testid": "tile-layer" }),
@@ -223,33 +241,58 @@ describe("ResourceList", () => {
   });
 });
 
-describe("RacePage", () => {
+describe("RacePage — control-center redesign", () => {
   beforeEach(() => {
     __setMockValue(makeAppData());
   });
 
-  it("renders list view by default", () => {
+  it("shows Gjennomført tab by default with done races", () => {
     render(<RacePage />);
-
     expect(screen.getByText("Boston Marathon")).toBeTruthy();
-    expect(screen.getByText("races.addRace")).toBeTruthy();
+    expect(screen.queryByText("Western States 100")).toBeNull();
   });
 
-  it("navigates to detail view when clicking a race", () => {
+  it("switching to Drømmer tab shows dream races", () => {
     render(<RacePage />);
-
-    fireEvent.click(screen.getByText("Boston Marathon"));
-    // Should show breadcrumb with race name
-    expect(screen.getByText("nav.races")).toBeTruthy();
+    fireEvent.click(screen.getByText("Drømmer"));
+    expect(screen.getByText("Western States 100")).toBeTruthy();
+    expect(screen.queryByText("Boston Marathon")).toBeNull();
   });
 
-  it("navigates to detail view when clicking a map marker", () => {
+  it("done/dream split: Boston (1 participation) is done; Western States (0) is dream", () => {
     render(<RacePage />);
+    // Gjennomført tab: done race visible
+    expect(screen.getByTestId("done-card-race-1")).toBeTruthy();
+    expect(screen.queryByTestId("done-card-race-2")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Map Boston Marathon" }));
+    fireEvent.click(screen.getByText("Drømmer"));
+    expect(screen.getByTestId("dream-card-race-2")).toBeTruthy();
+    expect(screen.queryByTestId("dream-card-race-1")).toBeNull();
+  });
 
-    expect(screen.getByText("nav.races")).toBeTruthy();
+  it("groups done races by year — Boston 2025 shows under year heading", () => {
+    render(<RacePage />);
+    // Year derived from latest participation date (2025-04-21)
+    expect(screen.getByText("2025")).toBeTruthy();
+  });
+
+  it("navigates to detail view when clicking a done race card", () => {
+    render(<RacePage />);
+    fireEvent.click(screen.getByTestId("done-card-race-1"));
+    expect(screen.getByTestId("race-detail")).toBeTruthy();
     expect(screen.getByText("Boston Marathon")).toBeTruthy();
+  });
+
+  it("navigates to detail view when clicking a dream race card", () => {
+    render(<RacePage />);
+    fireEvent.click(screen.getByText("Drømmer"));
+    fireEvent.click(screen.getByTestId("dream-card-race-2"));
+    expect(screen.getByTestId("race-detail")).toBeTruthy();
+  });
+
+  it("shows + Legg til løp button", () => {
+    render(<RacePage />);
+    expect(screen.getByText("+ Legg til løp")).toBeTruthy();
   });
 });
 

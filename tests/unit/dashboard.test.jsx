@@ -1,243 +1,132 @@
 /**
- * Dashboard (HeroPage) tests
+ * PR#1 Dashboard — IntelligencePage rewrite
  *
- * Verifies that the main dashboard correctly displays data that originates
- * from Strava activities stored in the Supabase `activities` table.
+ * Verifies that IntelligencePage renders the three PDF page-1 sections:
+ *   (a) HeroToday   — dark navy hero with weather pill + target grid
+ *   (b) ReadinessPanel — score + /100 + 6 vital rows
+ *   (c) SeasonPlanCard — eyebrow, race title, phase ribbon, 4-KPI strip
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import HeroPage from "../../src/pages/HeroPage";
-import { makeAppData, SAMPLE_ACTIVITIES } from "./mockAppData";
+import IntelligencePage from "../../src/pages/IntelligencePage";
+import { makeAppData } from "./mockAppData";
 
-// Mock the context so we can inject controlled data without hitting Supabase
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
-}));
-
-// Render shadcn Select as a native <select> so tests can use .options
-vi.mock("@/components/ui/select", () => ({
-  Select: ({ children, value, onValueChange, "aria-label": ariaLabel }) => (
-    <select
-      aria-label={ariaLabel}
-      value={value ?? ""}
-      onChange={(e) => onValueChange?.(e.target.value)}
-    >
-      {children}
-    </select>
-  ),
-  SelectTrigger: () => null,
-  SelectValue: () => null,
-  SelectContent: ({ children }) => <>{children}</>,
-  SelectItem: ({ value, children }) => <option value={value}>{children}</option>,
-}));
-
-// Stub Tabs so the Overview tab content is always visible (no click needed)
-vi.mock("@/components/ui/tabs", () => ({
-  Tabs: ({ children }) => <div>{children}</div>,
-  TabsList: ({ children }) => <div>{children}</div>,
-  TabsTrigger: ({ children }) => <button type="button">{children}</button>,
-  TabsContent: ({ children }) => <div>{children}</div>,
 }));
 
 import { useAppData } from "../../src/context/AppDataContext";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Stub localStorage to avoid state bleed between tests
-  vi.stubGlobal("localStorage", {
-    getItem: vi.fn().mockReturnValue(null),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
+  useAppData.mockReturnValue(makeAppData());
+});
+
+// ── HeroToday ────────────────────────────────────────────────────────────────
+describe("IntelligencePage — HeroToday", () => {
+  it("renders the I DAG eyebrow in uppercase", () => {
+    const { container } = render(<IntelligencePage />);
+    const today = container.querySelector(".today");
+    expect(today).toBeInTheDocument();
+    expect(within(today).getByText("I DAG")).toBeInTheDocument();
+  });
+
+  it("renders Generert av Trener attribution top-right", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText(/Generert av Trener/i)).toBeInTheDocument();
+  });
+
+  it("renders a weather pill in the hero meta row", () => {
+    const { container } = render(<IntelligencePage />);
+    expect(container.querySelector(".today .weather-pill")).toBeInTheDocument();
+  });
+
+  it("does NOT render the old CTA buttons", () => {
+    render(<IntelligencePage />);
+    expect(screen.queryByText(/Start økten/i)).toBeNull();
+    expect(screen.queryByText(/Flytt til i morgen/i)).toBeNull();
+  });
+
+  it("renders uppercase target labels DISTANSE / VARIGHET", () => {
+    const { container } = render(<IntelligencePage />);
+    const grid = container.querySelector(".today .target-grid");
+    expect(grid).toBeInTheDocument();
+    expect(within(grid).getByText("DISTANSE")).toBeInTheDocument();
+    expect(within(grid).getByText("VARIGHET")).toBeInTheDocument();
   });
 });
 
-describe("Dashboard — loading state", () => {
-  it("shows skeleton UI while activities are loading", () => {
-    useAppData.mockReturnValue(makeAppData({
-      activities: { activities: [], loading: true, error: null, loadActivities: vi.fn() },
-    }));
+// ── ReadinessPanel ───────────────────────────────────────────────────────────
+describe("IntelligencePage — ReadinessPanel", () => {
+  it("renders FORM I DAG eyebrow (uppercase)", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText("FORM I DAG")).toBeInTheDocument();
+  });
 
-    const { container } = render(<HeroPage />);
-    expect(container.querySelector(".is-loading")).toBeInTheDocument();
+  it("renders Beredskap title + / 100 sub", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText("Beredskap")).toBeInTheDocument();
+    expect(screen.getByText("/ 100")).toBeInTheDocument();
+  });
+
+  it("renders 6 readiness rows in a 2-col grid (no Track bars)", () => {
+    const { container } = render(<IntelligencePage />);
+    const rows = container.querySelectorAll(".readiness-rows .readiness-row");
+    expect(rows.length).toBe(6);
+    expect(container.querySelector(".readiness .track")).toBeNull();
+  });
+
+  it("shows each expected vital name", () => {
+    render(<IntelligencePage />);
+    ["Form (CTL)", "Tretthet", "Søvn 7d", "HRV 7d", "RPE 7d", "Hvilepuls"].forEach((name) => {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    });
+  });
+
+  it("renders a KLAR status pill when activities are present", () => {
+    const { container } = render(<IntelligencePage />);
+    const pill = container.querySelector(".readiness-score .status");
+    expect(pill).toBeInTheDocument();
+    expect(pill.textContent.toUpperCase()).toMatch(/KLAR|UTMERKET|MODERAT|SLITEN/);
   });
 });
 
-describe("Dashboard — error state", () => {
-  it("shows error message when activity data cannot be loaded", () => {
-    useAppData.mockReturnValue(makeAppData({
-      activities: { activities: [], loading: false, error: { message: "Network error" }, loadActivities: vi.fn() },
-    }));
-
-    render(<HeroPage />);
-    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard — KPI metrics", () => {
-  beforeEach(() => {
-    useAppData.mockReturnValue(makeAppData());
+// ── SeasonPlanCard ───────────────────────────────────────────────────────────
+describe("IntelligencePage — SeasonPlanCard", () => {
+  it("renders SESONGPLAN eyebrow with week count", () => {
+    render(<IntelligencePage />);
+    expect(screen.getByText(/SESONGPLAN · \d+ UKER/)).toBeInTheDocument();
   });
 
-  it("renders Total Distance KPI card", () => {
-    render(<HeroPage />);
-    expect(screen.getByText("Total Distance")).toBeInTheDocument();
-    expect(screen.getAllByText(/km/i).length).toBeGreaterThan(0);
+  it("renders the race title in large serif display", () => {
+    const { container } = render(<IntelligencePage />);
+    const card = container.querySelector(".season-plan");
+    expect(card).toBeInTheDocument();
+    expect(within(card).getByText(/Stockholm Marathon/i)).toBeInTheDocument();
   });
 
-  it("shows Active Time KPI in hours or minutes", () => {
-    render(<HeroPage />);
-    expect(screen.getAllByText(/Active Time/i).length).toBeGreaterThan(0);
+  it("renders the Faser/Uker/Dager segmented switch with Faser selected", () => {
+    const { container } = render(<IntelligencePage />);
+    const card = container.querySelector(".season-plan");
+    ["Faser", "Uker", "Dager"].forEach((opt) => {
+      expect(within(card).getByText(opt)).toBeInTheDocument();
+    });
+    expect(within(card).getByText("Faser").className).toContain("on");
   });
 
-  it("shows Sessions KPI counting workouts", () => {
-    render(<HeroPage />);
-    expect(screen.getByText("Sessions")).toBeInTheDocument();
+  it("renders a .gantt with at least one phase bar", () => {
+    const { container } = render(<IntelligencePage />);
+    const gantt = container.querySelector(".season-plan .gantt");
+    expect(gantt).toBeInTheDocument();
+    expect(gantt.querySelectorAll(".bar").length).toBeGreaterThan(0);
   });
 
-  it("shows Avg. Pace KPI", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Avg\. Pace/i)).toBeInTheDocument();
-  });
-
-  it("shows Readiness KPI as a percentage", () => {
-    render(<HeroPage />);
-    const readinessLabels = screen.getAllByText(/Readiness/i);
-    expect(readinessLabels.length).toBeGreaterThan(0);
-  });
-
-  it("shows Elevation Gain KPI", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Elevation Gain/i)).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard — activity history table", () => {
-  beforeEach(() => {
-    useAppData.mockReturnValue(makeAppData());
-  });
-
-  it("shows Activity History section heading", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Activity History/i)).toBeInTheDocument();
-  });
-
-  it("lists recent activities by name in the history table", () => {
-    render(<HeroPage />);
-    expect(screen.getAllByText("Morning Run").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Tempo Tuesday").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Long Run Sunday").length).toBeGreaterThan(0);
-  });
-
-  it("shows duration formatted as H:MM:SS in the table", () => {
-    render(<HeroPage />);
-    // Morning Run: 3120s → 0:52:00
-    expect(screen.getAllByText("0:52:00").length).toBeGreaterThan(0);
-    // Tempo Tuesday: 2160s → 0:36:00
-    expect(screen.getAllByText("0:36:00").length).toBeGreaterThan(0);
-  });
-
-  it("shows 2:00:00 for long run with 7200s moving time", () => {
-    render(<HeroPage />);
-    // Long Run Sunday: moving_time 7200s → 2:00:00
-    expect(screen.getAllByText("2:00:00").length).toBeGreaterThan(0);
-  });
-
-  it("shows Add Activity and View All buttons", () => {
-    render(<HeroPage />);
-    expect(screen.getByRole("button", { name: /Add Activity/i })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /View All/i }).length).toBeGreaterThan(0);
-  });
-});
-
-describe("Dashboard — Workout Breakdown section", () => {
-  beforeEach(() => {
-    useAppData.mockReturnValue(makeAppData());
-  });
-
-  it("shows Workout Breakdown heading", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Workout Breakdown/i)).toBeInTheDocument();
-  });
-
-  it("shows workout type breakdown for sample activities", () => {
-    render(<HeroPage />);
-    // SAMPLE_ACTIVITIES are all type "Run" → should show "Run" in breakdown
-    expect(screen.getAllByText(/Run/i).length).toBeGreaterThan(0);
-  });
-});
-
-describe("Dashboard — Weekly Progress section", () => {
-  beforeEach(() => {
-    useAppData.mockReturnValue(makeAppData());
-  });
-
-  it("shows Weekly Progression heading", () => {
-    render(<HeroPage />);
-    expect(screen.getByText(/Weekly Progression/i)).toBeInTheDocument();
-  });
-
-  it("shows completed and planned km summary pills", () => {
-    render(<HeroPage />);
-    // Use selector:'span' to avoid matching parent containers
-    expect(screen.getByText(/completed/i, { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByText(/planned/i, { selector: "span" })).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard — empty state (no Strava data)", () => {
-  it("shows empty state message when there are no activities and no workout entries", () => {
-    useAppData.mockReturnValue(makeAppData({
-      activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
-      workoutEntries: { entries: [], loading: false, loadEntriesForWeek: vi.fn().mockResolvedValue([]) },
-    }));
-
-    render(<HeroPage />);
-    expect(screen.getByText(/No workout data for this week/i)).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard — Weekly Progress empty state", () => {
-  it("shows empty state when no activities and no workout entries", () => {
-    useAppData.mockReturnValue(makeAppData({
-      activities: { activities: [], loading: false, error: null, loadActivities: vi.fn() },
-      workoutEntries: { entries: [], loading: false, loadEntriesForWeek: vi.fn().mockResolvedValue([]) },
-    }));
-    render(<HeroPage />);
-    expect(screen.getByText(/No workout data for this week/i)).toBeInTheDocument();
-  });
-});
-
-describe("Dashboard — filter controls", () => {
-  beforeEach(() => {
-    useAppData.mockReturnValue(makeAppData());
-  });
-
-  it("has Week and Month date filter buttons", () => {
-    render(<HeroPage />);
-    const controls = screen.getByRole("group", { name: /Dashboard filters/i });
-    expect(controls).toHaveTextContent("Week");
-    expect(controls).toHaveTextContent("Month");
-  });
-
-  it("has workout type filter select with All/Run/Ride/Workout options", () => {
-    render(<HeroPage />);
-    const typeSelect = screen.getByRole("combobox", { name: /Workout type filter/i });
-    expect(typeSelect).toBeInTheDocument();
-    const options = Array.from(typeSelect.options).map((o) => o.value);
-    expect(options).toContain("All");
-    expect(options).toContain("Run");
-    expect(options).toContain("Ride");
-    expect(options).toContain("Workout");
-  });
-
-  it("changes active date filter when chip is clicked", async () => {
-    const user = userEvent.setup();
-    render(<HeroPage />);
-
-    const controls = screen.getByRole("group", { name: /Dashboard filters/i });
-    const monthChip = within(controls).getByRole("button", { name: "Month" });
-    await user.click(monthChip);
-    expect(monthChip).toHaveAttribute("aria-pressed", "true");
+  it("renders the four bottom KPI labels", () => {
+    const { container } = render(<IntelligencePage />);
+    const strip = container.querySelector(".season-plan .season-kpis");
+    expect(strip).toBeInTheDocument();
+    ["DAGER IGJEN", "PLANLAGT KM", "PLANLAGT HØYDE", "KVALITETSØKTER"].forEach((lbl) => {
+      expect(within(strip).getByText(lbl)).toBeInTheDocument();
+    });
   });
 });

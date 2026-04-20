@@ -1,10 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
-import PageContainer from "../components/layout/PageContainer";
 import { PlanViewer } from "../components/planner/PlanViewer";
+import { PlanWeekCard } from "../components/planner/PlanWeekCard";
+import { SimpleWeekGrid } from "../components/planner/SimpleWeekGrid";
+import { Next4WeeksList } from "../components/planner/Next4WeeksList";
+import { AiCoachNotes } from "../components/planner/AiCoachNotes";
 import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
+import { buildPlanPageModel } from "../components/planner/planPageModel";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
 import { RaceLine } from "../components/ui/signature/RaceLine";
+import Segmented from "../components/ui/Segmented";
+import { currentMondayIso, isoDateOffset } from "../lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Flag, Target, Zap, Utensils, Mountain } from "lucide-react";
 
@@ -128,22 +134,97 @@ function resolveWorkoutSelection(planData, selection) {
   };
 }
 
-export default function LongTermPlanPage() {
-  const { plans, trainingBlocks, hierarchicalPlan } = useAppData();
+function phaseColorFor(name) {
+  const normalized = String(name ?? "").toLowerCase();
+  if (normalized.includes("base")) return "var(--phase-base, #6B7A5A)";
+  if (normalized.includes("build")) return "var(--phase-build, #8B6F3F)";
+  if (normalized.includes("peak")) return "var(--phase-peak, #B03A2E)";
+  if (normalized.includes("taper")) return "var(--phase-taper, #4A5E6B)";
+  return "var(--phase-recovery, #7C6F8A)";
+}
 
-  const [selectedPlanId, setSelectedPlanId] = useState(null);
+function detectMobileView() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(max-width: 600px)").matches;
+}
+
+function buildFourWeekWeeks(planData) {
+  const startMonday = currentMondayIso();
+  const endIso = isoDateOffset(startMonday, 27);
+  return (planData?.weeks ?? [])
+    .filter((week) => week?.startDate <= endIso && week?.endDate >= startMonday)
+    .slice(0, 4);
+}
+
+function buildWorkoutSelection(phaseName, meta) {
+  const dayDate = meta?.day?.date ?? null;
+  const dayLabel = meta?.day?.dayOfWeek && dayDate
+    ? `${meta.day.dayOfWeek} ${new Date(`${dayDate}T00:00:00Z`).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })}`
+    : meta?.day?.dayOfWeek ?? null;
+
+  return {
+    phaseName,
+    weekNumber: meta?.week?.weekNumber ?? null,
+    dayDate,
+    dayLabel,
+    workout: meta?.workout ?? null,
+  };
+}
+
+function FourWeekPlanCards({ weeks, onWorkoutSelect }) {
+  const [isMobile, setIsMobile] = useState(() => detectMobileView());
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+
+    const media = window.matchMedia("(max-width: 600px)");
+    const handleChange = (event) => setIsMobile(event.matches);
+    setIsMobile(media.matches);
+    media.addEventListener?.("change", handleChange);
+    return () => media.removeEventListener?.("change", handleChange);
+  }, []);
+
+  return (
+    <div className="space-y-4" data-testid="plan-four-week-view">
+      {weeks.map((week) => (
+        <PlanWeekCard
+          key={week.weekNumber}
+          week={week}
+          phaseColor={phaseColorFor(week?.phase)}
+          isMobile={isMobile}
+          onWorkoutSelect={(workout, meta) => onWorkoutSelect?.(buildWorkoutSelection(week?.phase ?? null, {
+            ...meta,
+            workout,
+          }))}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function LongTermPlanPage() {
+  const { activities, checkins, plans, hierarchicalPlan } = useAppData();
+
   const [formError, setFormError] = useState(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [workoutSaving, setWorkoutSaving] = useState(false);
-
-  useEffect(() => {
-    if (!selectedPlanId && plans.plans.length > 0) {
-      setSelectedPlanId(plans.plans[0].id);
-    }
-  }, [plans.plans, selectedPlanId]);
+  const [viewMode, setViewMode] = useState("Uke");
 
   const planData = hierarchicalPlan?.plan?.plan_data ?? null;
+  const planPageModel = useMemo(
+    () =>
+      buildPlanPageModel({
+        planData,
+        activities: activities?.activities ?? [],
+        checkins: checkins?.checkins ?? [],
+        plans: plans?.plans ?? [],
+      }),
+    [activities?.activities, checkins?.checkins, planData, plans?.plans],
+  );
 
   const raceLineWeeks = useMemo(() => {
     if (!planData) return [];
@@ -157,6 +238,8 @@ export default function LongTermPlanPage() {
       return { weekNumber: week.weekNumber, mileage, phase: phase?.name ?? "Base" };
     });
   }, [planData]);
+
+  const fourWeekWeeks = useMemo(() => buildFourWeekWeeks(planData), [planData]);
 
   const handleViewerWorkoutSelect = useCallback((selection) => {
     setSelectedWorkout(selection ?? null);
@@ -214,38 +297,97 @@ export default function LongTermPlanPage() {
     }
   }, [hierarchicalPlan, selectedWorkout]);
 
+  function handleReplanAI() {
+    window.dispatchEvent(new CustomEvent("rs:coach-ask", {
+      detail: "Jeg vil gjennomgå treningsplanen min. Kan du se på progresjonen og belastningen og foreslå justeringer?"
+    }));
+  }
+
+  const renderPlanBody = () => {
+    if (viewMode === "Sesong") {
+      return (
+        <div data-testid="plan-season-view">
+          <PlanViewer
+            planData={planData}
+            onWorkoutSelect={handleViewerWorkoutSelect}
+            ribbonLayout
+          />
+        </div>
+      );
+    }
+
+    if (viewMode === "4 uker") {
+      return (
+        <FourWeekPlanCards
+          weeks={fourWeekWeeks}
+          onWorkoutSelect={handleViewerWorkoutSelect}
+        />
+      );
+    }
+
+    return (
+      <div className="plan-week-layout">
+        <div className="plan-week-layout__main">
+          <SimpleWeekGrid
+            week={planPageModel.currentWeek}
+            days={planPageModel.currentWeekDays}
+            onWorkoutSelect={handleViewerWorkoutSelect}
+          />
+
+          {planData?.raceStrategy ? (
+            <RaceStrategyCard strategy={planData.raceStrategy} />
+          ) : null}
+        </div>
+
+        <div className="plan-week-layout__rail">
+          <Next4WeeksList weeks={planPageModel.nextFourWeeks} />
+          <AiCoachNotes notes={planPageModel.coachNotes} />
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <PageContainer>
-      {/* Editorial header */}
-      <div>
-        <span
-          className="block mb-2"
-          style={{ font: "var(--type-caption)", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--ink-muted)" }}
-        >
-          CH. 02 · PLAN
-        </span>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="m-0 mb-1" style={{ font: "var(--type-cover)", color: "var(--ink)" }}>
-              Training Plan
-            </h2>
-            <p className="m-0 text-sm" style={{ color: "var(--ink-muted)" }}>
-              Phases and training blocks towards your goal race.
-            </p>
-          </div>
+    <div className="canvas">
+      {/* Page header */}
+      <div className="full" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <p className="cc-label" style={{ marginBottom: 4 }}>Treningsplan</p>
+          <h1 className="display-md" style={{ margin: 0 }}>Treningsplan</h1>
+          <p className="body-sm" style={{ marginTop: 6 }}>Faser og treningsblokker mot målløpet ditt.</p>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
           {hierarchicalPlan?.plan && (
-            <Button variant="outline" onClick={() => setIntakeOpen(true)}>
-              Regenerate Plan
-            </Button>
+            <button
+              type="button"
+              onClick={handleReplanAI}
+              style={{
+                background: "var(--primary)",
+                color: "#fff",
+                border: 0,
+                borderRadius: "var(--r-md)",
+                padding: "9px 18px",
+                fontFamily: "var(--ff-display)",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+              }}
+            >
+              <span>✦</span>
+              Replanlegg med AI
+            </button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setIntakeOpen(true)}>
+            Generer ny plan
+          </Button>
         </div>
       </div>
 
       {/* Plan Section */}
-      <div
-        className="rounded-[var(--radius-xl)] p-6"
-        style={{ background: "var(--paper-raised)", boxShadow: "var(--shadow-lift)" }}
-      >
+      <div className="full plan-page-frame">
         {hierarchicalPlan?.loading ? (
           <div className="text-center py-8">
             <p className="text-sm" style={{ color: "var(--ink-muted)" }}>Loading plan…</p>
@@ -268,7 +410,7 @@ export default function LongTermPlanPage() {
             <Button onClick={() => setIntakeOpen(true)}>Generate Plan</Button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 plan-page-shell">
             {/* Plan meta header */}
             <div>
               <span
@@ -300,17 +442,18 @@ export default function LongTermPlanPage() {
                 </div>
               )}
 
-              <PlanViewer
-                planData={planData}
-                onWorkoutSelect={handleViewerWorkoutSelect}
-                ribbonLayout
-              />
-
-            {planData?.raceStrategy && (
-              <div className="mt-8">
-                <RaceStrategyCard strategy={planData.raceStrategy} />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="cc-label" style={{ marginBottom: 4 }}>Visning</p>
+                  <Segmented
+                    options={["Uke", "4 uker", "Sesong"]}
+                    value={viewMode}
+                    onChange={setViewMode}
+                  />
+                </div>
               </div>
-            )}
+
+              {renderPlanBody()}
           </div>
         )}
       </div>
@@ -330,6 +473,6 @@ export default function LongTermPlanPage() {
         onSave={handleWorkoutSave}
       />
 
-    </PageContainer>
+    </div>
   );
 }

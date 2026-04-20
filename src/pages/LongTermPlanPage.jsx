@@ -10,6 +10,7 @@ import { buildPlanPageModel } from "../components/planner/planPageModel";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
 import { RaceLine } from "../components/ui/signature/RaceLine";
 import Segmented from "../components/ui/Segmented";
+import { currentMondayIso, isoDateOffset } from "../lib/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Flag, Target, Zap, Utensils, Mountain } from "lucide-react";
 
@@ -133,8 +134,54 @@ function resolveWorkoutSelection(planData, selection) {
   };
 }
 
+function plannerTypeForWorkout(workout) {
+  const rawType = String(workout?.type ?? "").trim();
+  if (rawType === "Workout") return "Intervals";
+  return rawType || "Easy";
+}
+
+function buildFourWeekPlannerSource(planData, planId) {
+  const sourcePlanId = planId ?? "hierarchical-plan";
+  const startMonday = currentMondayIso();
+  const endIso = isoDateOffset(startMonday, 27);
+  const weeks = (planData?.weeks ?? []).filter(
+    (week) => week?.startDate <= endIso && week?.endDate >= startMonday,
+  );
+
+  const entries = weeks.flatMap((week) =>
+    (week?.days ?? []).flatMap((day) =>
+      (day?.workouts ?? []).map((workout) => ({
+        id: `${week.weekNumber}-${day.date}-${workout.id}`,
+        plan_id: sourcePlanId,
+        workout_date: day.date,
+        workout_type: plannerTypeForWorkout(workout),
+        distance_km: workout?.distanceKm ?? null,
+        duration_min: workout?.durationMinutes ?? null,
+        description: workout?.description ?? workout?.name ?? workout?.humanReadable ?? null,
+        completed: Boolean(workout?.completed),
+      })),
+    ),
+  );
+
+  const blocks = weeks.map((week) => ({
+    id: `week-${week.weekNumber}`,
+    plan_id: sourcePlanId,
+    phase: week?.phase ?? null,
+    start_date: week?.startDate,
+    end_date: week?.endDate,
+    target_km: week?.summary?.totalKm ?? null,
+    notes: week?.focus ?? null,
+  }));
+
+  return {
+    planId: sourcePlanId,
+    entries,
+    blocks,
+  };
+}
+
 export default function LongTermPlanPage() {
-  const { activities, checkins, plans, trainingBlocks, workoutEntries, hierarchicalPlan } = useAppData();
+  const { activities, checkins, plans, hierarchicalPlan } = useAppData();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [formError, setFormError] = useState(null);
@@ -173,6 +220,11 @@ export default function LongTermPlanPage() {
       return { weekNumber: week.weekNumber, mileage, phase: phase?.name ?? "Base" };
     });
   }, [planData]);
+
+  const fourWeekPlannerSource = useMemo(
+    () => buildFourWeekPlannerSource(planData, selectedPlanId ?? hierarchicalPlan?.plan?.id ?? null),
+    [hierarchicalPlan?.plan?.id, planData, selectedPlanId],
+  );
 
   const handleViewerWorkoutSelect = useCallback((selection) => {
     setSelectedWorkout(selection ?? null);
@@ -252,13 +304,12 @@ export default function LongTermPlanPage() {
     if (viewMode === "4 uker") {
       return (
         <FourWeekGrid
-          entries={workoutEntries?.entries ?? []}
-          loading={workoutEntries?.loading ?? false}
-          loadEntriesForRange={workoutEntries?.loadEntriesForRange}
-          planId={selectedPlanId}
-          blocks={trainingBlocks?.blocks ?? []}
+          entries={fourWeekPlannerSource.entries}
+          loading={false}
+          planId={fourWeekPlannerSource.planId}
+          blocks={fourWeekPlannerSource.blocks}
           onEdit={() => {}}
-          onToggleCompleted={workoutEntries?.toggleCompleted}
+          onToggleCompleted={() => {}}
           onCreateForDate={() => {}}
         />
       );

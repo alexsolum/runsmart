@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import LongTermPlanPage from "../../src/pages/LongTermPlanPage";
 import { makeAppData } from "./mockAppData";
 import { generateCoachingInsights } from "../../src/domain/compute";
+import { currentMondayIso, isoDateOffset } from "../../src/lib/dateUtils";
 
 vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
@@ -32,6 +33,63 @@ function makeNoTrainingContextAppData() {
     plans: {
       ...base.plans,
       plans: [],
+    },
+  });
+}
+
+function makeFourWeekHierarchicalAppData() {
+  const startMonday = currentMondayIso();
+  const weeks = Array.from({ length: 4 }, (_, weekIndex) => {
+    const weekStart = isoDateOffset(startMonday, weekIndex * 7);
+    const weekEnd = isoDateOffset(weekStart, 6);
+    return {
+      weekNumber: weekIndex + 1,
+      startDate: weekStart,
+      endDate: weekEnd,
+      phase: weekIndex < 2 ? "Build" : "Peak",
+      summary: { totalHours: 6 + weekIndex, totalKm: 60 + weekIndex * 8, sessions: 4 },
+      days: Array.from({ length: 7 }, (_, dayIndex) => ({
+        date: isoDateOffset(weekStart, dayIndex),
+        dayOfWeek: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][dayIndex],
+        workouts: dayIndex === 1 ? [{
+          id: `test-workout-${weekIndex}`,
+          sport: "Run",
+          type: "Intervals",
+          name: `Key workout ${weekIndex + 1}`,
+          description: `4 x 5 min for week ${weekIndex + 1}`,
+          durationMinutes: 60,
+          distanceKm: 12,
+          completed: false,
+        }] : [],
+      })),
+    };
+  });
+
+  const base = makeAppData();
+  return makeAppData({
+    ...base,
+    workoutEntries: {
+      ...base.workoutEntries,
+      entries: [],
+      loadEntriesForRange: vi.fn().mockResolvedValue([]),
+    },
+    trainingBlocks: {
+      ...base.trainingBlocks,
+      blocks: [],
+    },
+    hierarchicalPlan: {
+      ...base.hierarchicalPlan,
+      plan: {
+        ...base.hierarchicalPlan.plan,
+        plan_data: {
+          ...base.hierarchicalPlan.plan.plan_data,
+          weeks,
+          phases: [
+            { name: "Build", startWeek: 1, endWeek: 2 },
+            { name: "Peak", startWeek: 3, endWeek: 4 },
+          ],
+        },
+      },
     },
   });
 }
@@ -98,5 +156,15 @@ describe("LongTermPlanPage", () => {
     const seasonView = screen.getByTestId("plan-season-view");
     expect(seasonView).toBeInTheDocument();
     expect(within(seasonView).getAllByText("Base").length).toBeGreaterThan(0);
+  });
+
+  it("renders four-week workouts from the hierarchical plan even when planner entries are empty", () => {
+    useAppData.mockReturnValue(makeFourWeekHierarchicalAppData());
+
+    render(<LongTermPlanPage />);
+    fireEvent.click(screen.getByRole("button", { name: "4 uker" }));
+
+    expect(screen.getByText("4 x 5 min for week 1")).toBeInTheDocument();
+    expect(screen.getByText("4 x 5 min for week 2")).toBeInTheDocument();
   });
 });

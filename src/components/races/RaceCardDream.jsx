@@ -15,16 +15,24 @@ function formatRaceDate(dateStr) {
 function distanceTag(km) {
   if (!km) return null;
   if (km >= 80) return "100K";
-  if (km >= 38) return "50K";
   if (km >= 40) return "Maraton";
-  if (km >= 19) return "Halvmaraton";
+  if (km >= 21) return "Halvmaraton";
   return `${km} km`;
 }
 
+function dreamStatus(race) {
+  const raw = race.status ?? race.registration_status;
+  if (!raw) return "✦ DRØM";
+  const normalized = String(raw).toLowerCase();
+  if (normalized.includes("lotto")) return "✦ LOTTERI";
+  if (normalized.includes("registered")) return "✓ REGISTRERT";
+  if (normalized.includes("signed")) return "✓ PÅMELDT";
+  return raw.toUpperCase();
+}
+
 export default function RaceCardDream({ race, onClick }) {
-  const { d, m } = formatRaceDate(race.race_date ?? race.next_race_date);
+  const { d, m } = formatRaceDate(race.next_race_date ?? race.race_date);
   const tag = distanceTag(race.distance_km);
-  const status = race.registration_status ?? "drøm";
 
   return (
     <button className="race-card dream" type="button" onClick={onClick}>
@@ -39,21 +47,18 @@ export default function RaceCardDream({ race, onClick }) {
           {race.location ?? ""}
           {race.elevation_gain_m ? <span>{race.elevation_gain_m} m D+</span> : null}
         </span>
-        {tag && (
-          <div className="tags">
-            <Chip kind="ghost">{tag}</Chip>
-          </div>
-        )}
+        <div className="tags">
+          {tag ? <Chip kind="ghost">{tag}</Chip> : null}
+          {race.registration_info ? <Chip kind="ghost">{race.registration_info}</Chip> : null}
+        </div>
       </div>
 
       <div className="race-stats">
-        {race.target_time && (
-          <div>
-            <span className="lbl">Mål</span>
-            <span className="v">{race.target_time}</span>
-          </div>
-        )}
-        <Chip kind="recovery" style={{ textTransform: "capitalize" }}>{status}</Chip>
+        <div>
+          <span className="lbl">Mål</span>
+          <span className="v">{race.target_time ?? "Velg mål senere"}</span>
+        </div>
+        <Chip kind="recovery">{dreamStatus(race)}</Chip>
       </div>
     </button>
   );

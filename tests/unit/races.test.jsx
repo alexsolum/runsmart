@@ -37,10 +37,14 @@ vi.mock("../../src/components/races/RaceFormDialog", () => ({
 }));
 
 vi.mock("../../src/components/races/RaceCardDone", () => ({
-  default: ({ race, onClick }) =>
+  default: ({ race, participation, onClick }) =>
     React.createElement(
       "button",
-      { type: "button", onClick, "data-testid": `done-card-${race.id}` },
+      {
+        type: "button",
+        onClick,
+        "data-testid": `done-card-${race.id}-${participation?.id ?? "default"}`,
+      },
       race.name,
     ),
 }));
@@ -107,12 +111,13 @@ import RacePage from "../../src/pages/RacePage";
 import RaceCard from "../../src/components/races/RaceCard";
 import RaceListView from "../../src/components/races/RaceListView";
 import ParticipationAccordion from "../../src/components/races/ParticipationAccordion";
+import ParticipationFormDialog from "../../src/components/races/ParticipationFormDialog";
 import ResourceList from "../../src/components/races/ResourceList";
 import { __setMockValue, useAppData } from "../../src/context/AppDataContext";
 
 describe("RaceCard", () => {
   it("renders history race with participation count and PR", () => {
-    const race = SAMPLE_RACES[0]; // Boston Marathon with 2 participations
+    const race = SAMPLE_RACES.find((item) => item.name === "Boston Marathon");
     const onClick = vi.fn();
     render(<RaceCard race={race} onClick={onClick} />);
 
@@ -122,7 +127,7 @@ describe("RaceCard", () => {
   });
 
   it("renders bucket list race with description", () => {
-    const race = SAMPLE_RACES[1]; // Western States with 0 participations
+    const race = SAMPLE_RACES.find((item) => item.name === "Western States 100");
     render(<RaceCard race={race} onClick={vi.fn()} />);
 
     expect(screen.getByText("Western States 100")).toBeTruthy();
@@ -241,44 +246,55 @@ describe("ResourceList", () => {
   });
 });
 
-describe("RacePage — control-center redesign", () => {
+describe("RacePage — PR3 polish", () => {
   beforeEach(() => {
     __setMockValue(makeAppData());
   });
 
-  it("shows Gjennomført tab by default with done races", () => {
+  it("renders the PDF-style race header copy", () => {
     render(<RacePage />);
-    expect(screen.getByText("Boston Marathon")).toBeTruthy();
-    expect(screen.queryByText("Western States 100")).toBeNull();
+    expect(screen.getByText("LØPSSENTER · VEGG OG DRØMMER")).toBeTruthy();
+    expect(screen.getByText("Løp")).toBeTruthy();
+    expect(
+      screen.getByText(/Alt du har gjennomført og alt du sikter mot/i),
+    ).toBeTruthy();
   });
 
-  it("switching to Drømmer tab shows dream races", () => {
+  it("shows one done row per participation, not one row per race", () => {
     render(<RacePage />);
-    fireEvent.click(screen.getByText("Drømmer"));
-    expect(screen.getByText("Western States 100")).toBeTruthy();
-    expect(screen.queryByText("Boston Marathon")).toBeNull();
+    // Boston Marathon has 2 participations; Berlin Marathon adds a third completed result overall
+    expect(screen.getAllByText("Boston Marathon")).toHaveLength(2);
   });
 
-  it("done/dream split: Boston (1 participation) is done; Western States (0) is dream", () => {
+  it("groups completed races by participation year", () => {
     render(<RacePage />);
-    // Gjennomført tab: done race visible
-    expect(screen.getByTestId("done-card-race-1")).toBeTruthy();
-    expect(screen.queryByTestId("done-card-race-2")).toBeNull();
-
-    fireEvent.click(screen.getByText("Drømmer"));
-    expect(screen.getByTestId("dream-card-race-2")).toBeTruthy();
-    expect(screen.queryByTestId("dream-card-race-1")).toBeNull();
-  });
-
-  it("groups done races by year — Boston 2025 shows under year heading", () => {
-    render(<RacePage />);
-    // Year derived from latest participation date (2025-04-21)
     expect(screen.getByText("2025")).toBeTruthy();
+    expect(screen.getByText("2023")).toBeTruthy();
+  });
+
+  it("uses fullføringer copy on the done tab", () => {
+    render(<RacePage />);
+    expect(screen.getAllByText(/fullføringer/i).length).toBeGreaterThan(0);
+  });
+
+  it("shows planlagt copy on the dreams tab", () => {
+    render(<RacePage />);
+    fireEvent.click(screen.getByText("Drømmer"));
+    expect(screen.getAllByText(/planlagt/i).length).toBeGreaterThan(0);
+  });
+
+  it("renders the stats row with participation-based totals", () => {
+    render(<RacePage />);
+    expect(screen.getByText("LØP GJENNOMFØRT")).toBeTruthy();
+    expect(screen.getByText("SAMLET RACEDISTANSE")).toBeTruthy();
+    expect(screen.getByText("LAND BESØKT")).toBeTruthy();
+    expect(screen.getByText("DRØMMER PLANLAGT")).toBeTruthy();
+    expect(screen.getByText(/3 fullføringer/i)).toBeTruthy();
   });
 
   it("navigates to detail view when clicking a done race card", () => {
     render(<RacePage />);
-    fireEvent.click(screen.getByTestId("done-card-race-1"));
+    fireEvent.click(screen.getByTestId("done-card-race-1-rp-1"));
     expect(screen.getByTestId("race-detail")).toBeTruthy();
     expect(screen.getByText("Boston Marathon")).toBeTruthy();
   });
@@ -293,6 +309,75 @@ describe("RacePage — control-center redesign", () => {
   it("shows + Legg til løp button", () => {
     render(<RacePage />);
     expect(screen.getByText("+ Legg til løp")).toBeTruthy();
+  });
+});
+
+describe("RaceCardDone + PlacementMedal", () => {
+  it("renders a gold medal for a top-10% participation", async () => {
+    const mod = await vi.importActual("../../src/components/races/RaceCardDone");
+    const RaceCardDoneReal = mod.default;
+    render(
+      <RaceCardDoneReal
+        race={SAMPLE_RACES[0]}
+        participation={SAMPLE_RACES[0].race_participations[0]}
+        onClick={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(/placement medal/i)).toHaveTextContent("5");
+  });
+
+  it("hides the medal when total_finishers is missing", async () => {
+    const mod = await vi.importActual("../../src/components/races/RaceCardDone");
+    const RaceCardDoneReal = mod.default;
+    render(
+      <RaceCardDoneReal
+        race={SAMPLE_RACES[0]}
+        participation={{
+          ...SAMPLE_RACES[0].race_participations[0],
+          total_finishers: null,
+        }}
+        onClick={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText(/placement medal/i)).toBeNull();
+  });
+});
+
+describe("ParticipationFormDialog", () => {
+  it("submits place, field size, and PB fields with the participation payload", () => {
+    const onSubmit = vi.fn();
+    render(
+      <ParticipationFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("races.raceDate *"), {
+      target: { value: "2026-04-11" },
+    });
+    fireEvent.change(screen.getByLabelText("races.finishTime"), {
+      target: { value: "11:24:16" },
+    });
+    fireEvent.change(screen.getByLabelText("Overall place"), {
+      target: { value: "17" },
+    });
+    fireEvent.change(screen.getByLabelText("Field size"), {
+      target: { value: "212" },
+    });
+    fireEvent.click(screen.getByLabelText("Mark as PB"));
+    fireEvent.click(screen.getByText("races.save"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        race_date: "2026-04-11",
+        finish_time: "11:24:16",
+        overall_place: 17,
+        total_finishers: 212,
+        is_pb: true,
+      }),
+    );
   });
 });
 

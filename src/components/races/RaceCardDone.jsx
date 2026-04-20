@@ -1,5 +1,6 @@
 import React from "react";
 import Chip from "../ui/Chip";
+import PlacementMedal from "./PlacementMedal";
 
 const NO_MONTHS = ["JAN","FEB","MAR","APR","MAI","JUN","JUL","AUG","SEP","OKT","NOV","DES"];
 
@@ -12,23 +13,11 @@ function formatRaceDate(dateStr) {
   };
 }
 
-function deriveMedal(participation) {
-  if (!participation) return null;
-  if (participation.medal) return participation.medal.toLowerCase();
-  const place = participation.overall_place;
-  if (!place || !participation.total_finishers) return "bronze";
-  const pct = place / participation.total_finishers;
-  if (pct <= 0.10) return "gold";
-  if (pct <= 0.25) return "silver";
-  return "bronze";
-}
-
 function distanceTag(km) {
   if (!km) return null;
   if (km >= 80) return "100K";
-  if (km >= 38) return "50K";
   if (km >= 40) return "Maraton";
-  if (km >= 19) return "Halvmaraton";
+  if (km >= 21) return "Halvmaraton";
   return `${km} km`;
 }
 
@@ -37,10 +26,8 @@ function formatFinishTime(t) {
   return String(t).replace(/^0+(?=\d{2}:)/, "");
 }
 
-export default function RaceCardDone({ race, onClick }) {
-  const participation = (race.race_participations ?? [])[0] ?? null;
-  const { d, m } = formatRaceDate(race.race_date);
-  const medal = deriveMedal(participation);
+export default function RaceCardDone({ race, participation, onClick }) {
+  const { d, m } = formatRaceDate(participation?.race_date);
   const tag = distanceTag(race.distance_km);
 
   return (
@@ -56,31 +43,29 @@ export default function RaceCardDone({ race, onClick }) {
           {race.location ?? ""}
           {race.elevation_gain_m ? <span>{race.elevation_gain_m} m D+</span> : null}
         </span>
-        {tag && (
-          <div className="tags">
-            <Chip kind="ghost">{tag}</Chip>
-          </div>
-        )}
+        <div className="tags">
+          {tag ? <Chip kind="ghost">{tag}</Chip> : null}
+          {participation?.is_pb ? <Chip kind="build">PB</Chip> : null}
+          {participation?.notes ? <Chip kind="ghost">{participation.notes}</Chip> : null}
+        </div>
       </div>
 
       <div className="race-stats">
-        {participation?.finish_time && (
-          <div>
-            <span className="lbl">Tid</span>
-            <span className="v">{formatFinishTime(participation.finish_time)}</span>
-          </div>
-        )}
-        {participation?.overall_place && (
-          <div>
-            <span className="lbl">Plass</span>
-            <span className="v">{participation.overall_place}<small>/{participation.total_finishers ?? "?"}</small></span>
-          </div>
-        )}
-        {medal && (
-          <div className={`medal ${medal}`}>
-            {medal === "gold" ? "🥇" : medal === "silver" ? "🥈" : "🥉"}
-          </div>
-        )}
+        <div>
+          <span className="lbl">Tid</span>
+          <span className="v">{formatFinishTime(participation?.finish_time)}</span>
+        </div>
+        <div>
+          <span className="lbl">Plass</span>
+          <span className="v">
+            {participation?.overall_place ?? "—"}
+            {participation?.total_finishers ? <small>/{participation.total_finishers}</small> : null}
+          </span>
+        </div>
+        <PlacementMedal
+          overallPlace={participation?.overall_place}
+          totalFinishers={participation?.total_finishers}
+        />
       </div>
     </button>
   );

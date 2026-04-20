@@ -97,6 +97,6 @@ describe("LongTermPlanPage", () => {
 
     const seasonView = screen.getByTestId("plan-season-view");
     expect(seasonView).toBeInTheDocument();
-    expect(within(seasonView).getByText("Base")).toBeInTheDocument();
+    expect(within(seasonView).getAllByText("Base").length).toBeGreaterThan(0);
   });
 });

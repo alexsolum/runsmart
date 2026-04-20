@@ -9,6 +9,7 @@ export function localTodayIso(now = new Date()) {
 
 function activityIso(activity) {
   const raw =
+    activity?.started_at ??
     activity?.start_date_local ??
     activity?.start_date ??
     activity?.date ??
@@ -31,9 +32,16 @@ export function deriveCurrentWeek(weeks, todayIso = localTodayIso()) {
 }
 
 export function deriveNextFourWeeks(weeks, currentWeekNumber) {
-  return (Array.isArray(weeks) ? weeks : [])
-    .filter((week) => week?.weekNumber > currentWeekNumber)
-    .slice(0, 4);
+  const allWeeks = Array.isArray(weeks) ? weeks : [];
+  const forwardWeeks = allWeeks.filter((week) => week?.weekNumber > currentWeekNumber);
+
+  if (forwardWeeks.length >= 4) {
+    return forwardWeeks.slice(0, 4);
+  }
+
+  return allWeeks
+    .filter((week) => week?.weekNumber !== currentWeekNumber)
+    .slice(-4);
 }
 
 export function deriveWeekDaysWithStatus(week, activities, todayIso = localTodayIso()) {

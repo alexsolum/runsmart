@@ -1,9 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppData } from "../context/AppDataContext";
 import { PlanViewer } from "../components/planner/PlanViewer";
+import { FourWeekGrid } from "../components/planner/FourWeekGrid";
+import { SimpleWeekGrid } from "../components/planner/SimpleWeekGrid";
+import { Next4WeeksList } from "../components/planner/Next4WeeksList";
+import { AiCoachNotes } from "../components/planner/AiCoachNotes";
 import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
+import { buildPlanPageModel } from "../components/planner/planPageModel";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
 import { RaceLine } from "../components/ui/signature/RaceLine";
+import Segmented from "../components/ui/Segmented";
 import { Button } from "@/components/ui/button";
 import { Flag, Target, Zap, Utensils, Mountain } from "lucide-react";
 
@@ -128,13 +134,14 @@ function resolveWorkoutSelection(planData, selection) {
 }
 
 export default function LongTermPlanPage() {
-  const { plans, trainingBlocks, hierarchicalPlan } = useAppData();
+  const { activities, checkins, plans, trainingBlocks, workoutEntries, hierarchicalPlan } = useAppData();
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [formError, setFormError] = useState(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [workoutSaving, setWorkoutSaving] = useState(false);
+  const [viewMode, setViewMode] = useState("Uke");
 
   useEffect(() => {
     if (!selectedPlanId && plans.plans.length > 0) {
@@ -143,6 +150,16 @@ export default function LongTermPlanPage() {
   }, [plans.plans, selectedPlanId]);
 
   const planData = hierarchicalPlan?.plan?.plan_data ?? null;
+  const planPageModel = useMemo(
+    () =>
+      buildPlanPageModel({
+        planData,
+        activities: activities?.activities ?? [],
+        checkins: checkins?.checkins ?? [],
+        plans: plans?.plans ?? [],
+      }),
+    [activities?.activities, checkins?.checkins, planData, plans?.plans],
+  );
 
   const raceLineWeeks = useMemo(() => {
     if (!planData) return [];
@@ -218,6 +235,56 @@ export default function LongTermPlanPage() {
       detail: "Jeg vil gjennomgå treningsplanen min. Kan du se på progresjonen og belastningen og foreslå justeringer?"
     }));
   }
+
+  const renderPlanBody = () => {
+    if (viewMode === "Sesong") {
+      return (
+        <div data-testid="plan-season-view">
+          <PlanViewer
+            planData={planData}
+            onWorkoutSelect={handleViewerWorkoutSelect}
+            ribbonLayout
+          />
+        </div>
+      );
+    }
+
+    if (viewMode === "4 uker") {
+      return (
+        <FourWeekGrid
+          entries={workoutEntries?.entries ?? []}
+          loading={workoutEntries?.loading ?? false}
+          loadEntriesForRange={workoutEntries?.loadEntriesForRange}
+          planId={selectedPlanId}
+          blocks={trainingBlocks?.blocks ?? []}
+          onEdit={() => {}}
+          onToggleCompleted={workoutEntries?.toggleCompleted}
+          onCreateForDate={() => {}}
+        />
+      );
+    }
+
+    return (
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)]">
+        <div className="space-y-6">
+          <SimpleWeekGrid
+            week={planPageModel.currentWeek}
+            days={planPageModel.currentWeekDays}
+            onWorkoutSelect={handleViewerWorkoutSelect}
+          />
+
+          {planData?.raceStrategy ? (
+            <RaceStrategyCard strategy={planData.raceStrategy} />
+          ) : null}
+        </div>
+
+        <div className="space-y-6">
+          <Next4WeeksList weeks={planPageModel.nextFourWeeks} />
+          <AiCoachNotes notes={planPageModel.coachNotes} />
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="canvas">
@@ -314,17 +381,18 @@ export default function LongTermPlanPage() {
                 </div>
               )}
 
-              <PlanViewer
-                planData={planData}
-                onWorkoutSelect={handleViewerWorkoutSelect}
-                ribbonLayout
-              />
-
-            {planData?.raceStrategy && (
-              <div className="mt-8">
-                <RaceStrategyCard strategy={planData.raceStrategy} />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="cc-label" style={{ marginBottom: 4 }}>Visning</p>
+                  <Segmented
+                    options={["Uke", "4 uker", "Sesong"]}
+                    value={viewMode}
+                    onChange={setViewMode}
+                  />
+                </div>
               </div>
-            )}
+
+              {renderPlanBody()}
           </div>
         )}
       </div>

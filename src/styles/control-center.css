@@ -46,7 +46,8 @@ input, select, textarea { font: inherit; color: inherit; }
    ========================================================= */
 .app {
   display: grid;
-  grid-template-columns: 232px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
+  column-gap: 22px;
   min-height: 100vh;
 }
 
@@ -171,6 +172,7 @@ input, select, textarea { font: inherit; color: inherit; }
   flex-direction: column;
   min-width: 0;
   background: var(--surface);
+  padding-right: 22px;
 }
 
 /* ── Topbar ── */
@@ -249,7 +251,7 @@ input, select, textarea { font: inherit; color: inherit; }
 
 /* ── Content canvas ── */
 .canvas {
-  padding: 18px 28px 120px;
+  padding: 18px 0 120px;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 18px;
@@ -657,6 +659,7 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   right: 22px; bottom: 22px;
   width: 380px;
   background: var(--surface-lowest);
+  border: 1px solid rgba(11, 23, 56, 0.08);
   border-radius: var(--r-xl);
   box-shadow: 0 24px 60px rgba(0,51,113,.18), 0 2px 8px rgba(0,51,113,.06);
   display: flex;
@@ -666,8 +669,8 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   transition: transform 240ms cubic-bezier(.2,.8,.2,1), opacity 200ms ease;
 }
 .coach-dock.collapsed {
-  width: auto;
-  padding-right: 6px;
+  width: 92px;
+  padding-right: 0;
 }
 .coach-head {
   display: flex;
@@ -1051,26 +1054,33 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
 }
 
 @media (min-width: 1281px) {
-  #intelligence .dashboard-stack {
-    max-width: calc(100% - 420px);
-  }
+  #intelligence .dashboard-stack { max-width: none; }
 }
 
 /* =========================================================
    PR#2 — Training plan week grid
    ========================================================= */
+.plan-page-frame {
+  grid-column: span 12;
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
 .plan-page-shell {
   display: grid;
-  gap: 20px;
+  gap: 22px;
 }
 
 .plan-week-card {
   display: grid;
   gap: 18px;
-  padding: 24px;
+  padding: 20px;
   border-radius: var(--radius-xl);
   background: var(--surface-lowest);
+  border: 1px solid rgba(11, 23, 56, 0.08);
   box-shadow: var(--shadow-1);
+  overflow: hidden;
 }
 
 .plan-week-card__header {
@@ -1078,6 +1088,8 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   justify-content: space-between;
   gap: 12px;
   align-items: flex-end;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(11, 23, 56, 0.06);
 }
 
 .plan-week-card__summary {
@@ -1087,19 +1099,37 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   font-size: 12px;
 }
 
+.plan-week-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.92fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.plan-week-layout__main,
+.plan-week-layout__rail {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
 .simple-week-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(7, minmax(118px, 1fr));
+  gap: 10px;
+  align-items: stretch;
 }
 
 .simple-week-grid__day {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 18px;
-  background: var(--paper-raised);
-  border: 1px solid rgba(11, 23, 56, 0.06);
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(246, 248, 252, 0.92), rgba(239, 243, 249, 0.9));
+  border: 1px solid rgba(11, 23, 56, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
 }
 
 .simple-week-grid__day--completed {
@@ -1114,30 +1144,45 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   border-color: rgba(153, 54, 54, 0.18);
 }
 
+.simple-week-grid__day:has(.simple-week-grid__chip--today) {
+  background: linear-gradient(180deg, #15233d, #162948);
+  border-color: rgba(21, 35, 61, 0.45);
+  box-shadow: 0 16px 32px rgba(21, 35, 61, 0.14);
+}
+
+.simple-week-grid__day:has(.simple-week-grid__chip--today) .simple-week-grid__date,
+.simple-week-grid__day:has(.simple-week-grid__chip--today) .simple-week-grid__meta,
+.simple-week-grid__day:has(.simple-week-grid__chip--today) .simple-week-grid__workout,
+.simple-week-grid__day:has(.simple-week-grid__chip--today) .simple-week-grid__empty {
+  color: #eef3fb;
+}
+
 .simple-week-grid__day-top {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
   gap: 8px;
-  align-items: flex-start;
 }
 
 .simple-week-grid__date {
   margin: 0;
+  font-family: var(--ff-ui);
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.45;
   color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .simple-week-grid__meta {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-muted);
 }
 
 .simple-week-grid__chips {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .simple-week-grid__chip {
@@ -1152,31 +1197,64 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
 }
 
 .simple-week-grid__chip--today {
-  background: var(--primary-500);
-  color: #fff;
+  background: rgba(214, 242, 224, 0.96);
+  color: var(--ok);
 }
 
 .simple-week-grid__workouts {
   display: grid;
   gap: 8px;
+  align-content: start;
 }
 
 .simple-week-grid__workout {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  gap: 6px;
   width: 100%;
-  padding: 10px 12px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
+  background: transparent;
   color: var(--ink);
   text-align: left;
+  box-shadow: none;
+}
+
+.simple-week-grid__day:has(.simple-week-grid__chip--today) .simple-week-grid__workout {
+  color: #f6f8fd;
+}
+
+.simple-week-grid__workout span:first-child {
+  display: block;
+  min-width: 0;
+  font-family: var(--ff-display);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.simple-week-grid__workout span:last-child {
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.simple-week-grid__day:has(.simple-week-grid__chip--today) .simple-week-grid__workout span:last-child {
+  color: rgba(238, 243, 251, 0.8);
 }
 
 .simple-week-grid__empty {
   margin: 0;
   color: var(--ink-muted);
   font-size: 12px;
+}
+
+@media (max-width: 1280px) {
+  .plan-week-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -1191,18 +1269,13 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   }
 }
 
-@media (min-width: 1281px) {
-  .plan-page-shell {
-    max-width: calc(100% - 420px);
-  }
-}
-
 .plan-side-card {
   display: grid;
   gap: 16px;
   padding: 22px;
   border-radius: var(--radius-xl);
   background: var(--surface-lowest);
+  border: 1px solid rgba(11, 23, 56, 0.08);
   box-shadow: var(--shadow-1);
 }
 
@@ -1251,12 +1324,32 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
   font-size: 12px;
 }
 
+.plan-next-week-row__summary span {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(45, 108, 199, 0.08);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.plan-next-week-row__summary strong {
+  color: var(--ink);
+  font-family: var(--ff-mono);
+  font-size: 14px;
+}
+
 .plan-ai-note {
   display: grid;
   gap: 6px;
   padding: 14px;
   border-radius: 16px;
-  background: var(--paper-raised);
+  background: linear-gradient(180deg, rgba(237, 243, 251, 0.95), rgba(232, 240, 250, 0.92));
+  border: 1px solid rgba(191, 206, 229, 0.7);
   border-left: 4px solid rgba(11, 23, 56, 0.1);
 }
 

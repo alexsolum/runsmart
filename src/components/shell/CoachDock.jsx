@@ -21,7 +21,7 @@ export default function CoachDock() {
   const { sessions, messages, activeSessionId, setActiveSessionId, startNewSession } =
     coachConversations;
 
-  const [open, setOpen] = useState(!shouldCollapseForViewport());
+  const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [optimistic, setOptimistic] = useState([]);
@@ -29,7 +29,9 @@ export default function CoachDock() {
 
   useEffect(() => {
     function syncDockMode() {
-      setOpen(!shouldCollapseForViewport());
+      if (shouldCollapseForViewport()) {
+        setOpen(false);
+      }
     }
 
     window.addEventListener("resize", syncDockMode);

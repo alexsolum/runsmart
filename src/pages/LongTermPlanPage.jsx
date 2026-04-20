@@ -265,8 +265,8 @@ export default function LongTermPlanPage() {
     }
 
     return (
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)]">
-        <div className="space-y-6">
+      <div className="plan-week-layout">
+        <div className="plan-week-layout__main">
           <SimpleWeekGrid
             week={planPageModel.currentWeek}
             days={planPageModel.currentWeekDays}
@@ -278,7 +278,7 @@ export default function LongTermPlanPage() {
           ) : null}
         </div>
 
-        <div className="space-y-6">
+        <div className="plan-week-layout__rail">
           <Next4WeeksList weeks={planPageModel.nextFourWeeks} />
           <AiCoachNotes notes={planPageModel.coachNotes} />
         </div>
@@ -326,7 +326,7 @@ export default function LongTermPlanPage() {
       </div>
 
       {/* Plan Section */}
-      <div className="panel full" style={{ gap: 20 }}>
+      <div className="full plan-page-frame">
         {hierarchicalPlan?.loading ? (
           <div className="text-center py-8">
             <p className="text-sm" style={{ color: "var(--ink-muted)" }}>Loading plan…</p>

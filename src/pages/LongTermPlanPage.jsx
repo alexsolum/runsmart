@@ -349,7 +349,7 @@ export default function LongTermPlanPage() {
             <Button onClick={() => setIntakeOpen(true)}>Generate Plan</Button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 plan-page-shell">
             {/* Plan meta header */}
             <div>
               <span

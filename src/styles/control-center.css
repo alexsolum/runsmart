@@ -1059,6 +1059,11 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
 /* =========================================================
    PR#2 — Training plan week grid
    ========================================================= */
+.plan-page-shell {
+  display: grid;
+  gap: 20px;
+}
+
 .plan-week-card {
   display: grid;
   gap: 18px;
@@ -1183,6 +1188,12 @@ svg.ic { stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill:
 @media (max-width: 640px) {
   .simple-week-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1281px) {
+  .plan-page-shell {
+    max-width: calc(100% - 420px);
   }
 }
 

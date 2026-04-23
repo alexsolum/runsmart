@@ -9,6 +9,10 @@ vi.mock("../../src/context/AppDataContext", () => ({
   useAppData: vi.fn(),
 }));
 
+vi.mock("../../src/lib/supabaseClient", () => ({
+  getSupabaseClient: vi.fn(() => null),
+}));
+
 vi.mock("../../src/domain/compute", async () => {
   const actual = await vi.importActual("../../src/domain/compute");
   return {
@@ -170,5 +174,46 @@ describe("LongTermPlanPage", () => {
     expect(screen.getByTestId("week-metrics-1")).toHaveTextContent("60 km");
     expect(screen.getByText("Key workout 1")).toBeInTheDocument();
     expect(screen.getByText("Key workout 2")).toBeInTheDocument();
+  });
+
+  it("shows an add-workout button on both empty and populated plan days", () => {
+    useAppData.mockReturnValue(makeFourWeekHierarchicalAppData());
+
+    render(<LongTermPlanPage />);
+    fireEvent.click(screen.getByRole("button", { name: "4 uker" }));
+
+    expect(screen.getByTestId("add-workout-2026-04-21")).toBeInTheDocument();
+    expect(screen.getByTestId("add-workout-2026-04-22")).toBeInTheDocument();
+  });
+
+  it("opens a create modal from the day add button and saves a workout on that date", async () => {
+    const appData = makeFourWeekHierarchicalAppData();
+    useAppData.mockReturnValue(appData);
+
+    render(<LongTermPlanPage />);
+    fireEvent.click(screen.getByRole("button", { name: "4 uker" }));
+    fireEvent.click(screen.getByTestId("add-workout-2026-04-21"));
+
+    expect(screen.getByRole("heading", { name: "Add workout" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Workout name"), { target: { value: "Easy double" } });
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "Easy" } });
+    fireEvent.change(screen.getByLabelText("Sport"), { target: { value: "Run" } });
+    fireEvent.change(screen.getByLabelText("Duration"), { target: { value: "45" } });
+    fireEvent.change(screen.getByLabelText("Distance"), { target: { value: "8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add workout" }));
+
+    expect(appData.hierarchicalPlan.addWorkout).toHaveBeenCalledWith({
+      weekNumber: 1,
+      dayDate: "2026-04-21",
+      workout: {
+        sport: "Run",
+        type: "Easy",
+        name: "Easy double",
+        description: "",
+        durationMinutes: 45,
+        distanceKm: 8,
+      },
+    });
   });
 });

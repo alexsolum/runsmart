@@ -1,4 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlanWorkoutCard } from "./PlanWorkoutCard";
 
@@ -9,7 +10,7 @@ function formatDayDate(date) {
   });
 }
 
-export function PlanDayCell({ day, week, onWorkoutSelect }) {
+export function PlanDayCell({ day, week, onWorkoutSelect, onAddWorkout }) {
   const { isOver, setNodeRef } = useDroppable({
     id: day.date,
     data: {
@@ -35,7 +36,7 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
         transform: isOver ? "scale(1.02)" : undefined,
       }}
     >
-      <div className="mb-2">
+      <div className="mb-2 flex items-start justify-between gap-2">
         <div
           style={{
             fontFamily: "var(--font-family-mono)",
@@ -46,6 +47,23 @@ export function PlanDayCell({ day, week, onWorkoutSelect }) {
         >
           {formatDayDate(day?.date)}
         </div>
+        <button
+          type="button"
+          data-testid={`add-workout-${day?.date}`}
+          aria-label={`Add workout for ${day?.date}`}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors"
+          style={{
+            background: "var(--paper-raised)",
+            color: "var(--ink)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddWorkout?.({ week, day });
+          }}
+        >
+          <Plus size={14} />
+        </button>
       </div>
 
       {workouts.length > 0 ? (

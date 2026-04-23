@@ -19,7 +19,7 @@ function formatHours(hours) {
   return `${Number(hours).toFixed(hours % 1 === 0 ? 0 : 1)} hr`;
 }
 
-export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSelect, weekRef }) {
+export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSelect, onAddWorkout, weekRef }) {
   const { hierarchicalPlan, showToast } = useAppData();
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [dragWidth, setDragWidth] = useState(null);
@@ -144,6 +144,7 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
                 day={mobileDay}
                 week={week}
                 onWorkoutSelect={onWorkoutSelect}
+                onAddWorkout={onAddWorkout}
               />
             ) : null}
           </div>
@@ -176,6 +177,7 @@ export function PlanWeekCard({ week, phaseColor, isMobile = false, onWorkoutSele
                     day={day}
                     week={week}
                     onWorkoutSelect={onWorkoutSelect}
+                    onAddWorkout={onAddWorkout}
                   />
                 ) : (
                   <div

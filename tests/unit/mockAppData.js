@@ -1004,6 +1004,7 @@ export function makeAppData(overrides = {}) {
       applyPatch: vi.fn().mockResolvedValue(SAMPLE_HIERARCHICAL_PLAN),
       toggleWorkoutCompleted: vi.fn().mockResolvedValue(SAMPLE_HIERARCHICAL_PLAN),
       moveWorkout: vi.fn().mockResolvedValue(SAMPLE_HIERARCHICAL_PLAN),
+      addWorkout: vi.fn().mockResolvedValue(SAMPLE_HIERARCHICAL_PLAN),
       getWeek: vi.fn().mockImplementation((weekNumber) =>
         SAMPLE_HIERARCHICAL_PLAN.plan_data.weeks.find((week) => week.weekNumber === weekNumber) ?? null
       ),

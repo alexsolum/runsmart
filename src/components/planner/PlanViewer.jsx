@@ -28,7 +28,7 @@ function phaseColorFor(name) {
   return "var(--phase-recovery, #7C6F8A)";
 }
 
-export function PlanViewer({ planData, onWorkoutSelect, todayIso, initialMobile, ribbonLayout = false }) {
+export function PlanViewer({ planData, onWorkoutSelect, onAddWorkout, todayIso, initialMobile, ribbonLayout = false }) {
   const [isMobile, setIsMobile] = useState(() => detectMobile(initialMobile));
   const [expandedPhases, setExpandedPhases] = useState({});
   const didAutoScrollRef = useRef(false);
@@ -145,6 +145,18 @@ export function PlanViewer({ planData, onWorkoutSelect, todayIso, initialMobile,
                                 workout,
                               });
                             }}
+                            onAddWorkout={(meta) => {
+                              const dayDate = meta?.day?.date ?? null;
+                              const dayLabel = meta?.day?.dayOfWeek && dayDate
+                                ? `${meta.day.dayOfWeek} ${dateLabel(dayDate)}`
+                                : meta?.day?.dayOfWeek ?? null;
+                              onAddWorkout?.({
+                                phaseName: phase.name,
+                                weekNumber: meta?.week?.weekNumber ?? null,
+                                dayDate,
+                                dayLabel,
+                              });
+                            }}
                             weekRef={(node) => {
                               if (node) weekRefs.current.set(week.weekNumber, node);
                               else weekRefs.current.delete(week.weekNumber);
@@ -247,6 +259,19 @@ export function PlanViewer({ planData, onWorkoutSelect, todayIso, initialMobile,
                           dayDate,
                           dayLabel,
                           workout,
+                        });
+                      }}
+                      onAddWorkout={(meta) => {
+                        const dayDate = meta?.day?.date ?? null;
+                        const dayLabel = meta?.day?.dayOfWeek && dayDate
+                          ? `${meta.day.dayOfWeek} ${dateLabel(dayDate)}`
+                          : meta?.day?.dayOfWeek ?? null;
+
+                        onAddWorkout?.({
+                          phaseName: phase.name,
+                          weekNumber: meta?.week?.weekNumber ?? null,
+                          dayDate,
+                          dayLabel,
                         });
                       }}
                       weekRef={(node) => {

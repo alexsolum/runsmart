@@ -6,6 +6,7 @@ import { SimpleWeekGrid } from "../components/planner/SimpleWeekGrid";
 import { Next4WeeksList } from "../components/planner/Next4WeeksList";
 import { AiCoachNotes } from "../components/planner/AiCoachNotes";
 import { WorkoutDetailModal } from "../components/planner/WorkoutDetailModal";
+import { AddWorkoutModal } from "../components/planner/AddWorkoutModal";
 import { buildPlanPageModel } from "../components/planner/planPageModel";
 import { PlanIntakeModal } from "../components/PlanIntakeModal";
 import { RaceLine } from "../components/ui/signature/RaceLine";
@@ -174,7 +175,24 @@ function buildWorkoutSelection(phaseName, meta) {
   };
 }
 
-function FourWeekPlanCards({ weeks, onWorkoutSelect }) {
+function buildDaySelection(phaseName, meta) {
+  const dayDate = meta?.day?.date ?? null;
+  const dayLabel = meta?.day?.dayOfWeek && dayDate
+    ? `${meta.day.dayOfWeek} ${new Date(`${dayDate}T00:00:00Z`).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })}`
+    : meta?.day?.dayOfWeek ?? null;
+
+  return {
+    phaseName,
+    weekNumber: meta?.week?.weekNumber ?? null,
+    dayDate,
+    dayLabel,
+  };
+}
+
+function FourWeekPlanCards({ weeks, onWorkoutSelect, onAddWorkout }) {
   const [isMobile, setIsMobile] = useState(() => detectMobileView());
 
   useEffect(() => {
@@ -199,6 +217,7 @@ function FourWeekPlanCards({ weeks, onWorkoutSelect }) {
             ...meta,
             workout,
           }))}
+          onAddWorkout={(meta) => onAddWorkout?.(buildDaySelection(week?.phase ?? null, meta))}
         />
       ))}
     </div>
@@ -211,6 +230,7 @@ export default function LongTermPlanPage() {
   const [formError, setFormError] = useState(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
+  const [selectedDayForCreate, setSelectedDayForCreate] = useState(null);
   const [workoutSaving, setWorkoutSaving] = useState(false);
   const [viewMode, setViewMode] = useState("Uke");
 
@@ -243,6 +263,10 @@ export default function LongTermPlanPage() {
 
   const handleViewerWorkoutSelect = useCallback((selection) => {
     setSelectedWorkout(selection ?? null);
+  }, []);
+
+  const handleViewerAddWorkout = useCallback((selection) => {
+    setSelectedDayForCreate(selection ?? null);
   }, []);
 
   const handleWorkoutToggleCompleted = useCallback(async () => {
@@ -297,6 +321,27 @@ export default function LongTermPlanPage() {
     }
   }, [hierarchicalPlan, selectedWorkout]);
 
+  const handleWorkoutCreate = useCallback(async (values) => {
+    if (!selectedDayForCreate?.weekNumber || !selectedDayForCreate?.dayDate) return;
+
+    setWorkoutSaving(true);
+    setFormError(null);
+
+    try {
+      await hierarchicalPlan.addWorkout({
+        weekNumber: selectedDayForCreate.weekNumber,
+        dayDate: selectedDayForCreate.dayDate,
+        workout: values,
+      });
+      setSelectedDayForCreate(null);
+    } catch (err) {
+      setFormError(err.message);
+      throw err;
+    } finally {
+      setWorkoutSaving(false);
+    }
+  }, [hierarchicalPlan, selectedDayForCreate]);
+
   function handleReplanAI() {
     window.dispatchEvent(new CustomEvent("rs:coach-ask", {
       detail: "Jeg vil gjennomgå treningsplanen min. Kan du se på progresjonen og belastningen og foreslå justeringer?"
@@ -310,6 +355,7 @@ export default function LongTermPlanPage() {
           <PlanViewer
             planData={planData}
             onWorkoutSelect={handleViewerWorkoutSelect}
+            onAddWorkout={handleViewerAddWorkout}
             ribbonLayout
           />
         </div>
@@ -321,6 +367,7 @@ export default function LongTermPlanPage() {
         <FourWeekPlanCards
           weeks={fourWeekWeeks}
           onWorkoutSelect={handleViewerWorkoutSelect}
+          onAddWorkout={handleViewerAddWorkout}
         />
       );
     }
@@ -471,6 +518,18 @@ export default function LongTermPlanPage() {
         saving={workoutSaving}
         onToggleCompleted={handleWorkoutToggleCompleted}
         onSave={handleWorkoutSave}
+      />
+      <AddWorkoutModal
+        open={Boolean(selectedDayForCreate)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedDayForCreate(null);
+            setWorkoutSaving(false);
+          }
+        }}
+        selection={selectedDayForCreate}
+        saving={workoutSaving}
+        onSave={handleWorkoutCreate}
       />
 
     </div>

@@ -11,6 +11,7 @@ import { useRunnerProfile } from "../hooks/useRunnerProfile";
 import { useCoachConversations } from "../hooks/useCoachConversations";
 import { useHierarchicalPlan } from "../hooks/useHierarchicalPlan";
 import { useRaces } from "../hooks/useRaces";
+import { useSeasonPlans } from "../hooks/useSeasonPlans";
 import { invokeEdgeFunctionWithSessionRetry } from "../lib/edgeFunctionAuth";
 import { useToast } from "./ToastContext";
 import { normalizeCheckin } from "../lib/coachPayload";
@@ -53,6 +54,7 @@ export function AppDataProvider({ children }) {
   const coachConversations = useCoachConversations(userId);
   const hierarchicalPlan = useHierarchicalPlan(userId);
   const races = useRaces(userId);
+  const seasonPlans = useSeasonPlans(userId);
   const invokeInsightsSynthesis = useCallback(
     async (payload) => {
       const client = auth.client;
@@ -87,11 +89,12 @@ export function AppDataProvider({ children }) {
       coachConversations,
       hierarchicalPlan,
       races,
+      seasonPlans,
       invokeInsightsSynthesis,
       showToast,
       dismissToast,
     }),
-    [auth, plans, activities, normalizedCheckins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, hierarchicalPlan, races, invokeInsightsSynthesis, showToast, dismissToast],
+    [auth, plans, activities, normalizedCheckins, dailyLogs, strava, trainingBlocks, workoutEntries, runnerProfile, coachConversations, hierarchicalPlan, races, seasonPlans, invokeInsightsSynthesis, showToast, dismissToast],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

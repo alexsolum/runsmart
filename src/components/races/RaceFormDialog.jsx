@@ -27,6 +27,8 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
     registration_info: "",
     image_url: "",
     cover_image_url: "",
+    typical_month: "",
+    typical_week_in_month: "",
     sections: null,
   });
 
@@ -49,6 +51,8 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
         registration_info: initialData.registration_info ?? "",
         image_url: initialData.image_url ?? "",
         cover_image_url: initialData.cover_image_url ?? "",
+        typical_month: initialData.typical_month ?? "",
+        typical_week_in_month: initialData.typical_week_in_month ?? "",
         sections: initialData.sections ?? null,
       });
       setCoverImageAutoFilled(false);
@@ -58,6 +62,7 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
         latitude: "", longitude: "", description: "", race_url: "",
         next_race_date: "", registration_info: "", image_url: "",
         cover_image_url: "",
+        typical_month: "", typical_week_in_month: "",
         sections: null,
       });
       setCoverImageAutoFilled(false);
@@ -139,6 +144,8 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
       registration_info: form.registration_info.trim() || null,
       image_url: form.image_url.trim() || null,
       cover_image_url: form.cover_image_url.trim().startsWith("https://") ? form.cover_image_url.trim() : null,
+      typical_month: form.typical_month ? Number(form.typical_month) : null,
+      typical_week_in_month: form.typical_week_in_month ? Number(form.typical_week_in_month) : null,
       sections: form.sections ?? null,
     };
     onSubmit(data, raceInfo);
@@ -241,6 +248,38 @@ export default function RaceFormDialog({ open, onClose, onSubmit, initialData })
             <div>
               <Label htmlFor="race-registration">{t("races.registrationInfo")}</Label>
               <Input id="race-registration" value={form.registration_info} onChange={handleChange("registration_info")} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="race-typical-month">Vanlig måned</Label>
+              <select
+                id="race-typical-month"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                value={form.typical_month}
+                onChange={handleChange("typical_month")}
+              >
+                <option value="">— Ukjent —</option>
+                {["januar","februar","mars","april","mai","juni","juli","august","september","oktober","november","desember"].map((name, i) => (
+                  <option key={name} value={i + 1}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="race-typical-week">Vanlig helg</Label>
+              <select
+                id="race-typical-week"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                value={form.typical_week_in_month}
+                onChange={handleChange("typical_week_in_month")}
+              >
+                <option value="">— Ukjent —</option>
+                <option value="1">Første helg</option>
+                <option value="2">Andre helg</option>
+                <option value="3">Tredje helg</option>
+                <option value="4">Fjerde helg</option>
+                <option value="5">Siste helg</option>
+              </select>
             </div>
           </div>
           <div>

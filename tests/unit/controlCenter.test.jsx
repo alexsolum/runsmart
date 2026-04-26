@@ -494,7 +494,7 @@ describe("ControlCenterPage smoke", () => {
     expect(screen.getByText(/Løpsplan/i)).toBeInTheDocument();
   });
 
-  it("makes the race strategy panel scrollable and expandable", () => {
+  it("keeps the race strategy panel collapsed by default and expands it on demand", () => {
     const longRaceStrategy = {
       event: {
         name: "Soria Moria til Verdens Ende 50 miles",
@@ -532,20 +532,51 @@ describe("ControlCenterPage smoke", () => {
     fireEvent.click(screen.getByRole("button", { name: /Treningsplan/i }));
 
     expect(screen.getByText(/Løpsplan · Soria Moria til Verdens Ende 50 miles/i)).toBeInTheDocument();
-    expect(document.querySelector(".race-strategy-body")).toBeInTheDocument();
-    expect(screen.getByText(/Use every aid station/i)).toBeInTheDocument();
-    expect(screen.getByText(/Prioritize traction/i)).toBeInTheDocument();
+    expect(screen.getByText(/2026-05-30/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Use every aid station/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Prioritize traction/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Utvid løpsplan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Vis løpsplan/i }));
 
     expect(document.querySelector(".race-strategy-panel.expanded")).toBeInTheDocument();
     expect(document.querySelector(".race-strategy-body.expanded")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Lukk utvidet løpsplan/i })).toBeInTheDocument();
+    expect(screen.getByText(/Use every aid station/i)).toBeInTheDocument();
+    expect(screen.getByText(/Prioritize traction/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Skjul løpsplan/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Lukk utvidet løpsplan/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Skjul løpsplan/i }));
 
     expect(document.querySelector(".race-strategy-panel.expanded")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Utvid løpsplan/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Use every aid station/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Vis løpsplan/i })).toBeInTheDocument();
+  });
+
+  it("calculates Training Plan weekly totals from current workouts instead of stale week summaries", () => {
+    const staleWeek = {
+      ...SAMPLE_HIERARCHICAL_PLAN.plan_data.weeks[0],
+      summary: { totalHours: 99, totalKm: 999, sessions: 99 },
+    };
+
+    state.appData = {
+      ...state.appData,
+      hierarchicalPlan: {
+        ...state.appData.hierarchicalPlan,
+        plan: {
+          ...SAMPLE_HIERARCHICAL_PLAN,
+          plan_data: {
+            ...SAMPLE_HIERARCHICAL_PLAN.plan_data,
+            weeks: [staleWeek],
+          },
+        },
+      },
+    };
+
+    render(<ControlCenterPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Treningsplan/i }));
+
+    const weekRow = screen.getByText("W1").closest("tr");
+    expect(within(weekRow).getByText("48")).toBeInTheDocument();
+    expect(within(weekRow).queryByText("999")).not.toBeInTheDocument();
   });
 
   it("shows the race map above the completed-races table and keeps career analysis visible", () => {

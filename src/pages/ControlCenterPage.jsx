@@ -1211,7 +1211,7 @@ function RaceStrategyPanel({ raceStrategy }) {
     return (
       <div className="e-panel race-strategy-panel">
         <div className="e-panel-header">
-        <span className="e-panel-title">Løpsplan · Strategi</span>
+          <span className="e-panel-title">Løpsplan · Strategi</span>
         </div>
         <div style={{ padding: "12px 14px", fontSize: 11, color: "var(--e-text-faint)" }}>
           Ingen løpsstrategi definert. Generer en plan for å fylle denne seksjonen.
@@ -1227,46 +1227,63 @@ function RaceStrategyPanel({ raceStrategy }) {
         <span className="e-panel-title">Løpsplan · {ev.name ?? "Målløp"}</span>
         <div className="e-panel-actions">
           <button type="button" className="e-panel-btn" onClick={() => setExpanded((current) => !current)}>
-            {expanded ? "Lukk utvidet løpsplan" : "Utvid løpsplan"}
+            {expanded ? "Skjul løpsplan" : "Vis løpsplan"}
           </button>
           <span className="e-panel-btn accent">✦ AI strategigjennomgang</span>
         </div>
       </div>
-      <div className={`race-strategy-body${expanded ? " expanded" : ""}`}>
-        <div className="race-strategy-meta">
+      {!expanded && (
+        <div className="race-strategy-collapsed">
           {[
             ["Løp",      ev.name ?? "—"],
             ["Distanse", ev.distance ?? "—"],
             ["Type",     ev.type ?? "—"],
             ["Dato",     ev.date ?? "—"],
           ].map(([k, v]) => (
-            <div key={k}>
-              <div className="race-strategy-label">{k}</div>
-              <div className="race-strategy-value">{String(v)}</div>
-            </div>
+            <span key={k}>
+              <span className="race-strategy-label">{k}</span>
+              <strong>{String(v)}</strong>
+            </span>
           ))}
         </div>
-        {tactics.length > 0 && (
-          <div className="race-strategy-section">
-            <div className="race-strategy-section-title">Nøkkeltaktikk</div>
-            <ul className="race-strategy-tactics">
-              {tactics.map((t, i) => <li key={i}>{typeof t === "string" ? t : (t.text ?? JSON.stringify(t))}</li>)}
-            </ul>
+      )}
+      {expanded && (
+        <div className="race-strategy-body expanded">
+          <div className="race-strategy-meta">
+            {[
+              ["Løp",      ev.name ?? "—"],
+              ["Distanse", ev.distance ?? "—"],
+              ["Type",     ev.type ?? "—"],
+              ["Dato",     ev.date ?? "—"],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <div className="race-strategy-label">{k}</div>
+                <div className="race-strategy-value">{String(v)}</div>
+              </div>
+            ))}
           </div>
-        )}
-        <div className="race-strategy-detail-grid">
-          {[
-            ["Tempo", raceStrategy.pacing],
-            ["Ernæring", raceStrategy.fueling],
-            ["Terreng", raceStrategy.terrain],
-          ].filter(([, v]) => v).map(([k, v]) => (
-            <div key={k} className="race-strategy-detail">
-              <div className="race-strategy-detail-title">{k}</div>
-              <div className="race-strategy-detail-text">{typeof v === "string" ? v : JSON.stringify(v)}</div>
+          {tactics.length > 0 && (
+            <div className="race-strategy-section">
+              <div className="race-strategy-section-title">Nøkkeltaktikk</div>
+              <ul className="race-strategy-tactics">
+                {tactics.map((t, i) => <li key={i}>{typeof t === "string" ? t : (t.text ?? JSON.stringify(t))}</li>)}
+              </ul>
             </div>
-          ))}
+          )}
+          <div className="race-strategy-detail-grid">
+            {[
+              ["Tempo", raceStrategy.pacing],
+              ["Ernæring", raceStrategy.fueling],
+              ["Terreng", raceStrategy.terrain],
+            ].filter(([, v]) => v).map(([k, v]) => (
+              <div key={k} className="race-strategy-detail">
+                <div className="race-strategy-detail-title">{k}</div>
+                <div className="race-strategy-detail-text">{typeof v === "string" ? v : JSON.stringify(v)}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1435,8 +1452,18 @@ function PlanPage({ season, goalRace, planData, planPageModel, hierarchicalPlan 
   };
 
   const weekTotalKm = (week) => {
-    if (week.summary?.totalKm != null) return Math.round(week.summary.totalKm);
-    return Math.round((week.days ?? []).reduce((s, d) => s + (d.workouts ?? []).reduce((ss, w) => ss + (w.distanceKm || 0), 0), 0));
+    const days = Array.isArray(week?.days) ? week.days : [];
+    if (days.length > 0) {
+      const total = days.reduce((sum, day) => {
+        return sum + (day?.workouts ?? []).reduce((workoutSum, workout) => {
+          const km = Number(workout?.distanceKm);
+          return workoutSum + (Number.isFinite(km) ? km : 0);
+        }, 0);
+      }, 0);
+      return Math.round(total);
+    }
+    const fallback = Number(week?.summary?.totalKm);
+    return Number.isFinite(fallback) ? Math.round(fallback) : 0;
   };
 
   const openAddWorkout = (week, day, event) => {

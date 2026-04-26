@@ -327,6 +327,50 @@ the full-plan response format.`;
     return data?.plan_data ?? nextPlanData;
   }, [client, state.plan, userId]);
 
+  // ── deleteWorkout ──────────────────────────────────────────────────────────
+  const deleteWorkout = useCallback(async (workoutId, weekNumber, dayDate) => {
+    if (!client || !state.plan) throw new Error("No active plan");
+
+    const currentPlanData = state.plan.plan_data;
+    const nextPlanData = {
+      ...currentPlanData,
+      weeks: (currentPlanData?.weeks ?? []).map((week) => {
+        if (week?.weekNumber !== weekNumber) return week;
+
+        return {
+          ...week,
+          days: (week?.days ?? []).map((day) => {
+            if (day?.date !== dayDate) return day;
+
+            return {
+              ...day,
+              workouts: (day?.workouts ?? []).filter((workout) => workout?.id !== workoutId),
+            };
+          }),
+        };
+      }),
+    };
+
+    const { data, error } = await client
+      .from("hierarchical_plans")
+      .update({
+        plan_data: nextPlanData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", state.plan.id)
+      .eq("user_id", userId)
+      .select("*")
+      .single();
+
+    if (error) {
+      dispatch({ type: "error", payload: error });
+      throw error;
+    }
+
+    dispatch({ type: "patched", payload: data });
+    return data?.plan_data ?? nextPlanData;
+  }, [client, state.plan, userId]);
+
   // ── getWeek (pure accessor) ─────────────────────────────────────────────────
   const getWeek = useCallback((weekNumber) => {
     if (!state.plan || !state.plan.plan_data?.weeks) return null;
@@ -358,6 +402,7 @@ the full-plan response format.`;
     toggleWorkoutCompleted,
     moveWorkout,
     addWorkout,
+    deleteWorkout,
     getWeek,
     getPhases,
   };

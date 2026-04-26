@@ -285,7 +285,7 @@ import { WORKOUT_TYPES, normalizeWorkoutType } from "./workoutTypes.js";
 
   // ---- Heart rate zone aggregation ----
 
-  function computeWeeklyHRZones(activities) {
+  function computeWeeklyHRZones(activities, weeksWanted) {
     var weekly = {};
     activities.forEach(function(a) {
       var z1 = Number(a.hr_zone_1_seconds) || 0;
@@ -303,9 +303,10 @@ import { WORKOUT_TYPES, normalizeWorkoutType } from "./workoutTypes.js";
       weekly[key].z4 += z4;
       weekly[key].z5 += z5;
     });
+    var slice = typeof weeksWanted === "number" && weeksWanted > 0 ? weeksWanted : 8;
     return Object.entries(weekly)
       .sort(function(a, b) { return a[0].localeCompare(b[0]); })
-      .slice(-8)
+      .slice(-slice)
       .map(function(entry) {
         var w = entry[1];
         return {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { APP_ICON_URL, APP_NAME } from "../lib/brand";
 
 export default function AuthPage() {
   const { auth } = useAppData();
@@ -50,7 +51,10 @@ export default function AuthPage() {
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-50 p-6">
       <Card className="w-full max-w-sm shadow-lg rounded-2xl">
         <CardContent className="p-10">
-          <div className="font-serif text-xl font-bold text-blue-600 mb-6">RunSmart</div>
+          <div className="flex items-center gap-3 mb-6">
+            <img src={APP_ICON_URL} alt="" className="h-11 w-11 rounded-xl shadow-sm" />
+            <div className="text-xl font-bold tracking-[0.18em] text-slate-950">{APP_NAME}</div>
+          </div>
           <h1 className="text-2xl font-bold text-slate-900 m-0 mb-5">
             {mode === "signin" ? "Sign in" : "Create account"}
           </h1>

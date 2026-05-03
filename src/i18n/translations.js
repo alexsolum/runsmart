@@ -15,7 +15,7 @@ export const TRANSLATIONS = {
     // Hero
     "hero.eyebrow": "AI-guided endurance training",
     "hero.title": "Plan smarter, adapt faster, and train with clarity.",
-    "hero.subhead": "RunSmart blends evidence-informed coaching with real-life constraints so every training block feels achievable, personalized, and explainable.",
+    "hero.subhead": "FLYT blends evidence-informed coaching with real-life constraints so every training block feels achievable, personalized, and explainable.",
     "hero.generatePlan": "Generate a plan",
     "hero.sampleWeek": "View sample week",
     "hero.nextGoal": "Next Goal Race",
@@ -163,7 +163,7 @@ export const TRANSLATIONS = {
     "footer.contact": "Contact",
 
     // Auth modal
-    "auth.title": "Sign in to RunSmart",
+    "auth.title": "Sign in to FLYT",
     "auth.googleContinue": "Continue with Google",
     "auth.or": "or",
     "auth.emailSignin": "Email sign in",
@@ -411,7 +411,7 @@ export const TRANSLATIONS = {
     // Hero
     "hero.eyebrow": "AI-veiledet utholdenhetstrening",
     "hero.title": "Planlegg smartere, tilpass raskere, og tren med klarhet.",
-    "hero.subhead": "RunSmart kombinerer evidensbasert coaching med hverdagens begrensninger, slik at hver treningsblokk f\u00f8les oppn\u00e5elig, personlig og forklarlig.",
+    "hero.subhead": "FLYT kombinerer evidensbasert coaching med hverdagens begrensninger, slik at hver treningsblokk f\u00f8les oppn\u00e5elig, personlig og forklarlig.",
     "hero.generatePlan": "Lag en plan",
     "hero.sampleWeek": "Se eksempeluke",
     "hero.nextGoal": "Neste m\u00e5ll\u00f8p",
@@ -559,7 +559,7 @@ export const TRANSLATIONS = {
     "footer.contact": "Kontakt",
 
     // Auth modal
-    "auth.title": "Logg inn p\u00e5 RunSmart",
+    "auth.title": "Logg inn p\u00e5 FLYT",
     "auth.googleContinue": "Fortsett med Google",
     "auth.or": "eller",
     "auth.emailSignin": "E-post innlogging",

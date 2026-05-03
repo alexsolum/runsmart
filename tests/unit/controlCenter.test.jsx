@@ -128,6 +128,7 @@ describe("ControlCenterPage smoke", () => {
     mockShowToast.mockClear();
     edgeInvoke.mockReset();
     edgeInvoke.mockResolvedValue({ data: {}, error: null });
+    window.localStorage.clear();
     state.appData = {
       ...makeAppData(),
       showToast: mockShowToast,
@@ -135,21 +136,37 @@ describe("ControlCenterPage smoke", () => {
     };
   });
 
-  it("shows a desktop-only notice below 900px", () => {
+  it("renders the mobile shell below 900px", () => {
     mockMatchMedia(true);
 
     render(<ControlCenterPage />);
 
-    expect(screen.getByRole("heading", { name: /RunSmart Control Center/i })).toBeInTheDocument();
-    expect(screen.getByText(/optimalisert for skjermer bredere enn 900 px/i)).toBeInTheDocument();
-    expect(screen.getByText(/Åpne appen på en desktop/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Oversikt/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/optimalisert for skjermer bredere enn 900 px/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("rs-mobile-shell")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /Mobilnavigasjon/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Oversikt/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Plan$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /AI-trener/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Dagens plan/i })).toBeInTheDocument();
+  });
+
+  it("switches between mobile dashboard, plan, and coach tabs", () => {
+    mockMatchMedia(true);
+
+    render(<ControlCenterPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Plan$/i }));
+    expect(screen.getByRole("heading", { name: /Sesongoversikt/i })).toBeInTheDocument();
+    expect(screen.getByText(/Uke 1/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /AI-trener/i }));
+    expect(screen.getByRole("heading", { name: /AI-trener/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Spør om trening, tempo, restitusjon/i)).toBeInTheDocument();
   });
 
   it("renders the app bar and module tabs", () => {
     render(<ControlCenterPage />);
-    // Logo mark "RS" appears in the app bar even if the word "RunSmart" is split across nodes.
-    expect(screen.getAllByText(/RS/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/FLYT/).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Oversikt/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Treningsplan/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /↗Coaching/i })).toBeInTheDocument();

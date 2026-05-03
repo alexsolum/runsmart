@@ -43,7 +43,10 @@ import {
   pickActivePlan,
   sortSeasonRaces,
 } from "../domain/seasonPlan";
+import { APP_ICON_URL, APP_NAME } from "../lib/brand";
 import "../styles/controlCenter.css";
+import "../styles/mobile.css";
+import ControlCenterMobile from "./mobile/MobileApp";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Module registry                                                            */
@@ -461,8 +464,8 @@ function AppBar({ athlete, load, goalRace, page }) {
   return (
     <div className="app-bar">
       <div className="app-bar-logo">
-        <div className="app-logo-mark">RS</div>
-        <div className="app-logo-text">Run<span>Smart</span></div>
+        <img className="app-logo-image" src={APP_ICON_URL} alt="" />
+        <div className="app-logo-text">{APP_NAME}</div>
       </div>
       <div className="app-bar-breadcrumb">
         <span>Treningsplanlegging og analyse</span>
@@ -4196,9 +4199,8 @@ function CoachPage() {
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Root                                                                        */
 /* ────────────────────────────────────────────────────────────────────────── */
-function ControlCenterDesktop() {
+export function useControlCenterData() {
   const { auth, activities, races, seasonPlans, checkins, hierarchicalPlan, plans, strava } = useAppData();
-  const [page, setPage] = useState("home");
 
   const email = auth.user?.email ?? "";
   const initials = email.slice(0, 2).toUpperCase() || "RS";
@@ -4210,6 +4212,7 @@ function ControlCenterDesktop() {
   const checkinList  = checkins?.checkins ?? [];
   const planList     = plans?.plans ?? [];
   const planData     = hierarchicalPlan?.plan?.plan_data ?? null;
+  const seasonPlanList = seasonPlans?.plans ?? [];
 
   const planPageModel = useMemo(() => buildPlanPageModel({
     planData,
@@ -4220,12 +4223,26 @@ function ControlCenterDesktop() {
   }), [planData, activityList, checkinList, planList]);
 
   const season    = useMemo(() => deriveSeasonState({ planData, currentWeek: planPageModel.currentWeek }), [planData, planPageModel.currentWeek]);
-  const seasonPlanList = seasonPlans?.plans ?? [];
   const goalRace  = useMemo(() => deriveGoalRace(planData, racesList, seasonPlanList), [planData, racesList, seasonPlanList]);
   const load      = useMemo(() => deriveTrainingLoad(activityList), [activityList]);
   const weeklyKm  = useMemo(() => deriveWeeklyKmSeries(activityList, 12), [activityList]);
   const hrZones   = useMemo(() => deriveHrZones(activityList, 8), [activityList]);
   const consistency = useMemo(() => deriveConsistency({ planData, checkins: checkinList, activities: activityList, n: 8 }), [planData, checkinList, activityList]);
+
+  return {
+    auth, races, seasonPlans, checkins, hierarchicalPlan, plans, strava,
+    activities, athlete, activityList, racesList, checkinList, planList, planData, seasonPlanList,
+    planPageModel, season, goalRace, load, weeklyKm, hrZones, consistency,
+  };
+}
+
+function ControlCenterDesktop() {
+  const {
+    races, seasonPlans, hierarchicalPlan, strava,
+    athlete, activityList, racesList, checkinList, planList, planData, seasonPlanList,
+    planPageModel, season, goalRace, load, weeklyKm, consistency,
+  } = useControlCenterData();
+  const [page, setPage] = useState("home");
 
   let body;
   if (page === "home")           body = <DashboardPage athlete={athlete} load={load} goalRace={goalRace} season={season} weeklyKm={weeklyKm} planPageModel={planPageModel} consistency={consistency} planData={planData} activities={activityList} strava={strava} races={racesList} seasonPlans={seasonPlanList} onNavigate={setPage} />;
@@ -4248,14 +4265,7 @@ export default function ControlCenterPage() {
   const isNarrow = useMediaQuery("(max-width: 899px)");
 
   if (isNarrow) {
-    return (
-      <div className="rs-cc rs-cc-mobile-notice">
-        <div className="app-logo-mark">RS</div>
-        <h1>RunSmart Control Center</h1>
-        <p>Denne visningen er optimalisert for skjermer bredere enn 900 px.</p>
-        <p>Åpne appen på en desktop for å fortsette.</p>
-      </div>
-    );
+    return <ControlCenterMobile />;
   }
 
   return <ControlCenterDesktop />;

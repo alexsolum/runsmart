@@ -121,7 +121,20 @@
   font-size: 10px; font-weight: 800; color: #fff;
   clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
 }
-.rs-cc .app-logo-text { font-size: 12px; font-weight: 700; color: var(--e-on-dark); }
+.rs-cc .app-logo-image {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.18);
+}
+.rs-cc .app-logo-text {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--e-on-dark);
+  letter-spacing: 0.14em;
+}
 .rs-cc .app-logo-text span { color: var(--e-nav-indicator); }
 .rs-cc .app-bar-breadcrumb {
   display: flex; align-items: center; padding: 0 16px;
